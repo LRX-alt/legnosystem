@@ -941,7 +941,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { 
   PlusIcon, 
   UsersIcon, 
@@ -966,77 +966,6 @@ const selectedWeek = ref('current')
 const selectedDipendente = ref(null)
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 
-// Lista cantieri dinamica (sincronizzata con localStorage)
-const cantieriDisponibili = ref([
-  'Villa Rossi',
-  'Capannone Industriale', 
-  'Tetto Storico',
-  'Condominio Aurora'
-])
-
-// Funzione per aggiornare lista cantieri dal localStorage
-const loadCantieriFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_cantieri')
-  if (stored) {
-    try {
-      const cantieri = JSON.parse(stored)
-      const nuoviCantieri = cantieri.map(c => c.nome)
-      // Aggiorna solo se ci sono differenze
-      if (JSON.stringify(nuoviCantieri) !== JSON.stringify(cantieriDisponibili.value)) {
-        cantieriDisponibili.value = nuoviCantieri
-        console.log('✅ Lista cantieri aggiornata:', nuoviCantieri)
-      }
-    } catch (e) {
-      console.warn('Errore nel caricamento cantieri:', e)
-    }
-  }
-}
-
-// Carica cantieri all'avvio
-loadCantieriFromStorage()
-
-// Ascolta i cambiamenti nel localStorage (per sincronizzazione tra pagine)
-window.addEventListener('storage', (e) => {
-  if (e.key === 'legnosystem_cantieri') {
-    loadCantieriFromStorage()
-  }
-})
-
-// Ascolta anche gli eventi personalizzati (per aggiornamenti nella stessa pagina)
-window.addEventListener('cantieri-updated', loadCantieriFromStorage)
-
-// Check periodico per essere sicuri della sincronizzazione
-setInterval(loadCantieriFromStorage, 5000)
-
-// Carica dipendenti dal localStorage all'avvio
-const loadDipendentiFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_dipendenti')
-  if (stored) {
-    try {
-      dipendenti.value = JSON.parse(stored)
-    } catch (e) {
-      console.warn('Errore nel caricamento dipendenti dal localStorage:', e)
-    }
-  }
-}
-
-// Salva dipendenti nel localStorage
-const saveDipendentiToStorage = () => {
-  localStorage.setItem('legnosystem_dipendenti', JSON.stringify(dipendenti.value))
-  window.dispatchEvent(new CustomEvent('dipendenti-updated'))
-}
-
-// Carica dipendenti all'avvio
-loadDipendentiFromStorage()
-
-// Se non ci sono dipendenti nel localStorage, salva quelli attuali
-if (!localStorage.getItem('legnosystem_dipendenti')) {
-  saveDipendentiToStorage()
-}
-
-// Ascolta gli eventi di aggiornamento dipendenti
-window.addEventListener('dipendenti-updated', loadDipendentiFromStorage)
-
 // Stats
 const stats = ref({
   dipendentiAttivi: 12,
@@ -1048,45 +977,15 @@ const stats = ref({
 // Presenze giornaliere
 const presenze = ref({})
 
-// Nuovo dipendente
-const newDipendente = ref({
-  nome: '',
-  cognome: '',
-  email: '',
-  telefono: '',
-  ruolo: '',
-  pagaOraria: 25,
-  dataAssunzione: new Date().toISOString().split('T')[0],
-  stato: 'attivo',
-  cantiereAttuale: '',
-  note: ''
-})
+// Lista cantieri dinamica (sincronizzata con localStorage)
+const cantieriDisponibili = ref([
+  'Villa Rossi',
+  'Capannone Industriale', 
+  'Tetto Storico',
+  'Condominio Aurora'
+])
 
-// Nuovo timesheet
-const newTimesheet = ref({
-  dipendenteId: '',
-  data: new Date().toISOString().split('T')[0],
-  ore: '',
-  cantiere: '',
-  note: ''
-})
-
-// Dipendente in modifica
-const editingDipendente = ref({
-  id: null,
-  nome: '',
-  cognome: '',
-  email: '',
-  telefono: '',
-  ruolo: '',
-  pagaOraria: 25,
-  dataAssunzione: '',
-  stato: 'attivo',
-  cantiereAttuale: '',
-  note: ''
-})
-
-// Dati dipendenti
+// Dati dipendenti - inizializzo con dati di default
 const dipendenti = ref([
   {
     id: 1,
@@ -1209,6 +1108,78 @@ const timesheetDettagli = ref([
   { id: 5, dipendenteId: 2, data: '2024-01-16', cantiere: 'Villa Rossi', ore: 8, note: 'Finitura pannelli' }
 ])
 
+// Nuovo dipendente
+const newDipendente = ref({
+  nome: '',
+  cognome: '',
+  email: '',
+  telefono: '',
+  ruolo: '',
+  pagaOraria: 25,
+  dataAssunzione: new Date().toISOString().split('T')[0],
+  stato: 'attivo',
+  cantiereAttuale: '',
+  note: ''
+})
+
+// Nuovo timesheet
+const newTimesheet = ref({
+  dipendenteId: '',
+  data: new Date().toISOString().split('T')[0],
+  ore: '',
+  cantiere: '',
+  note: ''
+})
+
+// Dipendente in modifica
+const editingDipendente = ref({
+  id: null,
+  nome: '',
+  cognome: '',
+  email: '',
+  telefono: '',
+  ruolo: '',
+  pagaOraria: 25,
+  dataAssunzione: '',
+  stato: 'attivo',
+  cantiereAttuale: '',
+  note: ''
+})
+
+// Funzioni per la gestione dei cantieri
+const loadCantieriFromStorage = () => {
+  const stored = localStorage.getItem('legnosystem_cantieri')
+  if (stored) {
+    try {
+      const cantieri = JSON.parse(stored)
+      const nuoviCantieri = cantieri.map(c => c.nome)
+      if (JSON.stringify(nuoviCantieri) !== JSON.stringify(cantieriDisponibili.value)) {
+        cantieriDisponibili.value = nuoviCantieri
+        console.log('✅ Lista cantieri aggiornata:', nuoviCantieri)
+      }
+    } catch (e) {
+      console.warn('Errore nel caricamento cantieri:', e)
+    }
+  }
+}
+
+// Funzioni per la gestione dei dipendenti
+const loadDipendentiFromStorage = () => {
+  const stored = localStorage.getItem('legnosystem_dipendenti')
+  if (stored) {
+    try {
+      dipendenti.value = JSON.parse(stored)
+    } catch (e) {
+      console.warn('Errore nel caricamento dipendenti dal localStorage:', e)
+    }
+  }
+}
+
+const saveDipendentiToStorage = () => {
+  localStorage.setItem('legnosystem_dipendenti', JSON.stringify(dipendenti.value))
+  window.dispatchEvent(new CustomEvent('dipendenti-updated'))
+}
+
 // Computed
 const filteredDipendenti = computed(() => {
   let result = dipendenti.value
@@ -1290,10 +1261,7 @@ const saveDipendente = () => {
   dipendenti.value.push(nuovoDipendente)
   stats.value.dipendentiAttivi++
 
-  // Salva nel localStorage per sincronizzazione con altre pagine
-  localStorage.setItem('legnosystem_dipendenti', JSON.stringify(dipendenti.value))
-  window.dispatchEvent(new CustomEvent('dipendenti-updated'))
-
+  saveDipendentiToStorage()
   closeAddModal()
   alert(`✅ Dipendente ${nuovoDipendente.nome} ${nuovoDipendente.cognome} aggiunto con successo!`)
 }
@@ -1473,10 +1441,7 @@ const saveEditDipendente = () => {
     }
   }
 
-  // Salva nel localStorage per sincronizzazione con altre pagine
-  localStorage.setItem('legnosystem_dipendenti', JSON.stringify(dipendenti.value))
-  window.dispatchEvent(new CustomEvent('dipendenti-updated'))
-
+  saveDipendentiToStorage()
   closeEditModal()
   alert(`✅ Dipendente ${editingDipendente.value.nome} ${editingDipendente.value.cognome} aggiornato con successo!`)
 }
@@ -1502,4 +1467,32 @@ const closeScheduleModal = () => {
   showScheduleModal.value = false
   selectedDipendente.value = null
 }
+
+// Inizializzazione del componente
+onMounted(() => {
+  // Carica cantieri dal localStorage
+  loadCantieriFromStorage()
+  
+  // Carica dipendenti dal localStorage all'avvio
+  loadDipendentiFromStorage()
+  
+  // Se non ci sono dipendenti nel localStorage, salva quelli attuali
+  if (!localStorage.getItem('legnosystem_dipendenti')) {
+    saveDipendentiToStorage()
+  }
+
+  // Ascolta i cambiamenti nel localStorage (per sincronizzazione tra pagine)
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'legnosystem_cantieri') {
+      loadCantieriFromStorage()
+    }
+  })
+
+  // Ascolta anche gli eventi personalizzati (per aggiornamenti nella stessa pagina)
+  window.addEventListener('cantieri-updated', loadCantieriFromStorage)
+  window.addEventListener('dipendenti-updated', loadDipendentiFromStorage)
+
+  // Check periodico per essere sicuri della sincronizzazione
+  setInterval(loadCantieriFromStorage, 5000)
+})
 </script> 
