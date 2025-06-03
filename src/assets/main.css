@@ -1,0 +1,172 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Font imports */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+
+/* Custom base styles for Legnosystem.bio */
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-semibold text-primary-800;
+  }
+}
+
+/* Custom components */
+@layer components {
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-white hover:bg-gray-50 text-primary-700 font-medium py-2 px-4 rounded-lg border border-primary-300 transition-colors duration-200;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+  
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-200;
+  }
+  
+  .nav-link.active {
+    @apply bg-primary-100 text-primary-700;
+  }
+}
+
+/* Loading animations */
+.fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* 📱 MOBILE OPTIMIZATIONS for Legnosystem.bio */
+
+/* Touch targets minimi 44px per mobile e accessibilità */
+@media (max-width: 768px) {
+  .btn-primary,
+  .btn-secondary,
+  button,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    touch-action: manipulation;
+    font-size: 1rem; /* 16px per evitare zoom iOS */
+  }
+  
+  /* Card spacing mobile-friendly */
+  .card {
+    @apply p-4 mx-2 my-2;
+  }
+  
+  /* Text sizing ottimizzato mobile */
+  .text-xs { font-size: 0.75rem; line-height: 1.2; }
+  .text-sm { font-size: 0.875rem; line-height: 1.3; }
+  .text-base { font-size: 1rem; line-height: 1.4; }
+  
+  /* Grid responsive per card */
+  .grid-cols-2 {
+    gap: 0.75rem;
+  }
+  
+  .grid-cols-3 {
+    gap: 0.5rem;
+  }
+}
+
+/* Feedback tattile per interazioni */
+button:active,
+.btn-primary:active,
+.btn-secondary:active,
+.card:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+
+/* Scroll smoothing iOS Safari */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Focus visibile per navigazione accessibile */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid #369e5d;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Badge e status ottimizzati mobile */
+.inline-flex {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Modal responsivi */
+@media (max-width: 640px) {
+  .fixed.inset-0 > div {
+    max-height: 90vh;
+    margin: 1rem;
+    border-radius: 12px;
+  }
+}
+
+/* Safe area per iPhone con notch */
+@supports (padding: max(0px)) {
+  .fixed.inset-y-0 {
+    padding-top: max(0px, env(safe-area-inset-top));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Hover effects disabilitati su touch */
+@media (hover: none) {
+  .hover\:shadow-md:hover {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+}
+
+/* Animazioni ridotte per utenti con sensibilità al movimento */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Progress bar touch-friendly */
+.h-2 {
+  min-height: 8px;
+}
+
+.h-3 {
+  min-height: 12px;
+}
+
+/* Keyframes animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
