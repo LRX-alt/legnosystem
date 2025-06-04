@@ -3365,8 +3365,160 @@ const handleMaterialFileUpload = async (event) => {
 }
 
 const generateMaterialReport = () => {
-  // Implementa la generazione del report materiale
-  alert('Generazione report materiale non implementata.')
+  if (!selectedMaterial.value) {
+    alert('❌ Nessun materiale selezionato')
+    return
+  }
+
+  const materiale = selectedMaterial.value
+  const fornitore = getFornitoreById(materiale.fornitoreId)
+  const allegati = getMaterialAttachments()
+  const cantiere = selectedCantiere.value
+
+  // Calcoli
+  const costoTotale = materiale.quantitaRichiesta * materiale.prezzoUnitario
+  const dataOggi = new Date().toLocaleDateString('it-IT')
+  
+  // Genera contenuto HTML del report
+  const reportHTML = `
+    <!DOCTYPE html>
+    <html lang="it">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Report Materiale - ${materiale.nome}</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+            .header { background: #2563eb; color: white; padding: 20px; border-radius: 8px; text-align: center; }
+            .section { margin: 20px 0; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+            .label { font-weight: bold; color: #6b7280; }
+            .value { color: #111827; }
+            .allegati { background: #f3f4f6; }
+            .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+            th { background: #f9fafb; font-weight: bold; }
+            .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+            .status-pianificato { background: #dbeafe; color: #1e40af; }
+            .status-ordinato { background: #fef3c7; color: #b45309; }
+            .status-in-uso { background: #d1fae5; color: #065f46; }
+            .status-completato { background: #dcfce7; color: #166534; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>📋 Report Materiale</h1>
+            <h2>${materiale.nome} (${materiale.codice})</h2>
+            <p>Generato il ${dataOggi} - Legnosystem.bio</p>
+        </div>
+
+        <div class="section">
+            <h3>🏗️ Informazioni Cantiere</h3>
+            <div class="grid">
+                <div><span class="label">Cantiere:</span> <span class="value">${cantiere.nome}</span></div>
+                <div><span class="label">Cliente:</span> <span class="value">${cantiere.cliente}</span></div>
+                <div><span class="label">Indirizzo:</span> <span class="value">${cantiere.indirizzo}</span></div>
+                <div><span class="label">Tipo Lavoro:</span> <span class="value">${cantiere.tipoLavoro}</span></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🧱 Dettagli Materiale</h3>
+            <div class="grid">
+                <div><span class="label">Nome:</span> <span class="value">${materiale.nome}</span></div>
+                <div><span class="label">Codice:</span> <span class="value">${materiale.codice}</span></div>
+                <div><span class="label">Descrizione:</span> <span class="value">${materiale.descrizione || 'N/A'}</span></div>
+                <div><span class="label">Stato:</span> <span class="status status-${materiale.stato}">${materiale.stato.toUpperCase()}</span></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📊 Quantità e Costi</h3>
+            <div class="grid">
+                <div><span class="label">Quantità Richiesta:</span> <span class="value">${materiale.quantitaRichiesta} ${materiale.unita}</span></div>
+                <div><span class="label">Quantità Utilizzata:</span> <span class="value">${materiale.quantitaUtilizzata || 0} ${materiale.unita}</span></div>
+                <div><span class="label">Prezzo Unitario:</span> <span class="value">€${materiale.prezzoUnitario.toFixed(2)}</span></div>
+                <div><span class="label">Costo Totale:</span> <span class="value"><strong>€${costoTotale.toFixed(2)}</strong></span></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🏭 Informazioni Fornitore</h3>
+            <div class="grid">
+                <div><span class="label">Fornitore:</span> <span class="value">${fornitore?.nome || 'N/A'}</span></div>
+                <div><span class="label">Telefono:</span> <span class="value">${fornitore?.telefono || 'N/A'}</span></div>
+                <div><span class="label">Email:</span> <span class="value">${fornitore?.email || 'N/A'}</span></div>
+                <div><span class="label">Data Acquisto:</span> <span class="value">${materiale.dataAcquisto || 'Da definire'}</span></div>
+            </div>
+        </div>
+
+        ${allegati.length > 0 ? `
+        <div class="section allegati">
+            <h3>📎 Allegati e Documentazione (${allegati.length})</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome File</th>
+                        <th>Tipo</th>
+                        <th>Categoria</th>
+                        <th>Dimensione</th>
+                        <th>Data Upload</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${allegati.map(allegato => `
+                        <tr>
+                            <td>${allegato.name}</td>
+                            <td>${allegato.type.toUpperCase()}</td>
+                            <td>${allegato.category || 'Generale'}</td>
+                            <td>${formatFileSize(allegato.size)}</td>
+                            <td>${formatDate(allegato.uploadDate)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        ` : '<div class="section"><h3>📎 Allegati</h3><p>Nessun allegato presente per questo materiale.</p></div>'}
+
+        ${materiale.note ? `
+        <div class="section">
+            <h3>📝 Note</h3>
+            <p>${materiale.note}</p>
+        </div>
+        ` : ''}
+
+        <div class="section">
+            <h3>📈 Statistiche</h3>
+            <div class="grid">
+                <div><span class="label">Utilizzo:</span> <span class="value">${Math.round((materiale.quantitaUtilizzata || 0) / materiale.quantitaRichiesta * 100)}%</span></div>
+                <div><span class="label">Documenti Allegati:</span> <span class="value">${allegati.length}</span></div>
+                <div><span class="label">Dimensione Totale Allegati:</span> <span class="value">${getTotalMaterialAttachmentsSize()}</span></div>
+                <div><span class="label">Ultimo Aggiornamento:</span> <span class="value">${getLastUploadDate()}</span></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Legnosystem.bio</strong> - Sistema di Gestione Cantieri</p>
+            <p>Report generato automaticamente il ${dataOggi}</p>
+            <p>Per informazioni: info@legnosystem.bio</p>
+        </div>
+    </body>
+    </html>
+  `
+
+  // Crea e scarica il file HTML
+  const blob = new Blob([reportHTML], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `Report_Materiale_${materiale.codice}_${cantiere.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.html`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  alert(`📊 Report materiale "${materiale.nome}" generato e scaricato!\n\n📋 Include:\n• Dettagli tecnici completi\n• Informazioni fornitore\n• Lista allegati (${allegati.length})\n• Calcoli costi\n• Tracciabilità cantiere\n\n💾 File salvato come HTML visualizzabile in qualsiasi browser`)
 }
 
 const materialSelectionMode = ref('existing')
