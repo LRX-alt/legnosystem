@@ -626,6 +626,9 @@
 
           <!-- Action Buttons -->
           <div class="flex justify-end pt-6 border-t border-gray-200">
+            <button @click="manageMaterials" class="btn-primary py-3 px-6 text-base mr-3">
+              🔧 Gestisci Materiali
+            </button>
             <button @click="closeMaterialsModal" class="btn-secondary py-3 px-6 text-base">
               Chiudi
             </button>
@@ -1414,6 +1417,361 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal Gestione Materiali Cantiere -->
+    <div v-if="showManageMaterialsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeManageMaterialsModal">
+      <div class="relative top-4 mx-auto border w-full max-w-4xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 bg-blue-100 rounded-lg">
+                <CubeIcon class="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 class="text-xl font-semibold text-gray-900">Gestione Materiali Cantiere</h3>
+                <p class="text-sm text-gray-600 mt-1">{{ selectedCantiere?.nome }} - {{ selectedCantiere?.cliente }}</p>
+              </div>
+            </div>
+            <button @click="closeManageMaterialsModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+          
+          <!-- Lista Materiali -->
+          <div class="space-y-4">
+            <div v-for="materiale in materialiCantiere" :key="materiale.id" class="card">
+              <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center space-x-3 flex-1">
+                  <div class="w-10 h-10 bg-wood-light rounded-lg flex items-center justify-center">
+                    <span class="text-primary-600 text-xs font-bold">{{ materiale.codice }}</span>
+                  </div>
+                  <div class="flex-1">
+                    <h4 class="text-sm font-semibold text-gray-900">{{ materiale.nome }}</h4>
+                    <p class="text-xs text-gray-600">{{ materiale.descrizione }}</p>
+                  </div>
+                </div>
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" :class="getMaterialStatusColor(materiale.stato)">
+                  {{ materiale.stato }}
+                </span>
+              </div>
+              
+              <div class="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p class="text-gray-500">Richiesto</p>
+                  <p class="font-medium">{{ materiale.quantitaRichiesta }} {{ materiale.unita }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-500">Utilizzato</p>
+                  <p class="font-medium">{{ materiale.quantitaUtilizzata }} {{ materiale.unita }}</p>
+                </div>
+                <div>
+                  <p class="text-gray-500">Valore</p>
+                  <p class="font-medium">€{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex justify-end pt-6 border-t border-gray-200">
+            <button @click="addMaterialToCantiere" class="btn-primary py-3 px-6 text-base mr-3">
+              ➕ Aggiungi Materiale
+            </button>
+            <button @click="closeManageMaterialsModal" class="btn-secondary py-3 px-6 text-base">
+              Chiudi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Aggiunta Materiale -->
+    <div v-if="showAddMaterialModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeAddMaterialModal">
+      <div class="relative top-4 mx-auto border w-full max-w-2xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-semibold text-gray-900">Aggiungi Materiale</h3>
+            <button @click="closeAddMaterialModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+          
+          <form v-if="newMaterial" @submit.prevent="saveMaterialToCantiere" class="space-y-6">
+            <!-- Nome Materiale -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nome Materiale</label>
+              <input
+                v-model="newMaterial.nome"
+                type="text"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Descrizione -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione</label>
+              <textarea
+                v-model="newMaterial.descrizione"
+                rows="2"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              ></textarea>
+            </div>
+
+            <!-- Codice -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Codice</label>
+              <input
+                v-model="newMaterial.codice"
+                type="text"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Quantità Richiesta -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Quantità Richiesta</label>
+              <input
+                v-model.number="newMaterial.quantitaRichiesta"
+                type="number"
+                min="0"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Unita di Misura -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Unita di Misura</label>
+              <input
+                v-model="newMaterial.unita"
+                type="text"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Prezzo Unitario -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Prezzo Unitario (€)</label>
+              <input
+                v-model.number="newMaterial.prezzoUnitario"
+                type="number"
+                min="0"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Stato -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Stato</label>
+              <select
+                v-model="newMaterial.stato"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              >
+                <option value="pianificato">Pianificato</option>
+                <option value="ordinato">Ordinato</option>
+                <option value="in-uso">In Uso</option>
+                <option value="utilizzato">Utilizzato</option>
+                <option value="completato">Completato</option>
+                <option value="in-lavorazione">In Lavorazione</option>
+              </select>
+            </div>
+
+            <!-- Data Acquisto -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Data Acquisto</label>
+              <input
+                v-model="newMaterial.dataAcquisto"
+                type="date"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Note -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+              <textarea
+                v-model="newMaterial.note"
+                rows="2"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              ></textarea>
+            </div>
+
+            <!-- Fornitori -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Fornitori</label>
+              <select
+                v-model="newMaterial.fornitoreId"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              >
+                <option v-for="fornitore in fornitori" :key="fornitore.id" :value="fornitore.id">
+                  {{ fornitore.nome }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+              <button type="button" @click="closeAddMaterialModal" class="w-full sm:w-auto btn-secondary py-3 text-base">
+                Annulla
+              </button>
+              <button type="submit" class="w-full sm:w-auto btn-primary py-3 text-base">
+                💾 Salva Nuovo Materiale
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Modifica Materiale -->
+    <div v-if="showEditMaterialModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeEditMaterialModal">
+      <div class="relative top-4 mx-auto border w-full max-w-2xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-semibold text-gray-900">Modifica Materiale</h3>
+            <button @click="closeEditMaterialModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+          
+          <form v-if="editingMaterial" @submit.prevent="saveMaterialChanges" class="space-y-6">
+            <!-- Nome Materiale -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nome Materiale</label>
+              <input
+                v-model="editingMaterial.nome"
+                type="text"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Descrizione -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione</label>
+              <textarea
+                v-model="editingMaterial.descrizione"
+                rows="2"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              ></textarea>
+            </div>
+
+            <!-- Codice -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Codice</label>
+              <input
+                v-model="editingMaterial.codice"
+                type="text"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Quantità Richiesta -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Quantità Richiesta</label>
+              <input
+                v-model.number="editingMaterial.quantitaRichiesta"
+                type="number"
+                min="0"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Unita di Misura -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Unita di Misura</label>
+              <input
+                v-model="editingMaterial.unita"
+                type="text"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Prezzo Unitario -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Prezzo Unitario (€)</label>
+              <input
+                v-model.number="editingMaterial.prezzoUnitario"
+                type="number"
+                min="0"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Stato -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Stato</label>
+              <select
+                v-model="editingMaterial.stato"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              >
+                <option value="pianificato">Pianificato</option>
+                <option value="ordinato">Ordinato</option>
+                <option value="in-uso">In Uso</option>
+                <option value="utilizzato">Utilizzato</option>
+                <option value="completato">Completato</option>
+                <option value="in-lavorazione">In Lavorazione</option>
+              </select>
+            </div>
+
+            <!-- Data Acquisto -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Data Acquisto</label>
+              <input
+                v-model="editingMaterial.dataAcquisto"
+                type="date"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
+            </div>
+
+            <!-- Note -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+              <textarea
+                v-model="editingMaterial.note"
+                rows="2"
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              ></textarea>
+            </div>
+
+            <!-- Fornitori -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Fornitori</label>
+              <select
+                v-model="editingMaterial.fornitoreId"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              >
+                <option v-for="fornitore in fornitori" :key="fornitore.id" :value="fornitore.id">
+                  {{ fornitore.nome }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+              <button type="button" @click="closeEditMaterialModal" class="w-full sm:w-auto btn-secondary py-3 text-base">
+                Annulla
+              </button>
+              <button type="submit" class="w-full sm:w-auto btn-primary py-3 text-base">
+                💾 Salva Modifiche
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1449,6 +1807,9 @@ const showMLTrainingModal = ref(false)
 const showAddModal = ref(false)
 const showTeamModal = ref(false)
 const showAttachmentsModal = ref(false)
+const showManageMaterialsModal = ref(false)
+const showAddMaterialModal = ref(false)
+const showEditMaterialModal = ref(false)
 
 const searchTerm = ref('')
 const selectedStatus = ref('')
@@ -1458,6 +1819,16 @@ const selectedCantiere = ref(null)
 const editingCantiere = ref(null)
 const materialiCantiere = ref([])
 const analysisResults = ref(null)
+const editingMaterial = ref(null)
+const newMaterial = ref({
+  materialeId: null,
+  quantitaRichiesta: 0,
+  fornitoreId: null,
+  prezzoEffettivo: 0,
+  dataAcquisto: '',
+  note: '',
+  stato: 'pianificato'
+})
 
 // Nuovo cantiere
 const newCantiere = ref({
@@ -1587,6 +1958,17 @@ const dipendentiDisponibili = ref([])
 // Gestione allegati
 const cantieriAttachments = ref({})
 
+// Dati magazzino (sincronizzato con localStorage)
+const materialiMagazzino = ref([])
+
+// Dati fornitori
+const fornitori = ref([
+  { id: 1, nome: 'LegnoAlp Spa', telefono: '0123 456789', email: 'info@legnoalp.it' },
+  { id: 2, nome: 'Segheria Montana', telefono: '0456 789123', email: 'vendite@montana.com' },
+  { id: 3, nome: 'Isolanti Nord Srl', telefono: '0789 123456', email: 'ordini@isolantinord.it' },
+  { id: 4, nome: 'Ferramenta Italiana', telefono: '0321 654987', email: 'info@ferramentaitaliana.com' }
+])
+
 // Funzione per caricare dipendenti dal localStorage
 const loadDipendentiFromStorage = () => {
   const stored = localStorage.getItem('legnosystem_dipendenti')
@@ -1610,6 +1992,33 @@ const loadAttachmentsFromStorage = () => {
       console.warn('Errore nel caricamento allegati:', e)
       cantieriAttachments.value = {}
     }
+  }
+}
+
+// Funzione per caricare materiali magazzino dal localStorage
+const loadMaterialiMagazzinoFromStorage = () => {
+  const stored = localStorage.getItem('legnosystem_materiali')
+  if (stored) {
+    try {
+      materialiMagazzino.value = JSON.parse(stored)
+    } catch (e) {
+      console.warn('Errore nel caricamento materiali magazzino:', e)
+      // Materiali di default se non ci sono dati
+      materialiMagazzino.value = [
+        { id: 1, codice: 'TRV001', nome: 'Trave Lamellare GL24h', categoria: 'travi', quantita: 45, unita: 'pz', prezzoUnitario: 85.50 },
+        { id: 2, codice: 'TAV002', nome: 'Tavole Abete', categoria: 'tavole', quantita: 120, unita: 'm²', prezzoUnitario: 45.00 },
+        { id: 3, codice: 'ISO003', nome: 'Isolante Termico', categoria: 'isolanti', quantita: 80, unita: 'm²', prezzoUnitario: 12.50 },
+        { id: 4, codice: 'VIT004', nome: 'Viti per Legno', categoria: 'ferramenta', quantita: 2500, unita: 'pz', prezzoUnitario: 0.35 }
+      ]
+    }
+  } else {
+    // Materiali di default
+    materialiMagazzino.value = [
+      { id: 1, codice: 'TRV001', nome: 'Trave Lamellare GL24h', categoria: 'travi', quantita: 45, unita: 'pz', prezzoUnitario: 85.50 },
+      { id: 2, codice: 'TAV002', nome: 'Tavole Abete', categoria: 'tavole', quantita: 120, unita: 'm²', prezzoUnitario: 45.00 },
+      { id: 3, codice: 'ISO003', nome: 'Isolante Termico', categoria: 'isolanti', quantita: 80, unita: 'm²', prezzoUnitario: 12.50 },
+      { id: 4, codice: 'VIT004', nome: 'Viti per Legno', categoria: 'ferramenta', quantita: 2500, unita: 'pz', prezzoUnitario: 0.35 }
+    ]
   }
 }
 
@@ -1652,6 +2061,9 @@ loadDipendentiFromStorage()
 
 // Carica allegati all'avvio
 loadAttachmentsFromStorage()
+
+// Carica materiali magazzino all'avvio
+loadMaterialiMagazzinoFromStorage()
 
 // Ascolta gli eventi di aggiornamento dipendenti
 window.addEventListener('dipendenti-updated', loadDipendentiFromStorage)
@@ -1808,6 +2220,24 @@ const closeMaterialsModal = () => {
 }
 
 const getMaterialsByCantiere = (cantiereId) => {
+  // Carica materiali cantiere dal localStorage
+  const stored = localStorage.getItem('legnosystem_materiali_cantieri')
+  let materialiCantieriData = {}
+  
+  if (stored) {
+    try {
+      materialiCantieriData = JSON.parse(stored)
+    } catch (e) {
+      console.warn('Errore nel caricamento materiali cantieri:', e)
+    }
+  }
+  
+  // Se esistono materiali per questo cantiere, restituiscili
+  if (materialiCantieriData[cantiereId]) {
+    return materialiCantieriData[cantiereId]
+  }
+  
+  // Altrimenti, usa i dati di esempio (backwards compatibility)
   const materialiDatabase = {
     1: [
       {
@@ -1819,7 +2249,12 @@ const getMaterialsByCantiere = (cantiereId) => {
         quantitaUtilizzata: 12,
         unita: 'pz',
         prezzoUnitario: 85.50,
-        stato: 'utilizzato'
+        stato: 'utilizzato',
+        fornitoreId: 1,
+        fornitoreNome: 'LegnoAlp Spa',
+        prezzoEffettivo: 85.50,
+        dataAcquisto: '2024-01-15',
+        note: ''
       },
       {
         id: 2,
@@ -1830,7 +2265,12 @@ const getMaterialsByCantiere = (cantiereId) => {
         quantitaUtilizzata: 65,
         unita: 'm²',
         prezzoUnitario: 45.00,
-        stato: 'in-uso'
+        stato: 'in-uso',
+        fornitoreId: 2,
+        fornitoreNome: 'Segheria Montana',
+        prezzoEffettivo: 42.50,
+        dataAcquisto: '2024-01-10',
+        note: 'Sconto 5% per quantità'
       },
       {
         id: 3,
@@ -1841,7 +2281,12 @@ const getMaterialsByCantiere = (cantiereId) => {
         quantitaUtilizzata: 120,
         unita: 'm²',
         prezzoUnitario: 14.20,
-        stato: 'completato'
+        stato: 'completato',
+        fornitoreId: 3,
+        fornitoreNome: 'Isolanti Nord Srl',
+        prezzoEffettivo: 13.80,
+        dataAcquisto: '2024-01-08',
+        note: 'Consegna anticipata'
       }
     ],
     2: [
@@ -1854,7 +2299,12 @@ const getMaterialsByCantiere = (cantiereId) => {
         quantitaUtilizzata: 0,
         unita: 'pz',
         prezzoUnitario: 125.00,
-        stato: 'ordinato'
+        stato: 'ordinato',
+        fornitoreId: 1,
+        fornitoreNome: 'LegnoAlp Spa',
+        prezzoEffettivo: 120.00,
+        dataAcquisto: '2024-02-01',
+        note: 'In attesa di consegna'
       },
       {
         id: 5,
@@ -1865,7 +2315,12 @@ const getMaterialsByCantiere = (cantiereId) => {
         quantitaUtilizzata: 0,
         unita: 'pz',
         prezzoUnitario: 28.50,
-        stato: 'pianificato'
+        stato: 'pianificato',
+        fornitoreId: 4,
+        fornitoreNome: 'Ferramenta Italiana',
+        prezzoEffettivo: 28.50,
+        dataAcquisto: '',
+        note: 'Da ordinare'
       }
     ],
     3: [
@@ -1878,7 +2333,12 @@ const getMaterialsByCantiere = (cantiereId) => {
         quantitaUtilizzata: 3,
         unita: 'pz',
         prezzoUnitario: 450.00,
-        stato: 'in-lavorazione'
+        stato: 'in-lavorazione',
+        fornitoreId: 2,
+        fornitoreNome: 'Segheria Montana',
+        prezzoEffettivo: 420.00,
+        dataAcquisto: '2024-01-20',
+        note: 'Materiale storico'
       }
     ]
   }
@@ -2221,6 +2681,125 @@ const handleFileUpload = async (event) => {
 
 const getCantiereAttachments = (cantiereId) => {
   return cantieriAttachments.value[cantiereId] || []
+}
+
+// Funzioni gestione materiali cantiere
+const manageMaterials = () => {
+  showManageMaterialsModal.value = true
+}
+
+const closeManageMaterialsModal = () => {
+  showManageMaterialsModal.value = false
+}
+
+const addMaterialToCantiere = () => {
+  newMaterial.value = {
+    materialeId: null,
+    quantitaRichiesta: 0,
+    fornitoreId: null,
+    prezzoEffettivo: 0,
+    dataAcquisto: '',
+    note: '',
+    stato: 'pianificato'
+  }
+  showAddMaterialModal.value = true
+}
+
+const closeAddMaterialModal = () => {
+  showAddMaterialModal.value = false
+}
+
+const editMaterialInCantiere = (materiale) => {
+  editingMaterial.value = { ...materiale }
+  showEditMaterialModal.value = true
+}
+
+const closeEditMaterialModal = () => {
+  showEditMaterialModal.value = false
+  editingMaterial.value = null
+}
+
+const saveMaterialToCantiere = () => {
+  if (!newMaterial.value.materialeId || !newMaterial.value.quantitaRichiesta) {
+    alert('❌ Seleziona materiale e inserisci quantità richiesta!')
+    return
+  }
+
+  const materialeSelected = materialiMagazzino.value.find(m => m.id == newMaterial.value.materialeId)
+  const fornitoreSelected = fornitori.value.find(f => f.id == newMaterial.value.fornitoreId)
+  
+  if (!materialeSelected) {
+    alert('❌ Materiale non trovato!')
+    return
+  }
+
+  const nuovoMateriale = {
+    id: Date.now() + Math.random(),
+    codice: materialeSelected.codice,
+    nome: materialeSelected.nome,
+    descrizione: materialeSelected.descrizione || '',
+    quantitaRichiesta: newMaterial.value.quantitaRichiesta,
+    quantitaUtilizzata: 0,
+    unita: materialeSelected.unita,
+    prezzoUnitario: materialeSelected.prezzoUnitario,
+    stato: newMaterial.value.stato,
+    fornitoreId: newMaterial.value.fornitoreId,
+    fornitoreNome: fornitoreSelected?.nome || '',
+    prezzoEffettivo: newMaterial.value.prezzoEffettivo || materialeSelected.prezzoUnitario,
+    dataAcquisto: newMaterial.value.dataAcquisto,
+    note: newMaterial.value.note
+  }
+
+  // Aggiungi a materialiCantiere e salva nel localStorage
+  materialiCantiere.value.push(nuovoMateriale)
+  saveMaterialiCantiereToStorage()
+  
+  closeAddMaterialModal()
+  alert(`✅ Materiale "${materialeSelected.nome}" aggiunto al cantiere!`)
+}
+
+const saveMaterialChanges = () => {
+  if (!editingMaterial.value) return
+
+  const index = materialiCantiere.value.findIndex(m => m.id === editingMaterial.value.id)
+  if (index !== -1) {
+    const fornitoreSelected = fornitori.value.find(f => f.id == editingMaterial.value.fornitoreId)
+    editingMaterial.value.fornitoreNome = fornitoreSelected?.nome || ''
+    
+    materialiCantiere.value[index] = { ...editingMaterial.value }
+    saveMaterialiCantiereToStorage()
+  }
+  
+  closeEditMaterialModal()
+  alert(`✅ Materiale "${editingMaterial.value.nome}" aggiornato!`)
+}
+
+const removeMaterialFromCantiere = (materialId) => {
+  if (confirm('🗑️ Sei sicuro di voler rimuovere questo materiale dal cantiere?')) {
+    const index = materialiCantiere.value.findIndex(m => m.id === materialId)
+    if (index !== -1) {
+      const materialeRimosso = materialiCantiere.value[index]
+      materialiCantiere.value.splice(index, 1)
+      saveMaterialiCantiereToStorage()
+      alert(`✅ Materiale "${materialeRimosso.nome}" rimosso dal cantiere!`)
+    }
+  }
+}
+
+const saveMaterialiCantiereToStorage = () => {
+  const stored = localStorage.getItem('legnosystem_materiali_cantieri')
+  let materialiCantieriData = {}
+  
+  if (stored) {
+    try {
+      materialiCantieriData = JSON.parse(stored)
+    } catch (e) {
+      materialiCantieriData = {}
+    }
+  }
+  
+  materialiCantieriData[selectedCantiere.value.id] = materialiCantiere.value
+  localStorage.setItem('legnosystem_materiali_cantieri', JSON.stringify(materialiCantieriData))
 }
 
 const openFile = (file) => {
