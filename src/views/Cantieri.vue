@@ -158,6 +158,16 @@
           </div>
         </div>
 
+        <!-- Info Allegati -->
+        <div v-if="getCantiereAttachments(cantiere.id).length > 0" class="mb-4 p-2 bg-blue-50 rounded-lg border border-blue-200">
+          <div class="flex items-center space-x-2">
+            <PaperClipIcon class="w-4 h-4 text-blue-600" />
+            <span class="text-xs text-blue-700 font-medium">
+              {{ getCantiereAttachments(cantiere.id).length }} allegat{{ getCantiereAttachments(cantiere.id).length === 1 ? 'o' : 'i' }}
+            </span>
+          </div>
+        </div>
+
         <!-- Azioni -->
         <div class="flex items-center justify-between pt-4 border-t border-gray-200">
           <button @click="viewCantiere(cantiere)" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
@@ -197,6 +207,15 @@
               </button>
               <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                 Analizza fabbisogno
+                <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+            <div class="relative group">
+              <button @click="manageAttachments(cantiere)" class="text-blue-500 hover:text-blue-700">
+                <PaperClipIcon class="w-4 h-4" />
+              </button>
+              <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                Gestisci allegati
                 <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
               </div>
             </div>
@@ -1293,6 +1312,100 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal Gestione Allegati -->
+    <div v-if="showAttachmentsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeAttachmentsModal">
+      <div class="relative top-4 mx-auto border w-full max-w-4xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-semibold text-gray-900">Allegati - {{ selectedCantiere?.nome }}</h3>
+            <button @click="closeAttachmentsModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+          
+          <div class="space-y-6">
+            <!-- Upload Area -->
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary-400 transition-colors">
+              <div class="text-center">
+                <div class="mx-auto w-12 h-12 text-gray-400 mb-4">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 48 48" aria-hidden="true">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </div>
+                <div class="flex text-sm text-gray-600">
+                  <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
+                    <span>Carica un file</span>
+                    <input id="file-upload" name="file-upload" type="file" class="sr-only" @change="handleFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.txt">
+                  </label>
+                  <p class="pl-1">o trascina qui</p>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">PDF, DOC, XLS, JPG, PNG fino a 10MB</p>
+              </div>
+            </div>
+
+            <!-- Lista Allegati -->
+            <div v-if="getAttachments()?.length > 0">
+              <h4 class="font-semibold text-gray-900 mb-4">Documenti allegati ({{ getAttachments().length }})</h4>
+              <div class="space-y-3">
+                <div v-for="attachment in getAttachments()" :key="attachment.id" 
+                     class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <div class="flex items-center space-x-3 flex-1 min-w-0">
+                    <!-- Icona file -->
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 rounded-lg flex items-center justify-center" :class="getFileTypeClass(attachment.type)">
+                        <span class="text-white text-xs font-bold">{{ getFileTypeIcon(attachment.type) }}</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Info file -->
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium text-gray-900 truncate">{{ attachment.name }}</p>
+                      <p class="text-xs text-gray-500">
+                        {{ formatFileSize(attachment.size) }} • {{ formatDate(attachment.uploadDate) }}
+                      </p>
+                      <p v-if="attachment.description" class="text-xs text-gray-600 mt-1">{{ attachment.description }}</p>
+                    </div>
+                  </div>
+                  
+                  <!-- Azioni -->
+                  <div class="flex items-center space-x-2">
+                    <button @click="downloadFile(attachment)" 
+                            class="text-primary-600 hover:text-primary-700 p-2 rounded-lg hover:bg-primary-50"
+                            title="Scarica file">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                    </button>
+                    <button @click="deleteFile(attachment)" 
+                            class="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50"
+                            title="Elimina file">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Nessun allegato -->
+            <div v-else class="text-center py-8 text-gray-500">
+              <PaperClipIcon class="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p class="text-lg font-medium text-gray-400">Nessun allegato</p>
+              <p class="text-sm text-gray-400">Carica documenti, fatture o foto del cantiere</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+              <button @click="closeAttachmentsModal" class="w-full sm:w-auto btn-secondary py-3 text-base font-medium">
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1314,7 +1427,8 @@ import {
   CheckIcon,
   ExclamationTriangleIcon,
   ClockIcon,
-  UsersIcon
+  UsersIcon,
+  PaperClipIcon
 } from '@heroicons/vue/24/outline'
 
 // Stato della pagina
@@ -1326,6 +1440,7 @@ const showMLConfigModal = ref(false)
 const showMLTrainingModal = ref(false)
 const showAddModal = ref(false)
 const showTeamModal = ref(false)
+const showAttachmentsModal = ref(false)
 
 const searchTerm = ref('')
 const selectedStatus = ref('')
@@ -1461,6 +1576,9 @@ const cantieri = ref([
 // Lista dipendenti disponibili (sincronizzata con localStorage)
 const dipendentiDisponibili = ref([])
 
+// Gestione allegati
+const cantieriAttachments = ref({})
+
 // Funzione per caricare dipendenti dal localStorage
 const loadDipendentiFromStorage = () => {
   const stored = localStorage.getItem('legnosystem_dipendenti')
@@ -1472,6 +1590,24 @@ const loadDipendentiFromStorage = () => {
       console.warn('Errore nel caricamento dipendenti:', e)
     }
   }
+}
+
+// Funzione per caricare allegati dal localStorage
+const loadAttachmentsFromStorage = () => {
+  const stored = localStorage.getItem('legnosystem_attachments')
+  if (stored) {
+    try {
+      cantieriAttachments.value = JSON.parse(stored)
+    } catch (e) {
+      console.warn('Errore nel caricamento allegati:', e)
+      cantieriAttachments.value = {}
+    }
+  }
+}
+
+// Funzione per salvare allegati nel localStorage
+const saveAttachmentsToStorage = () => {
+  localStorage.setItem('legnosystem_attachments', JSON.stringify(cantieriAttachments.value))
 }
 
 // Carica cantieri dal localStorage all'avvio
@@ -1505,6 +1641,9 @@ loadCantieriFromStorage()
 
 // Carica dipendenti all'avvio
 loadDipendentiFromStorage()
+
+// Carica allegati all'avvio
+loadAttachmentsFromStorage()
 
 // Ascolta gli eventi di aggiornamento dipendenti
 window.addEventListener('dipendenti-updated', loadDipendentiFromStorage)
@@ -1948,5 +2087,131 @@ const getRuoloLabel = (ruolo) => {
 const closeTeamModal = () => {
   showTeamModal.value = false
   selectedCantiere.value = null
+}
+
+const manageAttachments = (cantiere) => {
+  selectedCantiere.value = cantiere
+  showAttachmentsModal.value = true
+}
+
+const closeAttachmentsModal = () => {
+  showAttachmentsModal.value = false
+  selectedCantiere.value = null
+}
+
+const getAttachments = () => {
+  if (!selectedCantiere.value) return []
+  return cantieriAttachments.value[selectedCantiere.value.id] || []
+}
+
+const getFileTypeClass = (type) => {
+  const classes = {
+    'pdf': 'bg-red-500',
+    'doc': 'bg-blue-500',
+    'docx': 'bg-blue-600',
+    'xls': 'bg-green-500',
+    'xlsx': 'bg-green-600',
+    'jpg': 'bg-purple-500',
+    'jpeg': 'bg-purple-500',
+    'png': 'bg-indigo-500',
+    'txt': 'bg-gray-500'
+  }
+  return classes[type.toLowerCase()] || 'bg-gray-500'
+}
+
+const getFileTypeIcon = (type) => {
+  const icons = {
+    'pdf': 'PDF',
+    'doc': 'DOC',
+    'docx': 'DOC',
+    'xls': 'XLS',
+    'xlsx': 'XLS',
+    'jpg': 'JPG',
+    'jpeg': 'JPG',
+    'png': 'PNG',
+    'txt': 'TXT'
+  }
+  return icons[type.toLowerCase()] || 'FILE'
+}
+
+const formatFileSize = (bytes) => {
+  if (typeof bytes === 'string') return bytes
+  
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+const downloadFile = (file) => {
+  // Simula il download creando un link temporaneo
+  // In una vera implementazione, qui si farebbe una chiamata al server
+  const link = document.createElement('a')
+  link.href = file.url || '#'
+  link.download = file.name
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  
+  alert(`📥 Download di "${file.name}" avviato!`)
+}
+
+const deleteFile = (file) => {
+  if (confirm(`🗑️ Sei sicuro di voler eliminare "${file.name}"?`)) {
+    const cantiereId = selectedCantiere.value.id
+    if (cantieriAttachments.value[cantiereId]) {
+      cantieriAttachments.value[cantiereId] = cantieriAttachments.value[cantiereId].filter(f => f.id !== file.id)
+      saveAttachmentsToStorage()
+      alert(`✅ File "${file.name}" eliminato con successo!`)
+    }
+  }
+}
+
+const handleFileUpload = async (event) => {
+  const files = Array.from(event.target.files)
+  if (!files.length) return
+  
+  const cantiereId = selectedCantiere.value.id
+  
+  // Inizializza array allegati se non esiste
+  if (!cantieriAttachments.value[cantiereId]) {
+    cantieriAttachments.value[cantiereId] = []
+  }
+  
+  for (const file of files) {
+    // Validazione dimensione (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert(`❌ File "${file.name}" troppo grande (max 10MB)`)
+      continue
+    }
+    
+    // Crea oggetto allegato
+    const attachment = {
+      id: Date.now() + Math.random(),
+      name: file.name,
+      size: file.size,
+      type: file.name.split('.').pop().toLowerCase(),
+      uploadDate: new Date().toISOString().split('T')[0],
+      description: '',
+      cantiereId: cantiereId,
+      // In una vera implementazione, qui si caricherà il file su un server
+      // Per ora salviamo solo i metadati
+      url: URL.createObjectURL(file) // Temporaneo per la demo
+    }
+    
+    cantieriAttachments.value[cantiereId].push(attachment)
+  }
+  
+  saveAttachmentsToStorage()
+  
+  // Reset input
+  event.target.value = ''
+  
+  alert(`✅ ${files.length} file caricati con successo!`)
+}
+
+const getCantiereAttachments = (cantiereId) => {
+  return cantieriAttachments.value[cantiereId] || []
 }
 </script> 
