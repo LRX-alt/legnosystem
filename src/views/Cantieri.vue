@@ -1104,15 +1104,126 @@
               />
             </div>
 
-            <!-- Cliente -->
+            <!-- Cliente con Sistema Ibrido -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
-              <input
-                v-model="newCantiere.cliente"
-                type="text"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
-              />
+              <label class="block text-sm font-medium text-gray-700 mb-2">Cliente *</label>
+              
+              <!-- Toggle Selezione Cliente -->
+              <div class="flex space-x-4 mb-4">
+                <label class="flex items-center">
+                  <input 
+                    v-model="clientSelectionMode" 
+                    type="radio" 
+                    value="existing" 
+                    class="text-primary-600 focus:ring-primary-500"
+                  />
+                  <span class="ml-2 text-sm font-medium text-gray-700">📋 Seleziona Esistente</span>
+                </label>
+                <label class="flex items-center">
+                  <input 
+                    v-model="clientSelectionMode" 
+                    type="radio" 
+                    value="new" 
+                    class="text-primary-600 focus:ring-primary-500"
+                  />
+                  <span class="ml-2 text-sm font-medium text-gray-700">➕ Nuovo Cliente</span>
+                </label>
+              </div>
+
+              <!-- Selezione Cliente Esistente -->
+              <div v-if="clientSelectionMode === 'existing'" class="space-y-3">
+                <div>
+                  <select
+                    v-model="selectedClientFromList"
+                    @change="fillClientFromList"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                  >
+                    <option value="">🔍 Seleziona cliente esistente...</option>
+                    <option v-for="cliente in availableClients" :key="cliente.id" :value="cliente.id">
+                      {{ cliente.nome }} - {{ cliente.tipo === 'privato' ? '👤' : cliente.tipo === 'azienda' ? '🏢' : '🏛️' }} {{ getTipoLabel(cliente.tipo) }}
+                    </option>
+                  </select>
+                </div>
+                
+                <!-- Preview Cliente Selezionato -->
+                <div v-if="getSelectedClient()" class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold">
+                      {{ getSelectedClient().iniziali }}
+                    </div>
+                    <div class="flex-1">
+                      <p class="font-medium text-gray-900">{{ getSelectedClient().nome }}</p>
+                      <p class="text-sm text-gray-600">{{ getSelectedClient().email }} • {{ getSelectedClient().telefono }}</p>
+                      <p class="text-xs text-gray-500">{{ getSelectedClient().indirizzo }}</p>
+                    </div>
+                    <div class="text-right">
+                      <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" :class="getTipoColor(getSelectedClient().tipo)">
+                        {{ getTipoLabel(getSelectedClient().tipo) }}
+                      </span>
+                      <p class="text-xs text-gray-500 mt-1">{{ getSelectedClient().numeroProgetti }} progetti</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Inserimento Nuovo Cliente -->
+              <div v-else class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      v-model="newCantiere.cliente"
+                      type="text"
+                      required
+                      placeholder="Nome cliente/azienda..."
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                    />
+                  </div>
+                  <div>
+                    <select
+                      v-model="newCantiere.clienteTipo"
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                    >
+                      <option value="privato">👤 Privato</option>
+                      <option value="azienda">🏢 Azienda</option>
+                      <option value="ente-pubblico">🏛️ Ente Pubblico</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      v-model="newCantiere.clienteEmail"
+                      type="email"
+                      placeholder="email@esempio.it"
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      v-model="newCantiere.clienteTelefono"
+                      type="tel"
+                      placeholder="Telefono cliente"
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <input
+                    v-model="newCantiere.clienteIndirizzo"
+                    type="text"
+                    placeholder="Indirizzo cliente (opzionale)"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                  />
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p class="text-sm text-yellow-800">
+                    💡 <strong>Nuovo Cliente:</strong> I dati del cliente verranno automaticamente aggiunti all'anagrafica aziendale.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <!-- Indirizzo -->
@@ -2103,6 +2214,10 @@ const newMaterial = ref({
 const newCantiere = ref({
   nome: '',
   cliente: '',
+  clienteTipo: 'privato',
+  clienteEmail: '',
+  clienteTelefono: '',
+  clienteIndirizzo: '',
   indirizzo: '',
   tipoLavoro: '',
   valore: 0,
@@ -2708,6 +2823,38 @@ const saveNewCantiere = () => {
   // Salvo il nome prima di resettare il form
   const nomeCantiere = newCantiere.value.nome
   
+  // Se è un nuovo cliente, lo aggiungo all'anagrafica
+  if (clientSelectionMode.value === 'new') {
+    const nuovoCliente = {
+      id: Date.now() + Math.random(),
+      nome: newCantiere.value.cliente,
+      tipo: newCantiere.value.clienteTipo,
+      email: newCantiere.value.clienteEmail || '',
+      telefono: newCantiere.value.clienteTelefono || '',
+      indirizzo: newCantiere.value.clienteIndirizzo || '',
+      iniziali: newCantiere.value.cliente.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2),
+      stato: 'attivo',
+      numeroProgetti: 1,
+      valoreTotale: newCantiere.value.valore,
+      ultimoContatto: new Date().toISOString().split('T')[0]
+    }
+    
+    // Aggiungi alla lista clienti e salva nel localStorage
+    availableClients.value.push(nuovoCliente)
+    localStorage.setItem('legnosystem_clienti', JSON.stringify(availableClients.value))
+    
+    console.log('✅ Nuovo cliente aggiunto all\'anagrafica:', nuovoCliente.nome)
+  } else {
+    // Se cliente esistente, aggiorna numero progetti e valore
+    const clienteEsistente = getSelectedClient()
+    if (clienteEsistente) {
+      clienteEsistente.numeroProgetti += 1
+      clienteEsistente.valoreTotale += newCantiere.value.valore
+      clienteEsistente.ultimoContatto = new Date().toISOString().split('T')[0]
+      localStorage.setItem('legnosystem_clienti', JSON.stringify(availableClients.value))
+    }
+  }
+  
   const newId = Math.max(...cantieri.value.map(c => c.id)) + 1
   const nuovoCantiere = {
     ...newCantiere.value,
@@ -2723,12 +2870,17 @@ const saveNewCantiere = () => {
   saveCantieriToStorage()
 
   // Mostro la notifica prima del reset
-  alert(`✅ Cantiere "${nomeCantiere}" creato con successo!`)
+  const tipoClienteText = clientSelectionMode.value === 'new' ? 'nuovo cliente aggiunto' : 'cliente esistente'
+  alert(`✅ Cantiere "${nomeCantiere}" creato con successo!\n👤 Cliente: ${newCantiere.value.cliente} (${tipoClienteText})`)
 
   // Reset form
   newCantiere.value = {
     nome: '',
     cliente: '',
+    clienteTipo: 'privato',
+    clienteEmail: '',
+    clienteTelefono: '',
+    clienteIndirizzo: '',
     indirizzo: '',
     tipoLavoro: '',
     valore: 0,
@@ -2737,12 +2889,35 @@ const saveNewCantiere = () => {
     stato: 'pianificato',
     priorita: 'media'
   }
+  
+  // Reset selezione cliente
+  clientSelectionMode.value = 'existing'
+  selectedClientFromList.value = ''
 
   closeAddModal()
 }
 
 const closeAddModal = () => {
   showAddModal.value = false
+  // Reset completo del form
+  newCantiere.value = {
+    nome: '',
+    cliente: '',
+    clienteTipo: 'privato',
+    clienteEmail: '',
+    clienteTelefono: '',
+    clienteIndirizzo: '',
+    indirizzo: '',
+    tipoLavoro: '',
+    valore: 0,
+    dataInizio: '',
+    scadenza: '',
+    stato: 'pianificato',
+    priorita: 'media'
+  }
+  // Reset selezione cliente
+  clientSelectionMode.value = 'existing'
+  selectedClientFromList.value = ''
 }
 
 const manageTeam = (cantiere) => {
@@ -3531,5 +3706,65 @@ const getSelectedMaterialFromStock = () => {
 const fillMaterialFromStock = () => {
   newMaterial.value = { ...getSelectedMaterialFromStock() }
   closeAddMaterialModal()
+}
+
+const clientSelectionMode = ref('existing')
+const selectedClientFromList = ref('')
+
+const availableClients = ref([
+  { id: 1, nome: 'Famiglia Rossi', tipo: 'privato', email: 'info@famigliarossi.it', telefono: '0123 456789', indirizzo: 'Via delle Rose 15, Milano', numeroProgetti: 3, iniziali: 'FR' },
+  { id: 2, nome: 'Industrie SpA', tipo: 'azienda', email: 'vendite@industriespa.com', telefono: '0456 789123', indirizzo: 'Zona Industriale Nord, Bergamo', numeroProgetti: 2, iniziali: 'IS' },
+  { id: 3, nome: 'Comune di Verona', tipo: 'ente-pubblico', email: 'info@comunediverona.it', telefono: '0789 123456', indirizzo: 'Centro Storico, Verona', numeroProgetti: 1, iniziali: 'CV' }
+])
+
+// Carica clienti dal localStorage se esistono
+const loadClientsFromStorage = () => {
+  const stored = localStorage.getItem('legnosystem_clienti')
+  if (stored) {
+    try {
+      const clientiSalvati = JSON.parse(stored)
+      if (clientiSalvati.length > 0) {
+        availableClients.value = clientiSalvati
+      }
+    } catch (e) {
+      console.error('Errore nel caricamento clienti:', e)
+    }
+  }
+}
+
+// Carica clienti all'avvio
+loadClientsFromStorage()
+
+const getSelectedClient = () => {
+  return availableClients.value.find(cliente => cliente.id === selectedClientFromList.value)
+}
+
+const fillClientFromList = () => {
+  const selectedClient = getSelectedClient()
+  if (selectedClient) {
+    newCantiere.value.cliente = selectedClient.nome
+    newCantiere.value.clienteTipo = selectedClient.tipo
+    newCantiere.value.clienteEmail = selectedClient.email
+    newCantiere.value.clienteTelefono = selectedClient.telefono
+    newCantiere.value.clienteIndirizzo = selectedClient.indirizzo
+  }
+}
+
+const getTipoColor = (tipo) => {
+  const colors = {
+    'privato': 'bg-green-100 text-green-800',
+    'azienda': 'bg-blue-100 text-blue-800',
+    'ente-pubblico': 'bg-yellow-100 text-yellow-800'
+  }
+  return colors[tipo] || 'bg-gray-100 text-gray-800'
+}
+
+const getTipoLabel = (tipo) => {
+  const labels = {
+    'privato': '👤',
+    'azienda': '🏢',
+    'ente-pubblico': '🏛️'
+  }
+  return labels[tipo] || tipo
 }
 </script> 
