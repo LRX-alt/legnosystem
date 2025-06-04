@@ -1510,15 +1510,99 @@
           </div>
           
           <form v-if="newMaterial" @submit.prevent="saveMaterialToCantiere" class="space-y-6">
-            <!-- Nome Materiale -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Nome Materiale</label>
-              <input
-                v-model="newMaterial.nome"
-                type="text"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
-              />
+            <!-- Toggle Selezione/Nuovo -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <div class="flex items-center space-x-4">
+                <button 
+                  type="button"
+                  @click="materialSelectionMode = 'existing'"
+                  :class="[
+                    'px-4 py-2 rounded-lg font-medium text-sm transition-colors',
+                    materialSelectionMode === 'existing' 
+                      ? 'bg-primary-500 text-white' 
+                      : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+                  ]"
+                >
+                  📦 Seleziona da Magazzino
+                </button>
+                <button 
+                  type="button"
+                  @click="materialSelectionMode = 'new'"
+                  :class="[
+                    'px-4 py-2 rounded-lg font-medium text-sm transition-colors',
+                    materialSelectionMode === 'new' 
+                      ? 'bg-primary-500 text-white' 
+                      : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+                  ]"
+                >
+                  ➕ Nuovo Materiale
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mt-2">
+                {{ materialSelectionMode === 'existing' 
+                   ? 'Seleziona un materiale già presente in magazzino' 
+                   : 'Crea un nuovo materiale compilando tutti i campi' }}
+              </p>
+            </div>
+
+            <!-- Selezione Materiale Esistente -->
+            <div v-if="materialSelectionMode === 'existing'" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Materiale da Magazzino</label>
+                <select
+                  v-model="selectedMaterialFromStock"
+                  @change="fillMaterialFromStock"
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                >
+                  <option value="">-- Seleziona un materiale --</option>
+                  <option v-for="materiale in materialiMagazzino" :key="materiale.id" :value="materiale.id">
+                    {{ materiale.codice }} - {{ materiale.nome }} ({{ materiale.quantita }} {{ materiale.unita }} disponibili)
+                  </option>
+                </select>
+              </div>
+              
+              <!-- Info Materiale Selezionato -->
+              <div v-if="selectedMaterialFromStock" class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 class="font-medium text-blue-900 mb-2">📋 Dettagli Materiale Selezionato</h4>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                  <div><span class="text-blue-600">Categoria:</span> {{ getSelectedMaterialFromStock()?.categoria }}</div>
+                  <div><span class="text-blue-600">Disponibile:</span> {{ getSelectedMaterialFromStock()?.quantita }} {{ getSelectedMaterialFromStock()?.unita }}</div>
+                  <div><span class="text-blue-600">Prezzo:</span> €{{ getSelectedMaterialFromStock()?.prezzoUnitario }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Campi Materiale (sempre visibili ma readonly se da magazzino) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Nome Materiale -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nome Materiale</label>
+                <input
+                  v-model="newMaterial.nome"
+                  type="text"
+                  required
+                  :readonly="materialSelectionMode === 'existing'"
+                  :class="[
+                    'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base',
+                    materialSelectionMode === 'existing' ? 'bg-gray-100' : ''
+                  ]"
+                />
+              </div>
+
+              <!-- Codice -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Codice</label>
+                <input
+                  v-model="newMaterial.codice"
+                  type="text"
+                  required
+                  :readonly="materialSelectionMode === 'existing'"
+                  :class="[
+                    'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base',
+                    materialSelectionMode === 'existing' ? 'bg-gray-100' : ''
+                  ]"
+                />
+              </div>
             </div>
 
             <!-- Descrizione -->
@@ -1527,71 +1611,91 @@
               <textarea
                 v-model="newMaterial.descrizione"
                 rows="2"
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                :readonly="materialSelectionMode === 'existing'"
+                :class="[
+                  'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base',
+                  materialSelectionMode === 'existing' ? 'bg-gray-100' : ''
+                ]"
               ></textarea>
             </div>
 
-            <!-- Codice -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Codice</label>
-              <input
-                v-model="newMaterial.codice"
-                type="text"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
-              />
-            </div>
-
-            <!-- Quantità Richiesta -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Quantità Richiesta</label>
-              <input
-                v-model.number="newMaterial.quantitaRichiesta"
-                type="number"
-                min="0"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
-              />
-            </div>
-
-            <!-- Unita di Misura -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Unita di Misura</label>
-              <input
-                v-model="newMaterial.unita"
-                type="text"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
-              />
+            <!-- Quantità e Unità -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Quantità Richiesta</label>
+                <input
+                  v-model.number="newMaterial.quantitaRichiesta"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Unità di Misura</label>
+                <input
+                  v-model="newMaterial.unita"
+                  type="text"
+                  required
+                  :readonly="materialSelectionMode === 'existing'"
+                  :class="[
+                    'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base',
+                    materialSelectionMode === 'existing' ? 'bg-gray-100' : ''
+                  ]"
+                />
+              </div>
             </div>
 
             <!-- Prezzo Unitario -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Prezzo Unitario (€)</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Prezzo Unitario (€)
+                <span v-if="materialSelectionMode === 'existing'" class="text-xs text-gray-500">
+                  (modificabile per questo cantiere)
+                </span>
+              </label>
               <input
                 v-model.number="newMaterial.prezzoUnitario"
                 type="number"
                 min="0"
+                step="0.01"
                 required
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                :placeholder="materialSelectionMode === 'existing' ? 'Prezzo personalizzato per questo cantiere' : ''"
               />
             </div>
 
-            <!-- Stato -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Stato</label>
-              <select
-                v-model="newMaterial.stato"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
-              >
-                <option value="pianificato">Pianificato</option>
-                <option value="ordinato">Ordinato</option>
-                <option value="in-uso">In Uso</option>
-                <option value="utilizzato">Utilizzato</option>
-                <option value="completato">Completato</option>
-                <option value="in-lavorazione">In Lavorazione</option>
-              </select>
+            <!-- Stato e Fornitore -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Stato</label>
+                <select
+                  v-model="newMaterial.stato"
+                  required
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                >
+                  <option value="pianificato">Pianificato</option>
+                  <option value="ordinato">Ordinato</option>
+                  <option value="in-uso">In Uso</option>
+                  <option value="utilizzato">Utilizzato</option>
+                  <option value="completato">Completato</option>
+                  <option value="in-lavorazione">In Lavorazione</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Fornitore</label>
+                <select
+                  v-model="newMaterial.fornitoreId"
+                  required
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                >
+                  <option value="">-- Seleziona fornitore --</option>
+                  <option v-for="fornitore in fornitori" :key="fornitore.id" :value="fornitore.id">
+                    {{ fornitore.nome }}
+                  </option>
+                </select>
+              </div>
             </div>
 
             <!-- Data Acquisto -->
@@ -1611,21 +1715,8 @@
                 v-model="newMaterial.note"
                 rows="2"
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                :placeholder="materialSelectionMode === 'existing' ? 'Note specifiche per questo cantiere...' : 'Note sul materiale...'"
               ></textarea>
-            </div>
-
-            <!-- Fornitori -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Fornitori</label>
-              <select
-                v-model="newMaterial.fornitoreId"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
-              >
-                <option v-for="fornitore in fornitori" :key="fornitore.id" :value="fornitore.id">
-                  {{ fornitore.nome }}
-                </option>
-              </select>
             </div>
 
             <!-- Action Buttons -->
@@ -1634,7 +1725,7 @@
                 Annulla
               </button>
               <button type="submit" class="w-full sm:w-auto btn-primary py-3 text-base">
-                💾 Salva Nuovo Materiale
+                💾 {{ materialSelectionMode === 'existing' ? 'Aggiungi al Cantiere' : 'Salva Nuovo Materiale' }}
               </button>
             </div>
           </form>
@@ -2878,6 +2969,7 @@ const closeManageMaterialsModal = () => {
 }
 
 const addMaterialToCantiere = () => {
+  // Reset form con valori default
   newMaterial.value = {
     nome: '',
     descrizione: '',
@@ -2890,6 +2982,8 @@ const addMaterialToCantiere = () => {
     dataAcquisto: '',
     note: ''
   }
+  materialSelectionMode.value = 'existing' // Default a selezione da magazzino
+  selectedMaterialFromStock.value = ''
   showAddMaterialModal.value = true
 }
 
@@ -2908,9 +3002,14 @@ const closeEditMaterialModal = () => {
 }
 
 const saveMaterialToCantiere = () => {
-  // Validazione campi obbligatori per nuovo materiale
+  // Validazione campi obbligatori
   if (!newMaterial.value.nome || !newMaterial.value.quantitaRichiesta || !newMaterial.value.codice) {
     alert('❌ Compila nome, codice e quantità richiesta!')
+    return
+  }
+
+  if (!newMaterial.value.fornitoreId) {
+    alert('❌ Seleziona un fornitore!')
     return
   }
 
@@ -2930,29 +3029,20 @@ const saveMaterialToCantiere = () => {
     fornitoreNome: fornitoreSelected?.nome || '',
     prezzoEffettivo: newMaterial.value.prezzoUnitario || 0,
     dataAcquisto: newMaterial.value.dataAcquisto,
-    note: newMaterial.value.note
+    note: newMaterial.value.note,
+    // Metadati aggiuntivi
+    isFromStock: materialSelectionMode.value === 'existing',
+    originalStockId: materialSelectionMode.value === 'existing' ? selectedMaterialFromStock.value : null
   }
 
   // Aggiungi a materialiCantiere e salva nel localStorage
   materialiCantiere.value.push(nuovoMateriale)
   saveMaterialiCantiereToStorage()
   
-  // Reset form
-  newMaterial.value = {
-    nome: '',
-    descrizione: '',
-    codice: '',
-    quantitaRichiesta: 0,
-    unita: 'pz',
-    prezzoUnitario: 0,
-    stato: 'pianificato',
-    fornitoreId: null,
-    dataAcquisto: '',
-    note: ''
-  }
-  
   closeAddMaterialModal()
-  alert(`✅ Materiale "${nuovoMateriale.nome}" aggiunto al cantiere!`)
+  
+  const modeText = materialSelectionMode.value === 'existing' ? 'aggiunto dal magazzino' : 'creato e aggiunto'
+  alert(`✅ Materiale "${nuovoMateriale.nome}" ${modeText} al cantiere!`)
 }
 
 const saveMaterialChanges = () => {
@@ -3277,5 +3367,17 @@ const handleMaterialFileUpload = async (event) => {
 const generateMaterialReport = () => {
   // Implementa la generazione del report materiale
   alert('Generazione report materiale non implementata.')
+}
+
+const materialSelectionMode = ref('existing')
+const selectedMaterialFromStock = ref('')
+
+const getSelectedMaterialFromStock = () => {
+  return materialiMagazzino.value.find(materiale => materiale.id === selectedMaterialFromStock.value)
+}
+
+const fillMaterialFromStock = () => {
+  newMaterial.value = { ...getSelectedMaterialFromStock() }
+  closeAddMaterialModal()
 }
 </script> 
