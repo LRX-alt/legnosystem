@@ -595,6 +595,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Richiesto</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Utilizzato</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valore</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Allegati</th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -618,6 +619,18 @@
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ materiale.quantitaRichiesta }} {{ materiale.unita }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ materiale.quantitaUtilizzata }} {{ materiale.unita }}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">€{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <button @click="manageMaterialAttachments(materiale)" 
+                              class="flex items-center space-x-2 text-blue-600 hover:text-blue-700 p-2 rounded-lg hover:bg-blue-50"
+                              title="Gestisci allegati materiale">
+                        <PaperClipIcon class="w-4 h-4" />
+                        <span v-if="getMaterialAttachmentCount(materiale) > 0" 
+                              class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {{ getMaterialAttachmentCount(materiale) }}
+                        </span>
+                        <span v-else class="text-xs text-gray-400">0</span>
+                      </button>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -1810,6 +1823,7 @@ const showAttachmentsModal = ref(false)
 const showManageMaterialsModal = ref(false)
 const showAddMaterialModal = ref(false)
 const showEditMaterialModal = ref(false)
+const showMaterialAttachmentsModal = ref(false)
 
 const searchTerm = ref('')
 const selectedStatus = ref('')
@@ -1958,6 +1972,10 @@ const dipendentiDisponibili = ref([])
 // Gestione allegati
 const cantieriAttachments = ref({})
 
+// Gestione allegati materiali per cantiere
+const materialiAttachments = ref({})
+const selectedMaterial = ref(null)
+
 // Dati magazzino (sincronizzato con localStorage)
 const materialiMagazzino = ref([])
 
@@ -2064,6 +2082,9 @@ loadAttachmentsFromStorage()
 
 // Carica materiali magazzino all'avvio
 loadMaterialiMagazzinoFromStorage()
+
+// Carica allegati materiali all'avvio  
+loadMaterialAttachmentsFromStorage()
 
 // Ascolta gli eventi di aggiornamento dipendenti
 window.addEventListener('dipendenti-updated', loadDipendentiFromStorage)
@@ -2849,6 +2870,74 @@ const openFile = (file) => {
   } catch (error) {
     console.error('Errore nell\'apertura del file:', error)
     alert(`❌ Errore nell'apertura del file "${file.name}".\n\nDettagli: ${error.message}`)
+  }
+}
+
+// Funzione per caricare allegati materiali dal localStorage
+const loadMaterialAttachmentsFromStorage = () => {
+  const stored = localStorage.getItem('legnosystem_material_attachments')
+  if (stored) {
+    try {
+      materialiAttachments.value = JSON.parse(stored)
+    } catch (e) {
+      console.warn('Errore nel caricamento allegati materiali:', e)
+      materialiAttachments.value = {}
+    }
+  }
+}
+
+// Funzione per salvare allegati materiali nel localStorage
+const saveMaterialAttachmentsToStorage = () => {
+  localStorage.setItem('legnosystem_material_attachments', JSON.stringify(materialiAttachments.value))
+}
+
+const getMaterialAttachmentCount = (materiale) => {
+  return materialiAttachments.value[materiale.id]?.length || 0
+}
+
+const manageMaterialAttachments = (materiale) => {
+  selectedMaterial.value = materiale
+  showMaterialAttachmentsModal.value = true
+}
+
+const closeMaterialAttachmentsModal = () => {
+  showMaterialAttachmentsModal.value = false
+  selectedMaterial.value = null
+}
+
+const addAttachmentToMaterial = (materialId) => {
+  const material = materialiCantiere.value.find(m => m.id === materialId)
+  if (!material) return
+
+  const newAttachment = {
+    id: Date.now() + Math.random(),
+    name: `Attachment-${Date.now()}.pdf`,
+    size: 1024, // Simula una dimensione fissa
+    type: 'pdf',
+    uploadDate: new Date().toISOString().split('T')[0],
+    description: 'Nuovo allegato',
+    materialId: materialId,
+    url: URL.createObjectURL(new Blob([new Uint8Array(1024)], { type: 'application/pdf' }))
+  }
+
+  if (!materialiAttachments.value[materialId]) {
+    materialiAttachments.value[materialId] = []
+  }
+
+  materialiAttachments.value[materialId].push(newAttachment)
+  saveMaterialAttachmentsToStorage()
+
+  closeMaterialAttachmentsModal()
+  alert(`✅ Allegato aggiunto al materiale "${material.nome}"!`)
+}
+
+const removeAttachmentFromMaterial = (materialId, attachmentId) => {
+  if (confirm(`🗑️ Sei sicuro di voler eliminare questo allegato?`)) {
+    if (materialiAttachments.value[materialId]) {
+      materialiAttachments.value[materialId] = materialiAttachments.value[materialId].filter(a => a.id !== attachmentId)
+      saveMaterialAttachmentsToStorage()
+      alert(`✅ Allegato eliminato con successo!`)
+    }
   }
 }
 </script> 
