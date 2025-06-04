@@ -127,6 +127,7 @@
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fornitore</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valutazione</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantieri Attivi</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ordini Anno</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stato</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
@@ -159,6 +160,13 @@
                     </div>
                     <span class="ml-2 text-sm text-gray-600">({{ fornitore.rating }}/5)</span>
                   </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {{ getFornitoreRelations(fornitore.id).cantieri.length }} cantieri<br/>
+                  <span class="text-xs text-gray-500">{{ getFornitoreRelations(fornitore.id).materiali.length }} materiali</span>
+                  <span v-if="getFornitoreRelations(fornitore.id).totaleValore > 0" class="block text-xs text-green-600 font-medium">
+                    €{{ getFornitoreRelations(fornitore.id).totaleValore.toFixed(0) }}
+                  </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {{ fornitore.ordiniAnno }} ordini<br/>
@@ -223,6 +231,14 @@
             <div class="flex justify-between text-sm">
               <span class="text-gray-600">Ordini 2024:</span>
               <span class="font-medium">{{ fornitore.ordiniAnno }} - €{{ fornitore.valoreAnno.toLocaleString() }}</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Cantieri Attivi:</span>
+              <span class="font-medium">{{ getFornitoreRelations(fornitore.id).cantieri.length }} cantieri</span>
+            </div>
+            <div v-if="getFornitoreRelations(fornitore.id).materiali.length > 0" class="flex justify-between text-sm">
+              <span class="text-gray-600">Materiali:</span>
+              <span class="font-medium text-green-600">{{ getFornitoreRelations(fornitore.id).materiali.length }} (€{{ getFornitoreRelations(fornitore.id).totaleValore.toFixed(0) }})</span>
             </div>
           </div>
 
@@ -639,7 +655,39 @@ const isScaduto = (dateString) => {
 }
 
 const viewFornitore = (fornitore) => {
-  alert(`📋 Dettagli ${fornitore.nome}:\n\n📍 ${fornitore.indirizzo}, ${fornitore.citta}\n📞 ${fornitore.telefono}\n📧 ${fornitore.email}\n⭐ Rating: ${fornitore.rating}/5\n📦 Ordini 2024: ${fornitore.ordiniAnno}\n💰 Valore: €${fornitore.valoreAnno.toLocaleString()}`)
+  const relations = getFornitoreRelations(fornitore.id)
+  
+  let message = `📋 Dettagli ${fornitore.nome}:\n\n`
+  message += `📍 ${fornitore.indirizzo}, ${fornitore.citta}\n`
+  message += `📞 ${fornitore.telefono}\n`
+  message += `📧 ${fornitore.email}\n`
+  message += `⭐ Rating: ${fornitore.rating}/5\n\n`
+  
+  message += `📊 STATISTICHE 2024:\n`
+  message += `📦 Ordini: ${fornitore.ordiniAnno}\n`
+  message += `💰 Valore ordini: €${fornitore.valoreAnno.toLocaleString()}\n\n`
+  
+  if (relations.cantieri.length > 0) {
+    message += `🏗️ CANTIERI ASSOCIATI (${relations.cantieri.length}):\n`
+    relations.cantieri.forEach(cantiere => {
+      message += `• ${cantiere.nome} - ${cantiere.cliente} (${cantiere.materialiCount} materiali)\n`
+    })
+    message += `\n💰 Valore totale materiali: €${relations.totaleValore.toFixed(2)}\n\n`
+  }
+  
+  if (relations.materiali.length > 0) {
+    message += `🧱 MATERIALI FORNITI (${relations.materiali.length}):\n`
+    relations.materiali.slice(0, 5).forEach(materiale => {
+      message += `• ${materiale.nome} (${materiale.codice}) - ${materiale.cantiere.nome}\n`
+    })
+    if (relations.materiali.length > 5) {
+      message += `• ... e altri ${relations.materiali.length - 5} materiali\n`
+    }
+  } else {
+    message += `📝 Nessun materiale associato nei cantieri attuali`
+  }
+  
+  alert(message)
 }
 
 const editFornitore = (fornitore) => {
@@ -647,7 +695,7 @@ const editFornitore = (fornitore) => {
 }
 
 const createOrder = (fornitore) => {
-  alert(`🛒 Nuovo ordine per ${fornitore.nome}\n\n⏱️ Tempo consegna: ${fornitore.tempoConsegna} giorni\n⭐ Rating: ${fornitore.rating}/5\n\n📋 Sistema ordini in implementazione`)
+  alert(`🛒 Nuovo ordine per ${fornitore.nome} - Funzionalità in implementazione`)
 }
 
 const viewOrder = (ordine) => {
@@ -715,6 +763,63 @@ const closeAddModal = () => {
     provincia: '',
     telefono: '',
     email: ''
+  }
+}
+
+// Funzioni per sincronizzazione con materiali cantieri
+const getFornitoreRelations = (fornitoreId) => {
+  const stored = localStorage.getItem('legnosystem_materiali_cantieri')
+  const cantieriStored = localStorage.getItem('legnosystem_cantieri')
+  
+  if (!stored || !cantieriStored) return { materiali: [], cantieri: [], totaleValore: 0 }
+  
+  try {
+    const materialiCantieri = JSON.parse(stored)
+    const cantieri = JSON.parse(cantieriStored)
+    
+    let materiali = []
+    let cantieriAssociati = new Set()
+    let totaleValore = 0
+    
+    // Cerca in tutti i cantieri i materiali di questo fornitore
+    Object.entries(materialiCantieri).forEach(([cantiereId, materialiList]) => {
+      const cantiere = cantieri.find(c => c.id == cantiereId)
+      
+      materialiList.forEach(materiale => {
+        if (materiale.fornitoreId == fornitoreId) {
+          materiali.push({
+            ...materiale,
+            cantiere: {
+              id: cantiereId,
+              nome: cantiere?.nome || 'Cantiere non trovato',
+              cliente: cantiere?.cliente || ''
+            }
+          })
+          cantieriAssociati.add(cantiereId)
+          totaleValore += (materiale.quantitaRichiesta * materiale.prezzoUnitario) || 0
+        }
+      })
+    })
+    
+    const cantieriArray = Array.from(cantieriAssociati).map(id => {
+      const cantiere = cantieri.find(c => c.id == id)
+      return cantiere ? {
+        id: cantiere.id,
+        nome: cantiere.nome,
+        cliente: cantiere.cliente,
+        stato: cantiere.stato,
+        materialiCount: materialiCantieri[id]?.filter(m => m.fornitoreId == fornitoreId).length || 0
+      } : null
+    }).filter(Boolean)
+    
+    return {
+      materiali,
+      cantieri: cantieriArray,
+      totaleValore
+    }
+  } catch (e) {
+    console.error('Errore nel caricamento relazioni fornitore:', e)
+    return { materiali: [], cantieri: [], totaleValore: 0 }
   }
 }
 </script> 
