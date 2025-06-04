@@ -1370,6 +1370,14 @@
                   
                   <!-- Azioni -->
                   <div class="flex items-center space-x-2">
+                    <button @click="openFile(attachment)" 
+                            class="text-green-600 hover:text-green-700 p-2 rounded-lg hover:bg-green-50"
+                            title="Apri file">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                      </svg>
+                    </button>
                     <button @click="downloadFile(attachment)" 
                             class="text-primary-600 hover:text-primary-700 p-2 rounded-lg hover:bg-primary-50"
                             title="Scarica file">
@@ -2213,5 +2221,55 @@ const handleFileUpload = async (event) => {
 
 const getCantiereAttachments = (cantiereId) => {
   return cantieriAttachments.value[cantiereId] || []
+}
+
+const openFile = (file) => {
+  if (!file.url) {
+    alert('❌ File non disponibile per l\'apertura')
+    return
+  }
+
+  try {
+    // Apre il file in una nuova finestra/tab
+    const newWindow = window.open(file.url, '_blank')
+    
+    if (newWindow) {
+      // File aperto con successo
+      newWindow.focus()
+      
+      // Messaggio di feedback in base al tipo di file
+      const fileType = file.type.toLowerCase()
+      let message = `👁️ File "${file.name}" aperto in una nuova finestra`
+      
+      if (['pdf'].includes(fileType)) {
+        message += '\n📄 PDF - Visualizzazione diretta nel browser'
+      } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType)) {
+        message += '\n🖼️ Immagine - Visualizzazione diretta nel browser'
+      } else if (['txt', 'csv'].includes(fileType)) {
+        message += '\n📝 Testo - Visualizzazione diretta nel browser'
+      } else if (['doc', 'docx', 'xls', 'xlsx'].includes(fileType)) {
+        message += '\n📋 Documento Office - Potrebbe richiedere un\'applicazione esterna'
+      } else {
+        message += '\n📎 Il browser tenterà di aprire il file'
+      }
+      
+      console.log(message)
+    } else {
+      // Popup bloccato o errore
+      alert('⚠️ Impossibile aprire il file.\nVerifica che i popup non siano bloccati dal browser.')
+      
+      // Fallback: prova a creare un link temporaneo
+      const link = document.createElement('a')
+      link.href = file.url
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  } catch (error) {
+    console.error('Errore nell\'apertura del file:', error)
+    alert(`❌ Errore nell'apertura del file "${file.name}".\n\nDettagli: ${error.message}`)
+  }
 }
 </script> 
