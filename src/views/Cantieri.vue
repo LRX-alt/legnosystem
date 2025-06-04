@@ -2892,6 +2892,7 @@ const saveMaterialAttachmentsToStorage = () => {
 }
 
 const getMaterialAttachmentCount = (materiale) => {
+  if (!materialiAttachments.value || !materiale) return 0
   return materialiAttachments.value[materiale.id]?.length || 0
 }
 
@@ -2940,4 +2941,7 @@ const removeAttachmentFromMaterial = (materialId, attachmentId) => {
     }
   }
 }
+
+// Inizializza allegati materiali dopo tutte le dichiarazioni
+loadMaterialAttachmentsFromStorage()
 </script> 
