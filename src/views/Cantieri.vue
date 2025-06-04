@@ -2084,7 +2084,7 @@ loadAttachmentsFromStorage()
 loadMaterialiMagazzinoFromStorage()
 
 // Carica allegati materiali all'avvio  
-loadMaterialAttachmentsFromStorage()
+// loadMaterialAttachmentsFromStorage() // RIMOSSA: causava errore hoisting
 
 // Ascolta gli eventi di aggiornamento dipendenti
 window.addEventListener('dipendenti-updated', loadDipendentiFromStorage)
