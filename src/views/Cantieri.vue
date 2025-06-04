@@ -1996,13 +1996,16 @@ const materialiCantiere = ref([])
 const analysisResults = ref(null)
 const editingMaterial = ref(null)
 const newMaterial = ref({
-  materialeId: null,
+  nome: '',
+  descrizione: '',
+  codice: '',
   quantitaRichiesta: 0,
+  unita: 'pz',
+  prezzoUnitario: 0,
+  stato: 'pianificato',
   fornitoreId: null,
-  prezzoEffettivo: 0,
   dataAcquisto: '',
-  note: '',
-  stato: 'pianificato'
+  note: ''
 })
 
 // Nuovo cantiere
@@ -2876,13 +2879,16 @@ const closeManageMaterialsModal = () => {
 
 const addMaterialToCantiere = () => {
   newMaterial.value = {
-    materialeId: null,
+    nome: '',
+    descrizione: '',
+    codice: '',
     quantitaRichiesta: 0,
+    unita: 'pz',
+    prezzoUnitario: 0,
+    stato: 'pianificato',
     fornitoreId: null,
-    prezzoEffettivo: 0,
     dataAcquisto: '',
-    note: '',
-    stato: 'pianificato'
+    note: ''
   }
   showAddMaterialModal.value = true
 }
@@ -2902,32 +2908,27 @@ const closeEditMaterialModal = () => {
 }
 
 const saveMaterialToCantiere = () => {
-  if (!newMaterial.value.materialeId || !newMaterial.value.quantitaRichiesta) {
-    alert('❌ Seleziona materiale e inserisci quantità richiesta!')
+  // Validazione campi obbligatori per nuovo materiale
+  if (!newMaterial.value.nome || !newMaterial.value.quantitaRichiesta || !newMaterial.value.codice) {
+    alert('❌ Compila nome, codice e quantità richiesta!')
     return
   }
 
-  const materialeSelected = materialiMagazzino.value.find(m => m.id == newMaterial.value.materialeId)
   const fornitoreSelected = fornitori.value.find(f => f.id == newMaterial.value.fornitoreId)
   
-  if (!materialeSelected) {
-    alert('❌ Materiale non trovato!')
-    return
-  }
-
   const nuovoMateriale = {
     id: Date.now() + Math.random(),
-    codice: materialeSelected.codice,
-    nome: materialeSelected.nome,
-    descrizione: materialeSelected.descrizione || '',
+    codice: newMaterial.value.codice,
+    nome: newMaterial.value.nome,
+    descrizione: newMaterial.value.descrizione || '',
     quantitaRichiesta: newMaterial.value.quantitaRichiesta,
     quantitaUtilizzata: 0,
-    unita: materialeSelected.unita,
-    prezzoUnitario: materialeSelected.prezzoUnitario,
+    unita: newMaterial.value.unita || 'pz',
+    prezzoUnitario: newMaterial.value.prezzoUnitario || 0,
     stato: newMaterial.value.stato,
     fornitoreId: newMaterial.value.fornitoreId,
     fornitoreNome: fornitoreSelected?.nome || '',
-    prezzoEffettivo: newMaterial.value.prezzoEffettivo || materialeSelected.prezzoUnitario,
+    prezzoEffettivo: newMaterial.value.prezzoUnitario || 0,
     dataAcquisto: newMaterial.value.dataAcquisto,
     note: newMaterial.value.note
   }
@@ -2936,8 +2937,22 @@ const saveMaterialToCantiere = () => {
   materialiCantiere.value.push(nuovoMateriale)
   saveMaterialiCantiereToStorage()
   
+  // Reset form
+  newMaterial.value = {
+    nome: '',
+    descrizione: '',
+    codice: '',
+    quantitaRichiesta: 0,
+    unita: 'pz',
+    prezzoUnitario: 0,
+    stato: 'pianificato',
+    fornitoreId: null,
+    dataAcquisto: '',
+    note: ''
+  }
+  
   closeAddMaterialModal()
-  alert(`✅ Materiale "${materialeSelected.nome}" aggiunto al cantiere!`)
+  alert(`✅ Materiale "${nuovoMateriale.nome}" aggiunto al cantiere!`)
 }
 
 const saveMaterialChanges = () => {
