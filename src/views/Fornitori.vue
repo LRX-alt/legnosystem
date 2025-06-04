@@ -316,6 +316,214 @@
       </div>
     </div>
 
+    <!-- Modal Visualizzazione Fornitore Dettagliato -->
+    <div v-if="showDetailModal && selectedFornitore" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeDetailModal">
+      <div class="relative top-4 mx-auto border w-full max-w-6xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <!-- Header con info principale -->
+          <div class="flex items-start justify-between mb-6 pb-6 border-b border-gray-200">
+            <div class="flex items-center">
+              <div class="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mr-4">
+                <span class="text-primary-600 font-bold text-xl">{{ selectedFornitore.iniziali }}</span>
+              </div>
+              <div>
+                <h2 class="text-2xl font-bold text-gray-900">{{ selectedFornitore.nome }}</h2>
+                <p class="text-gray-600">{{ getCategoryLabel(selectedFornitore.categoria) }}</p>
+                <div class="flex items-center mt-2">
+                  <div class="flex mr-2">
+                    <StarIcon v-for="i in 5" :key="i" 
+                             :class="i <= selectedFornitore.rating ? 'text-yellow-400' : 'text-gray-300'" 
+                             class="w-5 h-5" />
+                  </div>
+                  <span class="text-sm text-gray-600">({{ selectedFornitore.rating }}/5)</span>
+                  <span class="ml-4 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatusColor(selectedFornitore.stato)">
+                    {{ getStatusLabel(selectedFornitore.stato) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center space-x-3">
+              <button @click="editFornitore(selectedFornitore)" class="btn-secondary p-2">
+                <PencilIcon class="w-5 h-5" />
+              </button>
+              <button @click="createOrder(selectedFornitore)" class="btn-primary p-2">
+                <ShoppingCartIcon class="w-5 h-5" />
+              </button>
+              <button @click="closeDetailModal" class="text-gray-400 hover:text-gray-600 p-2">
+                <XMarkIcon class="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Colonna Sinistra: Dati Anagrafici e Contatti -->
+            <div class="lg:col-span-1 space-y-6">
+              <!-- Dati Anagrafici -->
+              <div class="card">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <BuildingOfficeIcon class="w-5 h-5 mr-2 text-primary-600" />
+                  Dati Aziendali
+                </h3>
+                <div class="space-y-3">
+                  <div>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Partita IVA</p>
+                    <p class="text-sm font-medium text-gray-900">{{ selectedFornitore.partitaIva }}</p>
+                  </div>
+                  <div v-if="selectedFornitore.codiceFiscale">
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Codice Fiscale</p>
+                    <p class="text-sm font-medium text-gray-900">{{ selectedFornitore.codiceFiscale }}</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Indirizzo</p>
+                    <p class="text-sm font-medium text-gray-900">{{ selectedFornitore.indirizzo }}</p>
+                    <p class="text-sm text-gray-600">{{ selectedFornitore.cap }} {{ selectedFornitore.citta }} ({{ selectedFornitore.provincia }})</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contatti -->
+              <div class="card">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Contatti</h3>
+                <div class="space-y-3">
+                  <div class="flex items-center">
+                    <span class="text-gray-400 mr-3">📞</span>
+                    <a :href="`tel:${selectedFornitore.telefono}`" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                      {{ selectedFornitore.telefono }}
+                    </a>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="text-gray-400 mr-3">📧</span>
+                    <a :href="`mailto:${selectedFornitore.email}`" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                      {{ selectedFornitore.email }}
+                    </a>
+                  </div>
+                  <div class="flex items-center">
+                    <span class="text-gray-400 mr-3">🚚</span>
+                    <span class="text-sm text-gray-600">Consegna in {{ selectedFornitore.tempoConsegna }} giorni</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Azioni Rapide -->
+              <div class="card">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Azioni Rapide</h3>
+                <div class="space-y-2">
+                  <button @click="createOrder(selectedFornitore)" class="w-full btn-primary text-left py-3">
+                    🛒 Nuovo Ordine
+                  </button>
+                  <button @click="contactFornitore(selectedFornitore)" class="w-full btn-secondary text-left py-3">
+                    📞 Contatta
+                  </button>
+                  <button @click="viewContracts(selectedFornitore)" class="w-full btn-secondary text-left py-3">
+                    📄 Contratti & Listini
+                  </button>
+                  <button @click="viewHistory(selectedFornitore)" class="w-full btn-secondary text-left py-3">
+                    📊 Storico Ordini
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Colonna Centrale e Destra: Statistiche e Relazioni -->
+            <div class="lg:col-span-2 space-y-6">
+              <!-- Statistiche Performance -->
+              <div class="card">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <CurrencyEuroIcon class="w-5 h-5 mr-2 text-green-600" />
+                  Performance 2024
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div class="text-center p-4 bg-blue-50 rounded-lg">
+                    <p class="text-2xl font-bold text-blue-600">{{ selectedFornitore.ordiniAnno }}</p>
+                    <p class="text-sm text-gray-600">Ordini Totali</p>
+                  </div>
+                  <div class="text-center p-4 bg-green-50 rounded-lg">
+                    <p class="text-2xl font-bold text-green-600">€{{ selectedFornitore.valoreAnno.toLocaleString() }}</p>
+                    <p class="text-sm text-gray-600">Valore Ordini</p>
+                  </div>
+                  <div class="text-center p-4 bg-purple-50 rounded-lg">
+                    <p class="text-2xl font-bold text-purple-600">{{ getFornitoreRelations(selectedFornitore.id).cantieri.length }}</p>
+                    <p class="text-sm text-gray-600">Cantieri Attivi</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cantieri Associati -->
+              <div class="card" v-if="getFornitoreRelations(selectedFornitore.id).cantieri.length > 0">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  🏗️ Cantieri Associati ({{ getFornitoreRelations(selectedFornitore.id).cantieri.length }})
+                </h3>
+                <div class="space-y-3 max-h-64 overflow-y-auto">
+                  <div v-for="cantiere in getFornitoreRelations(selectedFornitore.id).cantieri" :key="cantiere.id" 
+                       class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div>
+                      <p class="font-medium text-gray-900">{{ cantiere.nome }}</p>
+                      <p class="text-sm text-gray-600">{{ cantiere.cliente }}</p>
+                      <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
+                            :class="cantiere.stato === 'attivo' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
+                        {{ cantiere.stato }}
+                      </span>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-sm font-medium text-gray-900">{{ cantiere.materialiCount }} materiali</p>
+                      <button @click="viewCantiereDetails(cantiere)" class="text-xs text-primary-600 hover:text-primary-700">
+                        Visualizza →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Materiali Forniti -->
+              <div class="card" v-if="getFornitoreRelations(selectedFornitore.id).materiali.length > 0">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                    🧱 Materiali Forniti ({{ getFornitoreRelations(selectedFornitore.id).materiali.length }})
+                  </h3>
+                  <p class="text-sm font-medium text-green-600">
+                    Totale: €{{ getFornitoreRelations(selectedFornitore.id).totaleValore.toFixed(2) }}
+                  </p>
+                </div>
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                  <div v-for="materiale in getFornitoreRelations(selectedFornitore.id).materiali" :key="`${materiale.cantiere.id}-${materiale.id}`" 
+                       class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="flex-1">
+                      <div class="flex items-center">
+                        <p class="font-medium text-gray-900">{{ materiale.nome }}</p>
+                        <span class="ml-2 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">{{ materiale.codice }}</span>
+                      </div>
+                      <p class="text-sm text-gray-600">{{ materiale.cantiere.nome }} - {{ materiale.cantiere.cliente }}</p>
+                      <div class="flex items-center mt-1 space-x-4">
+                        <span class="text-xs text-gray-500">Qtà: {{ materiale.quantitaRichiesta }} {{ materiale.unita }}</span>
+                        <span class="text-xs text-gray-500">€{{ materiale.prezzoUnitario }}</span>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" 
+                              :class="materiale.stato === 'consegnato' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'">
+                          {{ materiale.stato }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-sm font-bold text-gray-900">€{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Messaggio se nessun materiale -->
+              <div v-else class="card text-center py-8">
+                <div class="text-gray-400 mb-4">📦</div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Nessun materiale associato</h3>
+                <p class="text-gray-600 mb-4">Questo fornitore non ha ancora materiali associati ai cantieri attuali.</p>
+                <button @click="createOrder(selectedFornitore)" class="btn-primary">
+                  🛒 Crea Primo Ordine
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Nuovo Fornitore -->
     <div v-if="showAddModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeAddModal">
       <div class="relative top-4 mx-auto border w-full max-w-2xl shadow-lg rounded-md bg-white" @click.stop>
@@ -433,7 +641,9 @@ import {
 
 // Stato della pagina
 const showAddModal = ref(false)
+const showDetailModal = ref(false)
 const showComparationModal = ref(false)
+const selectedFornitore = ref(null)
 const activeTab = ref('fornitori')
 const searchTerm = ref('')
 const selectedCategory = ref('')
@@ -655,39 +865,33 @@ const isScaduto = (dateString) => {
 }
 
 const viewFornitore = (fornitore) => {
-  const relations = getFornitoreRelations(fornitore.id)
-  
-  let message = `📋 Dettagli ${fornitore.nome}:\n\n`
-  message += `📍 ${fornitore.indirizzo}, ${fornitore.citta}\n`
-  message += `📞 ${fornitore.telefono}\n`
-  message += `📧 ${fornitore.email}\n`
-  message += `⭐ Rating: ${fornitore.rating}/5\n\n`
-  
-  message += `📊 STATISTICHE 2024:\n`
-  message += `📦 Ordini: ${fornitore.ordiniAnno}\n`
-  message += `💰 Valore ordini: €${fornitore.valoreAnno.toLocaleString()}\n\n`
-  
-  if (relations.cantieri.length > 0) {
-    message += `🏗️ CANTIERI ASSOCIATI (${relations.cantieri.length}):\n`
-    relations.cantieri.forEach(cantiere => {
-      message += `• ${cantiere.nome} - ${cantiere.cliente} (${cantiere.materialiCount} materiali)\n`
-    })
-    message += `\n💰 Valore totale materiali: €${relations.totaleValore.toFixed(2)}\n\n`
+  selectedFornitore.value = fornitore
+  showDetailModal.value = true
+}
+
+const closeDetailModal = () => {
+  showDetailModal.value = false
+  selectedFornitore.value = null
+}
+
+const contactFornitore = (fornitore) => {
+  const message = `Vuoi contattare ${fornitore.nome}?`
+  if (confirm(message)) {
+    // Qui potresti integrare con un sistema di comunicazione
+    window.open(`mailto:${fornitore.email}?subject=Richiesta informazioni - Legnosystem`)
   }
-  
-  if (relations.materiali.length > 0) {
-    message += `🧱 MATERIALI FORNITI (${relations.materiali.length}):\n`
-    relations.materiali.slice(0, 5).forEach(materiale => {
-      message += `• ${materiale.nome} (${materiale.codice}) - ${materiale.cantiere.nome}\n`
-    })
-    if (relations.materiali.length > 5) {
-      message += `• ... e altri ${relations.materiali.length - 5} materiali\n`
-    }
-  } else {
-    message += `📝 Nessun materiale associato nei cantieri attuali`
-  }
-  
-  alert(message)
+}
+
+const viewContracts = (fornitore) => {
+  alert(`📄 Contratti e Listini per ${fornitore.nome}\n\n🔹 Contratto principale: Valido fino al 31/12/2024\n🔹 Listino 2024: Aggiornato il 15/01/2024\n🔹 Condizioni pagamento: 30gg FM\n🔹 Sconto volume: 5% oltre €10.000\n\n📋 Funzionalità completa in implementazione`)
+}
+
+const viewHistory = (fornitore) => {
+  alert(`📊 Storico Ordini ${fornitore.nome}\n\n📦 Ordini 2024: ${fornitore.ordiniAnno}\n💰 Valore totale: €${fornitore.valoreAnno.toLocaleString()}\n⭐ Rating medio: ${fornitore.rating}/5\n🚚 Tempo medio consegna: ${fornitore.tempoConsegna} giorni\n\n📈 Andamento ordini:\n• Q1 2024: €${Math.round(fornitore.valoreAnno * 0.3).toLocaleString()}\n• Q2 2024: €${Math.round(fornitore.valoreAnno * 0.4).toLocaleString()}\n• Q3 2024: €${Math.round(fornitore.valoreAnno * 0.2).toLocaleString()}\n• Q4 2024: €${Math.round(fornitore.valoreAnno * 0.1).toLocaleString()}`)
+}
+
+const viewCantiereDetails = (cantiere) => {
+  alert(`🏗️ Dettagli Cantiere: ${cantiere.nome}\n\n👤 Cliente: ${cantiere.cliente}\n📊 Stato: ${cantiere.stato}\n🧱 Materiali fornitore: ${cantiere.materialiCount}\n\n💡 Clicca su "Cantieri" nel menu per vedere tutti i dettagli`)
 }
 
 const editFornitore = (fornitore) => {
