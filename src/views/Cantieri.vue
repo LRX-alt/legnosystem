@@ -1785,6 +1785,167 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal Gestione Allegati Materiale -->
+    <div v-if="showMaterialAttachmentsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeMaterialAttachmentsModal">
+      <div class="relative top-4 mx-auto border w-full max-w-4xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 bg-blue-100 rounded-lg">
+                <PaperClipIcon class="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 class="text-xl font-semibold text-gray-900">📎 Allegati Materiale</h3>
+                <p class="text-sm text-gray-600 mt-1" v-if="selectedMaterial">
+                  {{ selectedMaterial.nome }} ({{ selectedMaterial.codice }}) - {{ getFornitoreById(selectedMaterial.fornitoreId)?.nome }}
+                </p>
+              </div>
+            </div>
+            <button @click="closeMaterialAttachmentsModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+          
+          <div class="space-y-6">
+            <!-- Info Materiale -->
+            <div class="bg-wood-light p-4 rounded-lg border border-primary-200">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p class="text-primary-600 font-medium">Quantità</p>
+                  <p class="font-semibold">{{ selectedMaterial?.quantitaRichiesta }} {{ selectedMaterial?.unita }}</p>
+                </div>
+                <div>
+                  <p class="text-primary-600 font-medium">Valore Totale</p>
+                  <p class="font-semibold">€{{ (selectedMaterial?.quantitaRichiesta * selectedMaterial?.prezzoUnitario).toFixed(2) }}</p>
+                </div>
+                <div>
+                  <p class="text-primary-600 font-medium">Stato</p>
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" :class="getMaterialStatusColor(selectedMaterial?.stato)">
+                    {{ selectedMaterial?.stato }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-primary-400 transition-colors">
+              <div class="text-center">
+                <div class="mx-auto w-12 h-12 text-gray-400 mb-4">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 48 48" aria-hidden="true">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </div>
+                <div class="flex text-sm text-gray-600">
+                  <label for="material-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
+                    <span>Carica documenti</span>
+                    <input id="material-file-upload" name="material-file-upload" type="file" class="sr-only" @change="handleMaterialFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.txt">
+                  </label>
+                  <p class="pl-1">o trascina qui</p>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">DDT, Fatture, Certificati, Foto - PDF, DOC, XLS, JPG, PNG fino a 10MB</p>
+              </div>
+            </div>
+
+            <!-- Lista Allegati -->
+            <div v-if="getMaterialAttachments()?.length > 0">
+              <h4 class="font-semibold text-gray-900 mb-4">📋 Documenti Allegati ({{ getMaterialAttachments().length }})</h4>
+              <div class="space-y-3">
+                <div v-for="attachment in getMaterialAttachments()" :key="attachment.id" 
+                     class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <div class="flex items-center space-x-3 flex-1 min-w-0">
+                    <!-- Icona file -->
+                    <div class="flex-shrink-0">
+                      <div class="w-10 h-10 rounded-lg flex items-center justify-center" :class="getFileTypeClass(attachment.type)">
+                        <span class="text-white text-xs font-bold">{{ getFileTypeIcon(attachment.type) }}</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Info file -->
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium text-gray-900 truncate">{{ attachment.name }}</p>
+                      <p class="text-xs text-gray-500">
+                        {{ formatFileSize(attachment.size) }} • {{ formatDate(attachment.uploadDate) }}
+                      </p>
+                      <p v-if="attachment.description" class="text-xs text-gray-600 mt-1">{{ attachment.description }}</p>
+                      <div class="flex items-center space-x-2 mt-1">
+                        <span class="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded">{{ attachment.category || 'Generale' }}</span>
+                        <span v-if="attachment.fornitore" class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{{ attachment.fornitore }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Azioni -->
+                  <div class="flex items-center space-x-2">
+                    <button @click="openMaterialFile(attachment)" 
+                            class="text-green-600 hover:text-green-700 p-2 rounded-lg hover:bg-green-50"
+                            title="Apri documento">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                      </svg>
+                    </button>
+                    <button @click="downloadMaterialFile(attachment)" 
+                            class="text-primary-600 hover:text-primary-700 p-2 rounded-lg hover:bg-primary-50"
+                            title="Scarica documento">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                    </button>
+                    <button @click="deleteMaterialFile(attachment)" 
+                            class="text-red-600 hover:text-red-700 p-2 rounded-lg hover:bg-red-50"
+                            title="Elimina documento">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Nessun allegato -->
+            <div v-else class="text-center py-8 text-gray-500">
+              <PaperClipIcon class="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p class="text-lg font-medium text-gray-400">Nessun documento allegato</p>
+              <p class="text-sm text-gray-400">Carica DDT, fatture, certificati o foto del materiale</p>
+            </div>
+
+            <!-- Statistiche -->
+            <div v-if="getMaterialAttachments()?.length > 0" class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                <div>
+                  <p class="text-sm text-blue-600">Documenti Totali</p>
+                  <p class="text-xl font-bold text-blue-800">{{ getMaterialAttachments().length }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-blue-600">Dimensione Totale</p>
+                  <p class="text-xl font-bold text-blue-800">{{ getTotalMaterialAttachmentsSize() }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-blue-600">Ultimo Upload</p>
+                  <p class="text-sm font-medium text-blue-800">{{ getLastUploadDate() }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-blue-600">Fornitore</p>
+                  <p class="text-sm font-medium text-blue-800">{{ getFornitoreById(selectedMaterial?.fornitoreId)?.nome || 'N/A' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+              <button @click="closeMaterialAttachmentsModal" class="w-full sm:w-auto btn-secondary py-3 text-base font-medium">
+                Chiudi
+              </button>
+              <button @click="generateMaterialReport" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-medium text-base">
+                📊 Genera Report Materiale
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -2944,4 +3105,162 @@ const removeAttachmentFromMaterial = (materialId, attachmentId) => {
 
 // Inizializza allegati materiali dopo tutte le dichiarazioni
 loadMaterialAttachmentsFromStorage()
+
+const getMaterialAttachments = () => {
+  if (!selectedMaterial.value) return []
+  return materialiAttachments.value[selectedMaterial.value.id] || []
+}
+
+const getTotalMaterialAttachmentsSize = () => {
+  const totalBytes = getMaterialAttachments().reduce((total, attachment) => total + attachment.size, 0)
+  return formatFileSize(totalBytes)
+}
+
+const getLastUploadDate = () => {
+  const attachments = getMaterialAttachments()
+  if (attachments.length === 0) return 'N/A'
+  
+  const lastUpload = attachments.reduce((latest, attachment) => {
+    return new Date(attachment.uploadDate) > latest ? new Date(attachment.uploadDate) : latest
+  }, new Date(0))
+  
+  return lastUpload.toLocaleDateString('it-IT')
+}
+
+const getFornitoreById = (fornitoreId) => {
+  return fornitori.value.find(f => f.id === fornitoreId)
+}
+
+const openMaterialFile = (attachment) => {
+  if (!attachment.url) {
+    alert('❌ File non disponibile per l\'apertura')
+    return
+  }
+
+  try {
+    // Apre il file in una nuova finestra/tab
+    const newWindow = window.open(attachment.url, '_blank')
+    
+    if (newWindow) {
+      // File aperto con successo
+      newWindow.focus()
+      
+      // Messaggio di feedback in base al tipo di file
+      const fileType = attachment.type.toLowerCase()
+      let message = `👁️ File "${attachment.name}" aperto in una nuova finestra`
+      
+      if (['pdf'].includes(fileType)) {
+        message += '\n📄 PDF - Visualizzazione diretta nel browser'
+      } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType)) {
+        message += '\n🖼️ Immagine - Visualizzazione diretta nel browser'
+      } else if (['txt', 'csv'].includes(fileType)) {
+        message += '\n📝 Testo - Visualizzazione diretta nel browser'
+      } else if (['doc', 'docx', 'xls', 'xlsx'].includes(fileType)) {
+        message += '\n📋 Documento Office - Potrebbe richiedere un\'applicazione esterna'
+      } else {
+        message += '\n📎 Il browser tenterà di aprire il file'
+      }
+      
+      console.log(message)
+    } else {
+      // Popup bloccato o errore
+      alert('⚠️ Impossibile aprire il file.\nVerifica che i popup non siano bloccati dal browser.')
+      
+      // Fallback: prova a creare un link temporaneo
+      const link = document.createElement('a')
+      link.href = attachment.url
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  } catch (error) {
+    console.error('Errore nell\'apertura del file:', error)
+    alert(`❌ Errore nell'apertura del file "${attachment.name}".\n\nDettagli: ${error.message}`)
+  }
+}
+
+const downloadMaterialFile = (attachment) => {
+  // Simula il download creando un link temporaneo
+  // In una vera implementazione, qui si farebbe una chiamata al server
+  const link = document.createElement('a')
+  link.href = attachment.url || '#'
+  link.download = attachment.name
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  
+  alert(`📥 Download di "${attachment.name}" avviato!`)
+}
+
+const deleteMaterialFile = (attachment) => {
+  if (confirm(`🗑️ Sei sicuro di voler eliminare "${attachment.name}"?`)) {
+    const materialId = selectedMaterial.value.id
+    if (materialiAttachments.value[materialId]) {
+      materialiAttachments.value[materialId] = materialiAttachments.value[materialId].filter(f => f.id !== attachment.id)
+      saveMaterialAttachmentsToStorage()
+      alert(`✅ File "${attachment.name}" eliminato con successo!`)
+    }
+  }
+}
+
+const handleMaterialFileUpload = async (event) => {
+  const files = Array.from(event.target.files)
+  if (!files.length || !selectedMaterial.value) return
+  
+  const materialId = selectedMaterial.value.id
+  const fornitore = getFornitoreById(selectedMaterial.value.fornitoreId)
+  
+  // Inizializza array allegati se non esiste
+  if (!materialiAttachments.value[materialId]) {
+    materialiAttachments.value[materialId] = []
+  }
+  
+  for (const file of files) {
+    // Validazione dimensione (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert(`❌ File "${file.name}" troppo grande (max 10MB)`)
+      continue
+    }
+    
+    // Determina categoria del file
+    const extension = file.name.split('.').pop().toLowerCase()
+    let category = 'Generale'
+    if (['pdf'].includes(extension)) category = 'Documento'
+    if (['jpg', 'jpeg', 'png'].includes(extension)) category = 'Foto'
+    if (['xls', 'xlsx'].includes(extension)) category = 'Fattura/DDT'
+    if (['doc', 'docx'].includes(extension)) category = 'Certificato'
+    
+    // Crea oggetto allegato
+    const attachment = {
+      id: Date.now() + Math.random(),
+      name: file.name,
+      size: file.size,
+      type: extension,
+      uploadDate: new Date().toISOString().split('T')[0],
+      description: '',
+      category: category,
+      fornitore: fornitore?.nome || 'N/A',
+      materialId: materialId,
+      cantiereId: selectedCantiere.value.id,
+      // In una vera implementazione, qui si caricherà il file su un server
+      url: URL.createObjectURL(file) // Temporaneo per la demo
+    }
+    
+    materialiAttachments.value[materialId].push(attachment)
+  }
+  
+  saveMaterialAttachmentsToStorage()
+  
+  // Reset input
+  event.target.value = ''
+  
+  alert(`✅ ${files.length} file caricati con successo per ${selectedMaterial.value.nome}!`)
+}
+
+const generateMaterialReport = () => {
+  // Implementa la generazione del report materiale
+  alert('Generazione report materiale non implementata.')
+}
 </script> 
