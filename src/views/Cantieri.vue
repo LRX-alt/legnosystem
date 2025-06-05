@@ -2869,9 +2869,27 @@ const saveNewCantiere = () => {
   // Salva nel localStorage per sincronizzazione con altre pagine
   saveCantieriToStorage()
 
+  // 🔧 INIZIALIZZA L'ENTRY MATERIALI PER IL NUOVO CANTIERE
+  const stored = localStorage.getItem('legnosystem_materiali_cantieri')
+  let materialiCantieriData = {}
+  
+  if (stored) {
+    try {
+      materialiCantieriData = JSON.parse(stored)
+    } catch (e) {
+      console.warn('Errore nel caricamento materiali cantieri:', e)
+      materialiCantieriData = {}
+    }
+  }
+  
+  // Inizializza array vuoto per il nuovo cantiere
+  materialiCantieriData[newId] = []
+  localStorage.setItem('legnosystem_materiali_cantieri', JSON.stringify(materialiCantieriData))
+  console.log(`✅ Sistema materiali inizializzato per cantiere ID: ${newId}`)
+
   // Mostro la notifica prima del reset
   const tipoClienteText = clientSelectionMode.value === 'new' ? 'nuovo cliente aggiunto' : 'cliente esistente'
-  alert(`✅ Cantiere "${nomeCantiere}" creato con successo!\n👤 Cliente: ${newCantiere.value.cliente} (${tipoClienteText})`)
+  alert(`✅ Cantiere "${nomeCantiere}" creato con successo!\n👤 Cliente: ${newCantiere.value.cliente} (${tipoClienteText})\n🧱 Sistema materiali inizializzato e pronto!`)
 
   // Reset form
   newCantiere.value = {
