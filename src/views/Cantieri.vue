@@ -547,7 +547,18 @@
                 </div>
                 <div>
                   <p class="text-gray-500">Utilizzato</p>
-                  <p class="font-medium">{{ materiale.quantitaUtilizzata }} {{ materiale.unita }}</p>
+                  <p class="font-medium">{{ materiale.quantitaUtilizzata || 0 }} {{ materiale.unita }}</p>
+                  <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                    <div 
+                      class="h-1.5 rounded-full transition-all duration-300"
+                      :class="(materiale.quantitaUtilizzata || 0) >= materiale.quantitaRichiesta ? 'bg-green-500' : 
+                              (materiale.quantitaUtilizzata || 0) > 0 ? 'bg-yellow-500' : 'bg-gray-300'"
+                      :style="`width: ${Math.min(((materiale.quantitaUtilizzata || 0) / materiale.quantitaRichiesta) * 100, 100)}%`"
+                    ></div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">
+                    {{ Math.round(((materiale.quantitaUtilizzata || 0) / materiale.quantitaRichiesta) * 100) }}%
+                  </p>
                 </div>
                 <div>
                   <p class="text-gray-500">Valore</p>
@@ -590,7 +601,20 @@
                       </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ materiale.quantitaRichiesta }} {{ materiale.unita }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ materiale.quantitaUtilizzata }} {{ materiale.unita }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm text-gray-900">{{ materiale.quantitaUtilizzata || 0 }} {{ materiale.unita }}</div>
+                      <div class="w-20 bg-gray-200 rounded-full h-1.5 mt-1">
+                        <div 
+                          class="h-1.5 rounded-full transition-all duration-300"
+                          :class="(materiale.quantitaUtilizzata || 0) >= materiale.quantitaRichiesta ? 'bg-green-500' : 
+                                  (materiale.quantitaUtilizzata || 0) > 0 ? 'bg-yellow-500' : 'bg-gray-300'"
+                          :style="`width: ${Math.min(((materiale.quantitaUtilizzata || 0) / materiale.quantitaRichiesta) * 100, 100)}%`"
+                        ></div>
+                      </div>
+                      <div class="text-xs text-gray-500 mt-1">
+                        {{ Math.round(((materiale.quantitaUtilizzata || 0) / materiale.quantitaRichiesta) * 100) }}%
+                      </div>
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">€{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <button @click="manageMaterialAttachments(materiale)" 
@@ -1130,12 +1154,52 @@
                 </div>
                 <div>
                   <p class="text-gray-500">Utilizzato</p>
-                  <p class="font-medium">{{ materiale.quantitaUtilizzata }} {{ materiale.unita }}</p>
+                  <p class="font-medium">{{ materiale.quantitaUtilizzata || 0 }} {{ materiale.unita }}</p>
+                  <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                    <div 
+                      class="h-1.5 rounded-full transition-all duration-300"
+                      :class="(materiale.quantitaUtilizzata || 0) >= materiale.quantitaRichiesta ? 'bg-green-500' : 
+                              (materiale.quantitaUtilizzata || 0) > 0 ? 'bg-yellow-500' : 'bg-gray-300'"
+                      :style="`width: ${Math.min(((materiale.quantitaUtilizzata || 0) / materiale.quantitaRichiesta) * 100, 100)}%`"
+                    ></div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">
+                    {{ Math.round(((materiale.quantitaUtilizzata || 0) / materiale.quantitaRichiesta) * 100) }}%
+                  </p>
                 </div>
                 <div>
                   <p class="text-gray-500">Valore</p>
                   <p class="font-medium">€{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}</p>
                 </div>
+              </div>
+              
+              <!-- Azioni Materiale -->
+              <div class="flex justify-end space-x-2 pt-3 border-t border-gray-200 mt-4">
+                <button 
+                  @click="editMaterialInCantiere(materiale)" 
+                  class="text-primary-600 hover:text-primary-700 text-sm font-medium px-3 py-1 rounded-lg hover:bg-primary-50"
+                  title="Modifica materiale"
+                >
+                  ✏️ Modifica
+                </button>
+                <button 
+                  @click="manageMaterialAttachments(materiale)" 
+                  class="text-blue-600 hover:text-blue-700 text-sm font-medium px-3 py-1 rounded-lg hover:bg-blue-50"
+                  title="Gestisci allegati"
+                >
+                  📎 Allegati
+                  <span v-if="getMaterialAttachmentCount(materiale) > 0" 
+                        class="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ml-1">
+                    {{ getMaterialAttachmentCount(materiale) }}
+                  </span>
+                </button>
+                <button 
+                  @click="removeMaterialFromCantiere(materiale.id)" 
+                  class="text-red-600 hover:text-red-700 text-sm font-medium px-3 py-1 rounded-lg hover:bg-red-50"
+                  title="Rimuovi materiale"
+                >
+                  🗑️ Rimuovi
+                </button>
               </div>
             </div>
           </div>
@@ -1432,16 +1496,35 @@
               />
             </div>
 
-            <!-- Quantità Richiesta -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Quantità Richiesta</label>
-              <input
-                v-model.number="editingMaterial.quantitaRichiesta"
-                type="number"
-                min="0"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
-              />
+            <!-- Quantità e Utilizzo -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Quantità Richiesta</label>
+                <input
+                  v-model.number="editingMaterial.quantitaRichiesta"
+                  type="number"
+                  min="0"
+                  required
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                  Quantità Utilizzata 
+                  <span class="text-xs text-gray-500">(Per aggiornare lo stato dei materiali)</span>
+                </label>
+                <input
+                  v-model.number="editingMaterial.quantitaUtilizzata"
+                  type="number"
+                  min="0"
+                  :max="editingMaterial.quantitaRichiesta"
+                  placeholder="0"
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+                />
+                <p class="text-xs text-gray-500 mt-1">
+                  Rimanente: {{ (editingMaterial.quantitaRichiesta || 0) - (editingMaterial.quantitaUtilizzata || 0) }}
+                </p>
+              </div>
             </div>
 
             <!-- Unita di Misura -->
@@ -2696,12 +2779,39 @@ const saveMaterialChanges = () => {
     const fornitoreSelected = fornitori.value.find(f => f.id == editingMaterial.value.fornitoreId)
     editingMaterial.value.fornitoreNome = fornitoreSelected?.nome || ''
     
+    // Auto-aggiornamento stato in base alla quantità utilizzata
+    const quantitaUtilizzata = editingMaterial.value.quantitaUtilizzata || 0
+    const quantitaRichiesta = editingMaterial.value.quantitaRichiesta || 0
+    
+    if (quantitaUtilizzata === 0) {
+      // Nessun utilizzo - mantieni stato originale se non è "utilizzato" o "completato"
+      if (editingMaterial.value.stato === 'utilizzato' || editingMaterial.value.stato === 'completato') {
+        editingMaterial.value.stato = 'ordinato'
+      }
+    } else if (quantitaUtilizzata >= quantitaRichiesta) {
+      // Completamente utilizzato
+      editingMaterial.value.stato = 'utilizzato'
+    } else if (quantitaUtilizzata > 0 && quantitaUtilizzata < quantitaRichiesta) {
+      // Parzialmente utilizzato
+      editingMaterial.value.stato = 'in-uso'
+    }
+    
     materialiCantiere.value[index] = { ...editingMaterial.value }
     saveMaterialiCantiereToStorage()
   }
   
+  const { success } = useToast()
   closeEditMaterialModal()
-  alert(`✅ Materiale "${editingMaterial.value.nome}" aggiornato!`)
+  
+  const quantitaUtilizzata = editingMaterial.value.quantitaUtilizzata || 0
+  const quantitaRichiesta = editingMaterial.value.quantitaRichiesta || 0
+  
+  if (quantitaUtilizzata > 0) {
+    const percentualeUtilizzo = ((quantitaUtilizzata / quantitaRichiesta) * 100).toFixed(1)
+    success(`Materiale aggiornato! Utilizzo: ${quantitaUtilizzata}/${quantitaRichiesta} (${percentualeUtilizzo}%)`, '✅ Materiale Aggiornato')
+  } else {
+    success(`Materiale "${editingMaterial.value.nome}" aggiornato!`, '✅ Materiale Aggiornato')
+  }
 }
 
 const removeMaterialFromCantiere = (materialId) => {
