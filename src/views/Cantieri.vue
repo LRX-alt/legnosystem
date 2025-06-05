@@ -2172,6 +2172,7 @@ import {
   UsersIcon,
   PaperClipIcon
 } from '@heroicons/vue/24/outline'
+import { useToast } from '@/composables/useToast'
 
 // Stato della pagina
 const showDetailModal = ref(false)
@@ -2815,8 +2816,10 @@ const closeMLTrainingModal = () => {
 }
 
 const saveNewCantiere = () => {
+  const { error, cantiereCreated } = useToast()
+  
   if (!newCantiere.value.nome || !newCantiere.value.cliente || !newCantiere.value.valore) {
-    alert('❌ Compila tutti i campi obbligatori!')
+    error('Compila tutti i campi obbligatori!')
     return
   }
 
@@ -2887,9 +2890,9 @@ const saveNewCantiere = () => {
   localStorage.setItem('legnosystem_materiali_cantieri', JSON.stringify(materialiCantieriData))
   console.log(`✅ Sistema materiali inizializzato per cantiere ID: ${newId}`)
 
-  // Mostro la notifica prima del reset
+  // Mostra toast di successo invece dell'alert
   const tipoClienteText = clientSelectionMode.value === 'new' ? 'nuovo cliente aggiunto' : 'cliente esistente'
-  alert(`✅ Cantiere "${nomeCantiere}" creato con successo!\n👤 Cliente: ${newCantiere.value.cliente} (${tipoClienteText})\n🧱 Sistema materiali inizializzato e pronto!`)
+  cantiereCreated(nomeCantiere, newCantiere.value.cliente, tipoClienteText)
 
   // Reset form
   newCantiere.value = {
@@ -3195,14 +3198,16 @@ const closeEditMaterialModal = () => {
 }
 
 const saveMaterialToCantiere = () => {
+  const { error, success } = useToast()
+  
   // Validazione campi obbligatori
   if (!newMaterial.value.nome || !newMaterial.value.quantitaRichiesta || !newMaterial.value.codice) {
-    alert('❌ Compila nome, codice e quantità richiesta!')
+    error('Compila nome, codice e quantità richiesta!')
     return
   }
 
   if (!newMaterial.value.fornitoreId) {
-    alert('❌ Seleziona un fornitore!')
+    error('Seleziona un fornitore!')
     return
   }
 
@@ -3235,7 +3240,7 @@ const saveMaterialToCantiere = () => {
   closeAddMaterialModal()
   
   const modeText = materialSelectionMode.value === 'existing' ? 'aggiunto dal magazzino' : 'creato e aggiunto'
-  alert(`✅ Materiale "${nuovoMateriale.nome}" ${modeText} al cantiere!`)
+  success(`Materiale "${nuovoMateriale.nome}" ${modeText} al cantiere!`, '✅ Materiale Aggiunto')
 }
 
 const saveMaterialChanges = () => {

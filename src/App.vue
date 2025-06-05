@@ -15,6 +15,9 @@
         </div>
       </main>
     </div>
+    
+    <!-- Toast Notifications -->
+    <ToastNotification />
   </div>
 </template>
 
@@ -22,6 +25,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import AppHeader from './components/layout/AppHeader.vue'
 import AppSidebar from './components/layout/AppSidebar.vue'
+import ToastNotification from './components/ToastNotification.vue'
 
 // Stato sidebar mobile
 const sidebarOpen = ref(false)

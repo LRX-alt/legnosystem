@@ -638,6 +638,7 @@ import {
   XMarkIcon,
   StarIcon
 } from '@heroicons/vue/24/outline'
+import { useToast } from '@/composables/useToast'
 
 // Stato della pagina
 const showAddModal = ref(false)
@@ -891,7 +892,8 @@ const viewHistory = (fornitore) => {
 }
 
 const viewCantiereDetails = (cantiere) => {
-  alert(`🏗️ Dettagli Cantiere: ${cantiere.nome}\n\n👤 Cliente: ${cantiere.cliente}\n📊 Stato: ${cantiere.stato}\n🧱 Materiali fornitore: ${cantiere.materialiCount}\n\n💡 Clicca su "Cantieri" nel menu per vedere tutti i dettagli`)
+  const { cantiereDetails } = useToast()
+  cantiereDetails(cantiere, { materialiCount: cantiere.materialiCount })
 }
 
 const editFornitore = (fornitore) => {
