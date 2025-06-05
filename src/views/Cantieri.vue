@@ -13,51 +13,51 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
       <div class="card">
         <div class="flex items-center">
-          <div class="p-2 bg-primary-100 rounded-lg">
-            <BuildingOfficeIcon class="w-6 h-6 text-primary-600" />
+          <div class="p-2 bg-primary-100 rounded-lg flex-shrink-0">
+            <BuildingOfficeIcon class="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
           </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">Cantieri Attivi</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.attivi }}</p>
+          <div class="ml-3 sm:ml-4 min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Cantieri Attivi</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.attivi }}</p>
           </div>
         </div>
       </div>
       
       <div class="card">
         <div class="flex items-center">
-          <div class="p-2 bg-accent-100 rounded-lg">
-            <CurrencyEuroIcon class="w-6 h-6 text-accent-600" />
+          <div class="p-2 bg-accent-100 rounded-lg flex-shrink-0">
+            <CurrencyEuroIcon class="w-5 h-5 sm:w-6 sm:h-6 text-accent-600" />
           </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">Valore Totale</p>
-            <p class="text-2xl font-bold text-gray-900">€{{ stats.valoreTotale.toLocaleString() }}</p>
-          </div>
-        </div>
-      </div>
-      
-      <div class="card">
-        <div class="flex items-center">
-          <div class="p-2 bg-blue-100 rounded-lg">
-            <CalendarDaysIcon class="w-6 h-6 text-blue-600" />
-          </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">In Scadenza</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.inScadenza }}</p>
+          <div class="ml-3 sm:ml-4 min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Valore Totale</p>
+            <p class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">€{{ stats.valoreTotale.toLocaleString() }}</p>
           </div>
         </div>
       </div>
       
       <div class="card">
         <div class="flex items-center">
-          <div class="p-2 bg-green-100 rounded-lg">
-            <CheckCircleIcon class="w-6 h-6 text-green-600" />
+          <div class="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+            <CalendarDaysIcon class="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
           </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">Completati Mese</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.completatiMese }}</p>
+          <div class="ml-3 sm:ml-4 min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">In Scadenza</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.inScadenza }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="flex items-center">
+          <div class="p-2 bg-green-100 rounded-lg flex-shrink-0">
+            <CheckCircleIcon class="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+          </div>
+          <div class="ml-3 sm:ml-4 min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Completati Mese</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.completatiMese }}</p>
           </div>
         </div>
       </div>
@@ -127,17 +127,17 @@
 
         <!-- Info Cantiere -->
         <div class="space-y-3 mb-4">
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600">Tipo Lavoro:</span>
-            <span class="font-medium">{{ cantiere.tipoLavoro }}</span>
+          <div class="flex items-center justify-between text-sm min-w-0">
+            <span class="text-gray-600 flex-shrink-0">Tipo Lavoro:</span>
+            <span class="font-medium truncate ml-2">{{ cantiere.tipoLavoro }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600">Valore:</span>
-            <span class="font-medium">€{{ cantiere.valore.toLocaleString() }}</span>
+          <div class="flex items-center justify-between text-sm min-w-0">
+            <span class="text-gray-600 flex-shrink-0">Valore:</span>
+            <span class="font-medium truncate ml-2">€{{ cantiere.valore.toLocaleString() }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600">Scadenza:</span>
-            <span class="font-medium" :class="isScaduto(cantiere.scadenza) ? 'text-red-600' : 'text-gray-900'">
+          <div class="flex items-center justify-between text-sm min-w-0">
+            <span class="text-gray-600 flex-shrink-0">Scadenza:</span>
+            <span class="font-medium truncate ml-2" :class="isScaduto(cantiere.scadenza) ? 'text-red-600' : 'text-gray-900'">
               {{ formatDate(cantiere.scadenza) }}
             </span>
           </div>
@@ -242,29 +242,29 @@
               <div>
                 <h4 class="font-semibold text-gray-900 mb-4">Informazioni Generali</h4>
                 <div class="space-y-3 text-sm">
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Cliente:</span> 
-                    <span class="font-medium">{{ selectedCantiere.cliente }}</span>
+                  <div class="flex justify-between min-w-0">
+                    <span class="text-gray-600 flex-shrink-0">Cliente:</span> 
+                    <span class="font-medium truncate ml-2">{{ selectedCantiere.cliente }}</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Indirizzo:</span> 
-                    <span class="font-medium text-right">{{ selectedCantiere.indirizzo }}</span>
+                  <div class="flex justify-between min-w-0">
+                    <span class="text-gray-600 flex-shrink-0">Indirizzo:</span> 
+                    <span class="font-medium text-right truncate ml-2">{{ selectedCantiere.indirizzo }}</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Tipo Lavoro:</span> 
-                    <span class="font-medium">{{ selectedCantiere.tipoLavoro }}</span>
+                  <div class="flex justify-between min-w-0">
+                    <span class="text-gray-600 flex-shrink-0">Tipo Lavoro:</span> 
+                    <span class="font-medium truncate ml-2">{{ selectedCantiere.tipoLavoro }}</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Valore:</span> 
-                    <span class="font-medium">€{{ selectedCantiere.valore.toLocaleString() }}</span>
+                  <div class="flex justify-between min-w-0">
+                    <span class="text-gray-600 flex-shrink-0">Valore:</span> 
+                    <span class="font-medium truncate ml-2">€{{ selectedCantiere.valore.toLocaleString() }}</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Data Inizio:</span> 
-                    <span class="font-medium">{{ formatDate(selectedCantiere.dataInizio) }}</span>
+                  <div class="flex justify-between min-w-0">
+                    <span class="text-gray-600 flex-shrink-0">Data Inizio:</span> 
+                    <span class="font-medium truncate ml-2">{{ formatDate(selectedCantiere.dataInizio) }}</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-gray-600">Scadenza:</span> 
-                    <span class="font-medium">{{ formatDate(selectedCantiere.scadenza) }}</span>
+                  <div class="flex justify-between min-w-0">
+                    <span class="text-gray-600 flex-shrink-0">Scadenza:</span> 
+                    <span class="font-medium truncate ml-2">{{ formatDate(selectedCantiere.scadenza) }}</span>
                   </div>
                 </div>
               </div>
