@@ -175,6 +175,15 @@
           </button>
           <div class="flex space-x-2">
             <div class="relative group">
+              <button @click="openDailyLog(cantiere)" class="text-gray-400 hover:text-gray-600">
+                <DocumentTextIcon class="w-5 h-5" />
+              </button>
+              <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                Giornale di cantiere
+                <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+            <div class="relative group">
               <button @click="editCantiere(cantiere)" class="text-gray-400 hover:text-gray-600">
                 <PencilIcon class="w-5 h-5" />
               </button>
@@ -2066,7 +2075,8 @@ import {
   ExclamationTriangleIcon,
   ClockIcon,
   UsersIcon,
-  PaperClipIcon
+  PaperClipIcon,
+  DocumentTextIcon
 } from '@heroicons/vue/24/outline'
 import { useToast } from '@/composables/useToast'
 
@@ -3783,4 +3793,9 @@ onMounted(() => {
   // Carica allegati materiali dal localStorage solo al mount del componente
   loadMaterialAttachmentsFromStorage()
 })
+
+const openDailyLog = (cantiere) => {
+  // Naviga alla vista del giornale di cantiere
+  window.location.href = `/cantieri/${cantiere.id}/giornale`
+}
 </script> 

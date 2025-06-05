@@ -69,20 +69,20 @@
         </div>
       </div>
 
-      <!-- Alert Scorte -->
+      <!-- Mezzi Disponibili -->
       <div class="card">
         <div class="flex items-center">
-          <div class="p-2 bg-red-100 rounded-lg">
-            <ExclamationTriangleIcon class="w-6 h-6 text-red-600" />
+          <div class="p-2 bg-green-100 rounded-lg">
+            <TruckIcon class="w-6 h-6 text-green-600" />
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">Alert Scorte</p>
-            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ kpis.alertScorte }}</p>
+            <p class="text-sm font-medium text-gray-600">Mezzi Disponibili</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ kpis.mezziDisponibili }}</p>
           </div>
         </div>
         <div class="mt-3 sm:mt-4">
           <div class="flex items-center text-xs sm:text-sm">
-            <span class="text-red-600 font-medium">Richiede attenzione</span>
+            <router-link to="/mezzi" class="text-green-600 font-medium hover:text-green-700">Gestisci mezzi →</router-link>
           </div>
         </div>
       </div>
@@ -236,7 +236,7 @@ import {
   BuildingOfficeIcon, 
   CubeIcon, 
   ClockIcon,
-  ExclamationTriangleIcon,
+  TruckIcon,
   PlusIcon,
   ArrowRightIcon,
   CheckIcon
@@ -247,7 +247,7 @@ const kpis = ref({
   cantieriAttivi: 8,
   valoreMagazzino: 125000,
   oreLavorate: 162,
-  alertScorte: 3
+  mezziDisponibili: 8
 })
 
 // Cantieri attivi

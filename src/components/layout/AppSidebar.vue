@@ -79,6 +79,10 @@
               <TruckIcon class="w-5 h-5" />
               <span>Gestione Fornitori</span>
             </router-link>
+            <router-link to="/mezzi" @click="$emit('close-sidebar')" class="nav-link" active-class="active">
+              <WrenchScrewdriverIcon class="w-5 h-5" />
+              <span>Mezzi & Attrezzature</span>
+            </router-link>
           </div>
         </div>
 
@@ -139,7 +143,7 @@
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-gray-900 truncate">Legnosystem.bio</p>
-            <p class="text-xs text-gray-500 truncate">v2.0.0</p>
+            <p class="text-xs text-gray-500 truncate">v1.13.0</p>
           </div>
         </div>
         <div class="text-center">
@@ -166,7 +170,8 @@ import {
   ChartBarIcon,
   XMarkIcon,
   TruckIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
+  WrenchScrewdriverIcon
 } from '@heroicons/vue/24/outline'
 
 // Props per controllare stato di apertura

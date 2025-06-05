@@ -5,6 +5,54 @@ Tutte le modifiche significative al progetto Legnosystem.bio saranno documentate
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2024-12-19
+
+### 🎉 NUOVE FUNZIONALITÀ MAGGIORI
+- **🚛 Gestione Mezzi & Attrezzature** - Sistema completo per parco macchine aziendale
+  - CRUD completo per 4 categorie: Veicoli, Attrezzature, Utensili, Macchinari
+  - Tracciamento chilometraggio/ore utilizzo con contatori automatici
+  - Sistema stati: Disponibile, In Uso, Manutenzione, Fuori Servizio
+  - Gestione manutenzioni programmate con alert scadenze (30 giorni)
+  - Calcolo costi operativi mensili per budget management
+  - Assegnazione mezzi a cantieri specifici con tracking utilizzo
+  - Progress bar manutenzioni con indicatori colorati (verde/giallo/rosso)
+
+- **📋 Giornale di Cantiere Digitale** - Sostituzione completa del registro Excel
+  - Registrazione attività giornaliere per cantiere con timestamp
+  - Tracciamento condizioni meteo (sereno/nuvoloso/pioggia/neve/vento)
+  - Gestione turni: mattino, pomeriggio, giornata intera
+  - Sistema problemi/imprevisti con categorizzazione
+  - Note operative dettagliate per ogni giornata
+  - Visualizzazione team presente con iniziali e ore lavorate
+  - Filtri avanzati per data, settimana, responsabile
+  - Modal editing completo con form strutturato
+
+### 🔧 MIGLIORAMENTI DASHBOARD & NAVIGAZIONE
+- **Dashboard aggiornata** con nuova metrica "Mezzi Disponibili" al posto di Alert Scorte
+- **Menu riorganizzato** con sezione "Mezzi & Attrezzature" sotto Fornitori
+- **Integrazione cross-moduli** per assegnazione mezzi-cantieri
+- **Interface responsive** ottimizzata per workflow mobile/tablet
+
+### 📊 FUNZIONALITÀ AVANZATE MEZZI
+- **Stats dinamiche**: Totali, Disponibili, In Manutenzione, Costi mensili
+- **Storico manutenzioni** dettagliato per ogni mezzo con costi e fornitori
+- **Tooltips informativi** su tutte le azioni (modifica, manutenzione, assegnazione)
+- **Visual indicators**: Icons categorizzati e colori stato mezzi
+- **Dati realistici**: Fiat Ducato, Escavatore CAT, Sega Festool, Pialla SCM, Trapano Makita
+
+### 🎯 BUSINESS PROCESS DIGITAL TRANSFORMATION
+- **Eliminazione Excel**: Giornale cantiere ora completamente digitale
+- **Prevenzione guasti**: Sistema manutenzioni programmate riduce fermi macchina
+- **Controllo costi**: Tracking real-time costi operativi mensili parco macchine
+- **Tracciabilità**: Storico completo utilizzi mezzi per cantiere
+- **Compliance**: Documentazione digitale sostituisce registri cartacei
+
+### 🛠️ MIGLIORAMENTI TECNICI
+- **Routing esteso**: `/mezzi` e `/cantieri/:id/giornale` per navigazione diretta
+- **Components scalabili**: Base per future integrazioni QR code e GPS tracking
+- **Performance**: Gestione efficiente grandi dataset mezzi e registrazioni
+- **LocalStorage**: Persistenza dati con sincronizzazione cross-page
+
 ## [1.12.0] - 2024-12-21
 
 ### 🗂️ SISTEMA ALLEGATI MATERIALI - RISOLUZIONE COMPLETA

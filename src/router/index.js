@@ -35,10 +35,22 @@ const router = createRouter({
       meta: { title: 'Gestione Cantieri - Legnosystem.bio' }
     },
     {
+      path: '/cantieri/:id/giornale',
+      name: 'giornale-cantiere',
+      component: () => import('../views/GiornaleCantiere.vue'),
+      meta: { title: 'Giornale di Cantiere - Legnosystem.bio' }
+    },
+    {
       path: '/fornitori',
       name: 'fornitori',
       component: () => import('../views/Fornitori.vue'),
       meta: { title: 'Gestione Fornitori - Legnosystem.bio' }
+    },
+    {
+      path: '/mezzi',
+      name: 'mezzi',
+      component: () => import('../views/Mezzi.vue'),
+      meta: { title: 'Gestione Mezzi - Legnosystem.bio' }
     },
     {
       path: '/calendario',
