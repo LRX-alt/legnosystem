@@ -176,7 +176,7 @@
           <div class="flex space-x-2">
             <div class="relative group">
               <button @click="editCantiere(cantiere)" class="text-gray-400 hover:text-gray-600">
-                <PencilIcon class="w-4 h-4" />
+                <PencilIcon class="w-5 h-5" />
               </button>
               <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                 Modifica cantiere
@@ -185,7 +185,7 @@
             </div>
             <div class="relative group">
               <button @click="updateProgress(cantiere)" class="text-gray-400 hover:text-gray-600">
-                <ChartBarIcon class="w-4 h-4" />
+                <ChartBarIcon class="w-5 h-5" />
               </button>
               <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                 Aggiorna progresso
@@ -194,7 +194,7 @@
             </div>
             <div class="relative group">
               <button @click="viewMaterials(cantiere)" class="text-gray-400 hover:text-gray-600">
-                <CubeIcon class="w-4 h-4" />
+                <CubeIcon class="w-5 h-5" />
               </button>
               <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                 Visualizza materiali
@@ -202,17 +202,8 @@
               </div>
             </div>
             <div class="relative group">
-              <button @click="analyzeFabbisogno(cantiere)" class="text-purple-500 hover:text-purple-700">
-                <BeakerIcon class="w-4 h-4" />
-              </button>
-              <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                Analizza fabbisogno
-                <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
-              </div>
-            </div>
-            <div class="relative group">
               <button @click="manageAttachments(cantiere)" class="text-blue-500 hover:text-blue-700">
-                <PaperClipIcon class="w-4 h-4" />
+                <PaperClipIcon class="w-5 h-5" />
               </button>
               <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                 Gestisci allegati
@@ -220,26 +211,8 @@
               </div>
             </div>
             <div class="relative group">
-              <button @click="configureAlgorithm()" class="text-orange-500 hover:text-orange-700">
-                <CogIcon class="w-4 h-4" />
-              </button>
-              <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                Configura algoritmo
-                <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
-              </div>
-            </div>
-            <div class="relative group">
-              <button @click="trainMLAlgorithm()" class="text-green-500 hover:text-green-700">
-                <CpuChipIcon class="w-4 h-4" />
-              </button>
-              <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                Training ML
-                <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
-              </div>
-            </div>
-            <div class="relative group">
               <button @click="manageTeam(cantiere)" class="text-blue-500 hover:text-blue-700">
-                <UsersIcon class="w-4 h-4" />
+                <UsersIcon class="w-5 h-5" />
               </button>
               <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                 Gestisci team
@@ -650,436 +623,7 @@
       </div>
     </div>
 
-    <!-- Modal Analisi Fabbisogno Intelligente -->
-    <div v-if="showAnalysisModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeAnalysisModal">
-      <div class="relative top-4 mx-auto border w-full max-w-5xl shadow-lg rounded-md bg-white" @click.stop>
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center space-x-3">
-              <div class="p-2 bg-purple-100 rounded-lg">
-                <BeakerIcon class="w-6 h-6 text-purple-600" />
-              </div>
-              <div>
-                <h3 class="text-xl font-semibold text-gray-900">🧠 Analisi Fabbisogno Intelligente</h3>
-                <p class="text-sm text-gray-600 mt-1">{{ selectedCantiere?.nome }} - {{ selectedCantiere?.tipoLavoro }}</p>
-              </div>
-            </div>
-            <button @click="closeAnalysisModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
-              <XMarkIcon class="w-6 h-6" />
-            </button>
-          </div>
 
-          <!-- Loading State -->
-          <div v-if="!analysisResults" class="text-center py-12">
-            <BeakerIcon class="w-16 h-16 text-purple-500 mx-auto mb-4 animate-pulse" />
-            <h3 class="text-lg font-medium text-gray-900 mb-2">Analisi in corso...</h3>
-            <p class="text-gray-600">Calcolo fabbisogno materiali per il progetto</p>
-          </div>
-
-          <!-- Results -->
-          <div v-if="analysisResults" class="space-y-6">
-            <!-- Stats Summary -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div class="card">
-                <div class="flex items-center">
-                  <div class="p-2 bg-green-100 rounded-lg">
-                    <CheckIcon class="w-5 h-5 text-green-600" />
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-600">Disponibili</p>
-                    <p class="text-lg font-bold text-green-600">{{ analysisResults.disponibili }}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="flex items-center">
-                  <div class="p-2 bg-yellow-100 rounded-lg">
-                    <ExclamationTriangleIcon class="w-5 h-5 text-yellow-600" />
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-600">Da Ordinare</p>
-                    <p class="text-lg font-bold text-yellow-600">{{ analysisResults.daOrdinare }}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="flex items-center">
-                  <div class="p-2 bg-red-100 rounded-lg">
-                    <XMarkIcon class="w-5 h-5 text-red-600" />
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-600">Mancanti</p>
-                    <p class="text-lg font-bold text-red-600">{{ analysisResults.mancanti }}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="flex items-center">
-                  <div class="p-2 bg-accent-100 rounded-lg">
-                    <CurrencyEuroIcon class="w-5 h-5 text-accent-600" />
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-sm font-medium text-gray-600">Costo Ordini</p>
-                    <p class="text-lg font-bold text-gray-900">€{{ analysisResults.costoOrdini.toLocaleString() }}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Analisi Dettagliata -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <!-- Materiali Necessari -->
-              <div class="card">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">📋 Materiali Necessari</h4>
-                <div class="space-y-3 max-h-80 overflow-y-auto">
-                  <div v-for="materiale in analysisResults.materialiNecessari" :key="materiale.codice" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div class="flex items-center space-x-3">
-                      <div class="w-8 h-8 bg-wood-light rounded-lg flex items-center justify-center">
-                        <span class="text-primary-600 text-xs font-bold">{{ materiale.codice }}</span>
-                      </div>
-                      <div>
-                        <p class="text-sm font-medium text-gray-900">{{ materiale.nome }}</p>
-                        <p class="text-xs text-gray-600">Richiesto: {{ materiale.quantitaNecessaria }} {{ materiale.unita }}</p>
-                      </div>
-                    </div>
-                    <div class="text-right">
-                      <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" :class="getAvailabilityColor(materiale.stato)">
-                        {{ materiale.stato }}
-                      </span>
-                      <p class="text-xs text-gray-500 mt-1">{{ materiale.disponibile }}/{{ materiale.quantitaNecessaria }} {{ materiale.unita }}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Lista Acquisti -->
-              <div class="card">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">🛒 Lista Acquisti</h4>
-                <div class="space-y-3 max-h-80 overflow-y-auto">
-                  <div v-for="acquisto in analysisResults.listaAcquisti" :key="acquisto.codice" class="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                    <div class="flex items-center space-x-3">
-                      <div class="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                        <span class="text-red-600 text-xs font-bold">{{ acquisto.codice }}</span>
-                      </div>
-                      <div>
-                        <p class="text-sm font-medium text-gray-900">{{ acquisto.nome }}</p>
-                        <p class="text-xs text-red-600 font-medium">Da ordinare: {{ acquisto.quantitaDaOrdinare }} {{ acquisto.unita }}</p>
-                      </div>
-                    </div>
-                    <div class="text-right">
-                      <p class="text-sm font-bold text-gray-900">€{{ (acquisto.quantitaDaOrdinare * acquisto.prezzoUnitario).toFixed(2) }}</p>
-                      <p class="text-xs text-gray-500">€{{ acquisto.prezzoUnitario }}/{{ acquisto.unita }}</p>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="analysisResults.listaAcquisti.length === 0" class="text-center py-8">
-                  <CheckIcon class="w-12 h-12 text-green-500 mx-auto mb-2" />
-                  <p class="text-green-600 font-medium">Tutti i materiali sono disponibili!</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Timeline Consegne -->
-            <div class="card" v-if="analysisResults.timeline">
-              <h4 class="text-lg font-semibold text-gray-900 mb-4">📅 Timeline Consegne Ottimizzata</h4>
-              <div class="space-y-3">
-                <div v-for="evento in analysisResults.timeline" :key="evento.id" class="flex items-center space-x-4 p-3 bg-blue-50 rounded-lg">
-                  <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <div class="flex-1">
-                    <p class="text-sm font-medium text-gray-900">{{ evento.descrizione }}</p>
-                    <p class="text-xs text-gray-600">{{ evento.data }} - {{ evento.fornitore }}</p>
-                  </div>
-                  <span class="text-sm font-medium text-blue-600">{{ evento.durata }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
-              <button @click="closeAnalysisModal" class="w-full sm:w-auto btn-secondary py-3 text-base">
-                Chiudi
-              </button>
-              <button v-if="analysisResults.listaAcquisti.length > 0" @click="generateOrderList" class="w-full sm:w-auto btn-primary py-3 text-base">
-                📋 Genera Lista Ordini
-              </button>
-              <button @click="exportAnalysis" class="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-medium text-base">
-                📊 Esporta Analisi
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Configurazione ML -->
-    <div v-if="showMLConfigModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeMLConfigModal">
-      <div class="relative top-4 mx-auto border w-full max-w-3xl shadow-lg rounded-md bg-white" @click.stop>
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center space-x-3">
-              <div class="p-2 bg-orange-100 rounded-lg">
-                <CogIcon class="w-6 h-6 text-orange-600" />
-              </div>
-              <div>
-                <h3 class="text-xl font-semibold text-gray-900">⚙️ Configurazione Algoritmo ML</h3>
-                <p class="text-sm text-gray-600 mt-1">Parametri Machine Learning per Analisi Fabbisogno</p>
-              </div>
-            </div>
-            <button @click="closeMLConfigModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2"
-                    title="Chiudi configurazione">
-              <XMarkIcon class="w-6 h-6" />
-            </button>
-          </div>
-
-          <!-- Configurazione Algoritmo -->
-          <div class="space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <!-- Parametri Algoritmo -->
-              <div class="card">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">🧠 Parametri Algoritmo</h4>
-                <div class="space-y-4">
-                  <div>
-                    <label class="block text-base font-medium text-gray-700 mb-2">Algoritmo</label>
-                    <select v-model="mlConfiguration.algoritmo" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base">
-                      <option value="Random Forest + Neural Network">Random Forest + Neural Network</option>
-                      <option value="Gradient Boosting">Gradient Boosting</option>
-                      <option value="Deep Learning">Deep Learning</option>
-                    </select>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4">
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">N. Alberi</label>
-                      <input v-model.number="mlConfiguration.parametri.nTrees" type="number" 
-                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base" />
-                    </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">Max Depth</label>
-                      <input v-model.number="mlConfiguration.parametri.maxDepth" type="number" 
-                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base" />
-                    </div>
-                  </div>
-                  <div class="grid grid-cols-2 gap-4">
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">Learning Rate</label>
-                      <input v-model.number="mlConfiguration.parametri.learningRate" type="number" step="0.001" 
-                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base" />
-                    </div>
-                    <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">Batch Size</label>
-                      <input v-model.number="mlConfiguration.parametri.batchSize" type="number" 
-                             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Features e Target -->
-              <div class="card">
-                <h4 class="text-lg font-semibold text-gray-900 mb-4">📊 Dataset Config</h4>
-                <div class="space-y-4">
-                  <div>
-                    <label class="block text-base font-medium text-gray-700 mb-2">Features Input</label>
-                    <div class="space-y-2">
-                      <div v-for="feature in mlConfiguration.features" :key="feature" 
-                           class="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <span class="text-base">{{ feature }}</span>
-                        <CheckIcon class="w-4 h-4 text-green-600" />
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <label class="block text-base font-medium text-gray-700 mb-2">Target Output</label>
-                    <div class="space-y-2">
-                      <div v-for="target in mlConfiguration.target" :key="target" 
-                           class="flex items-center justify-between p-2 bg-primary-50 rounded">
-                        <span class="text-base">{{ target }}</span>
-                        <CheckIcon class="w-4 h-4 text-primary-600" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Performance Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div class="card text-center">
-                <p class="text-base font-medium text-gray-600 mb-2">Accuratezza Costi</p>
-                <p class="text-2xl font-bold text-green-600">{{ mlPerformance.accuracyCosti }}%</p>
-              </div>
-              <div class="card text-center">
-                <p class="text-base font-medium text-gray-600 mb-2">Accuratezza Tempi</p>
-                <p class="text-2xl font-bold text-blue-600">{{ mlPerformance.accuracyTempi }}%</p>
-              </div>
-              <div class="card text-center">
-                <p class="text-base font-medium text-gray-600 mb-2">Accuratezza Materiali</p>
-                <p class="text-2xl font-bold text-accent-600">{{ mlPerformance.accuracyMateriali }}%</p>
-              </div>
-              <div class="card text-center">
-                <p class="text-base font-medium text-gray-600 mb-2">Confidence Level</p>
-                <p class="text-2xl font-bold text-gray-900">{{ mlPerformance.confidenceLevel }}%</p>
-              </div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
-              <button @click="closeMLConfigModal" class="w-full sm:w-auto btn-secondary py-3 text-base font-medium">
-                Chiudi
-              </button>
-              <button class="w-full sm:w-auto btn-primary py-3 text-base font-medium"
-                      title="Salva configurazione algoritmo">
-                ⚙️ Salva Configurazione
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Training ML -->
-    <div v-if="showMLTrainingModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeMLTrainingModal">
-      <div class="relative top-4 mx-auto border w-full max-w-4xl shadow-lg rounded-md bg-white" @click.stop>
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center space-x-3">
-              <div class="p-2 bg-green-100 rounded-lg">
-                <CpuChipIcon class="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <h3 class="text-xl font-semibold text-gray-900">🤖 Training Machine Learning</h3>
-                <p class="text-sm text-gray-600 mt-1">Auto-Learning dal Database Progetti Legnosystem</p>
-              </div>
-            </div>
-            <button @click="closeMLTrainingModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2"
-                    title="Chiudi training">
-              <XMarkIcon class="w-6 h-6" />
-            </button>
-          </div>
-
-          <div class="space-y-6">
-            <!-- Dataset Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div class="card">
-                <div class="flex items-center">
-                  <div class="p-2 bg-blue-100 rounded-lg">
-                    <BuildingOfficeIcon class="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-base font-medium text-gray-600">Progetti Totali</p>
-                    <p class="text-xl font-bold text-gray-900">{{ mlStats.totaleProgetti }}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="flex items-center">
-                  <div class="p-2 bg-accent-100 rounded-lg">
-                    <CubeIcon class="w-5 h-5 text-accent-600" />
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-base font-medium text-gray-600">Dataset Size</p>
-                    <p class="text-xl font-bold text-gray-900">{{ mlStats.datasetSize }}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="flex items-center">
-                  <div class="p-2 bg-green-100 rounded-lg">
-                    <ClockIcon class="w-5 h-5 text-green-600" />
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-base font-medium text-gray-600">Ore Training</p>
-                    <p class="text-xl font-bold text-gray-900">{{ mlStats.hoursTraining }}h</p>
-                  </div>
-                </div>
-              </div>
-              <div class="card">
-                <div class="flex items-center">
-                  <div class="p-2 bg-purple-100 rounded-lg">
-                    <BeakerIcon class="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div class="ml-3">
-                    <p class="text-base font-medium text-gray-600">Modello</p>
-                    <p class="text-base font-bold text-gray-900">v2.4.1</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Training Progress -->
-            <div class="card">
-              <h4 class="text-lg font-semibold text-gray-900 mb-4">🚀 Auto-Learning Status</h4>
-              <div class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div class="text-center p-4 bg-blue-50 rounded-lg">
-                    <p class="text-base font-medium text-blue-700">Rifacimenti</p>
-                    <p class="text-2xl font-bold text-blue-600">{{ mlStats.rifacimenti }}</p>
-                    <p class="text-sm text-blue-500">progetti analizzati</p>
-                  </div>
-                  <div class="text-center p-4 bg-green-50 rounded-lg">
-                    <p class="text-base font-medium text-green-700">Nuove Costruzioni</p>
-                    <p class="text-2xl font-bold text-green-600">{{ mlStats.nuoveCostruzioni }}</p>
-                    <p class="text-sm text-green-500">progetti analizzati</p>
-                  </div>
-                  <div class="text-center p-4 bg-purple-50 rounded-lg">
-                    <p class="text-base font-medium text-purple-700">Restauri</p>
-                    <p class="text-2xl font-bold text-purple-600">{{ mlStats.restauri }}</p>
-                    <p class="text-sm text-purple-500">progetti analizzati</p>
-                  </div>
-                </div>
-                
-                <div class="mt-6">
-                  <div class="flex items-center justify-between text-base mb-2">
-                    <span class="text-gray-600">Training Progress</span>
-                    <span class="font-medium">{{ Math.round((mlStats.totaleProgetti / 50) * 100) }}%</span>
-                  </div>
-                  <div class="w-full bg-gray-200 rounded-full h-3">
-                    <div class="bg-gradient-to-r from-green-500 to-blue-500 h-3 rounded-full transition-all duration-300" 
-                         :style="`width: ${Math.round((mlStats.totaleProgetti / 50) * 100)}%`"></div>
-                  </div>
-                  <p class="text-sm text-gray-500 mt-2">
-                    🎯 Obiettivo: 50 progetti per training ottimale
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Training Results -->
-            <div class="card">
-              <h4 class="text-lg font-semibold text-gray-900 mb-4">📈 Risultati Training</h4>
-              <div class="space-y-3">
-                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                  <span class="text-base font-medium text-green-700">✅ Pattern Recognition Attivato</span>
-                  <span class="text-sm text-green-600">Accuratezza: 94%</span>
-                </div>
-                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <span class="text-base font-medium text-blue-700">🔍 Analisi Predittiva Materiali</span>
-                  <span class="text-sm text-blue-600">Precisione: 97%</span>
-                </div>
-                <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                  <span class="text-base font-medium text-purple-700">⏱️ Stima Tempi Intelligente</span>
-                  <span class="text-sm text-purple-600">Affidabilità: 91%</span>
-                </div>
-                <div class="flex items-center justify-between p-3 bg-accent-50 rounded-lg">
-                  <span class="text-base font-medium text-accent-700">💰 Ottimizzazione Costi Auto</span>
-                  <span class="text-sm text-accent-600">Risparmio: 15%</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
-              <button @click="closeMLTrainingModal" class="w-full sm:w-auto btn-secondary py-3 text-base font-medium">
-                Chiudi
-              </button>
-              <button class="w-full sm:w-auto btn-primary py-3 text-base font-medium"
-                      title="Avvia nuovo ciclo di training">
-                🤖 Avvia Nuovo Training
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Modal Nuovo Cantiere -->
     <div v-if="showAddModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeAddModal">
@@ -2162,9 +1706,6 @@ import {
   PencilIcon,
   ChartBarIcon,
   CubeIcon,
-  BeakerIcon,
-  CogIcon,
-  CpuChipIcon,
   XMarkIcon,
   CheckIcon,
   ExclamationTriangleIcon,
@@ -2178,9 +1719,6 @@ import { useToast } from '@/composables/useToast'
 const showDetailModal = ref(false)
 const showEditModal = ref(false)
 const showMaterialsModal = ref(false)
-const showAnalysisModal = ref(false)
-const showMLConfigModal = ref(false)
-const showMLTrainingModal = ref(false)
 const showAddModal = ref(false)
 const showTeamModal = ref(false)
 const showAttachmentsModal = ref(false)
@@ -2196,7 +1734,6 @@ const selectedPriority = ref('')
 const selectedCantiere = ref(null)
 const editingCantiere = ref(null)
 const materialiCantiere = ref([])
-const analysisResults = ref(null)
 const editingMaterial = ref(null)
 const newMaterial = ref({
   nome: '',
@@ -2228,34 +1765,7 @@ const newCantiere = ref({
   priorita: 'media'
 })
 
-// Stats ML
-const mlStats = ref({
-  totaleProgetti: 45,
-  rifacimenti: 18,
-  nuoveCostruzioni: 15,
-  restauri: 12,
-  datasetSize: 1250,
-  hoursTraining: 48
-})
 
-const mlPerformance = ref({
-  accuracyCosti: 94,
-  accuracyTempi: 91,
-  accuracyMateriali: 97,
-  confidenceLevel: 89
-})
-
-const mlConfiguration = ref({
-  algoritmo: 'Random Forest + Neural Network',
-  parametri: {
-    nTrees: 100,
-    maxDepth: 15,
-    learningRate: 0.001,
-    batchSize: 32
-  },
-  features: ['superficie', 'tipoTetto', 'materiali', 'tempoAnno', 'regione'],
-  target: ['costiTotali', 'tempiRealizzazione', 'fabbisognoMateriali']
-})
 
 // Stats
 const stats = ref({
@@ -2748,72 +2258,7 @@ const getCompletedMaterials = () => {
   return materialiCantiere.value.filter(m => m.stato === 'completato' || m.stato === 'utilizzato').length
 }
 
-const analyzeFabbisogno = (cantiere) => {
-  selectedCantiere.value = cantiere
-  analysisResults.value = null
-  showAnalysisModal.value = true
-  
-  // Simula analisi ML
-  setTimeout(() => {
-    analysisResults.value = {
-      disponibili: 12,
-      daOrdinare: 8,
-      mancanti: 3,
-      costoOrdini: 15650,
-      materialiNecessari: [
-        {
-          codice: 'TRV01',
-          nome: 'Travi Lamellari GL24h',
-          quantitaNecessaria: 20,
-          unita: 'pz',
-          stato: 'disponibile'
-        },
-        {
-          codice: 'ISO05',
-          nome: 'Isolante Fibra di Legno',
-          quantitaNecessaria: 150,
-          unita: 'm²',
-          stato: 'ordinare'
-        },
-        {
-          codice: 'VIT012',
-          nome: 'Viti Autofilettanti 8x200',
-          quantitaNecessaria: 500,
-          unita: 'pz',
-          stato: 'mancante'
-        }
-      ],
-      raccomandazioni: [
-        '🔍 Ordinare immediatamente l\'isolante in fibra di legno',
-        '⚠️ Verificare disponibilità viti presso fornitori alternativi',
-        '📦 Considerare ordine cumulativo per ottimizzare costi',
-        '🚚 Pianificare consegne scaglionate per ottimizzare spazi'
-      ]
-    }
-  }, 3000)
-}
 
-const closeAnalysisModal = () => {
-  showAnalysisModal.value = false
-  selectedCantiere.value = null
-  analysisResults.value = null
-}
-
-const configureAlgorithm = () => {
-  showMLConfigModal.value = true
-}
-
-const closeMLConfigModal = () => {
-  showMLConfigModal.value = false
-}
-
-const trainMLAlgorithm = () => {
-  showMLTrainingModal.value = true
-}
-
-const closeMLTrainingModal = () => {
-  showMLTrainingModal.value = false
-}
 
 const saveNewCantiere = () => {
   const { error, cantiereCreated } = useToast()
