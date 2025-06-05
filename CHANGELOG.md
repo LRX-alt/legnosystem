@@ -5,6 +5,39 @@ Tutte le modifiche significative al progetto Legnosystem.bio saranno documentate
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2024-12-21
+
+### ♻️ SISTEMA CLEANUP & OTTIMIZZAZIONE
+- **Rimosso Sistema ML**: Eliminato sistema analisi fabbisogno e algoritmi ML non utilizzati
+- **Bundle Optimization**: Ridotto bundle cantieri da 117kB a 109kB (-7%) con features aggiunte
+- **Cleanup Icone**: Rimosse icone BeakerIcon, CogIcon, CpuChipIcon per semplificare interfaccia
+
+### 📱 UX MIGLIORAMENTI TABLET
+- **Icone Cantieri Ingrandite**: Aumentate da w-4 h-4 a w-5 h-5 per migliore usabilità touch
+- **Interface Optimization**: Design più accessibile per dispositivi tablet
+
+### 📊 SISTEMA TRACKING MATERIALI AVANZATO
+- **Campo Quantità Utilizzata**: Nuovo campo per tracciare materiali effettivamente utilizzati
+- **Auto-Status Update**: Cambio automatico stato materiali (ordinato → in-uso → utilizzato)
+- **Progress Bar Materiali**: Barre di progresso colorate per visualizzare utilizzo
+- **Toast Notifications**: Feedback immediato con percentuali di utilizzo
+- **Calcolo Quantità Rimanente**: Visualizzazione automatica quantità residue
+
+### 📝 SISTEMA NOTE DI PROGRESSO PROFESSIONALE
+- **Modale Progresso Avanzato**: Incrementi personalizzabili (5%, 10%, 15%, 20% o custom)
+- **Campi Richiesti**: Nome fase e data completamento obbligatori
+- **Note Dettagliate**: Campo opzionale per descrizione lavori completati
+- **Storico Progresso Completo**: Timeline chronologica nel dettaglio cantiere
+- **Persistenza localStorage**: Salvataggio automatico storico progressi
+- **Completamento Intelligente**: Auto-cambio stato a 100% completamento
+- **UX Professionale**: Design responsive con feedback immediato
+
+### 🔧 MIGLIORAMENTI TECNICI
+- **Input Validation**: Validazione completa campi e limiti incrementi
+- **Real-time Preview**: Anteprima progresso durante inserimento
+- **Error Handling**: Gestione errori robusta con fallback
+- **Data Synchronization**: Sincronizzazione perfetta tra localStorage e UI
+
 ## [2.0.0] - 2024-01-18 🎉 **SISTEMA COMPLETO!**
 
 ### 📅 CALENDARIO & PLANNING - Il Gran Finale!

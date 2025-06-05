@@ -2321,6 +2321,19 @@ const saveCantieriToStorage = () => {
 loadCantieriFromStorage()
 
 // Carica dipendenti all'avvio
+// Funzione per caricare storico progresso dal localStorage
+const loadProgressHistoryFromStorage = () => {
+  const stored = localStorage.getItem('legnosystem_progress_history')
+  if (stored) {
+    try {
+      cantieriProgressHistory.value = JSON.parse(stored)
+    } catch (e) {
+      console.warn('Errore nel caricamento storico progresso:', e)
+      cantieriProgressHistory.value = {}
+    }
+  }
+}
+
 loadDipendentiFromStorage()
 
 // Carica allegati all'avvio
@@ -2543,18 +2556,6 @@ const saveProgressToHistory = (cantiereId, updateData) => {
 const getProgressHistory = (cantiereId) => {
   if (!cantiereId) return []
   return cantieriProgressHistory.value[cantiereId] || []
-}
-
-const loadProgressHistoryFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_progress_history')
-  if (stored) {
-    try {
-      cantieriProgressHistory.value = JSON.parse(stored)
-    } catch (e) {
-      console.warn('Errore nel caricamento storico progresso:', e)
-      cantieriProgressHistory.value = {}
-    }
-  }
 }
 
 const viewMaterials = (cantiere) => {
