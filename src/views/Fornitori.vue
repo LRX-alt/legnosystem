@@ -178,14 +178,17 @@
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                  <button @click="viewFornitore(fornitore)" class="text-primary-600 hover:text-primary-700">
+                  <button @click="viewFornitore(fornitore)" class="text-primary-600 hover:text-primary-700" title="Visualizza dettagli">
                     <EyeIcon class="w-4 h-4" />
                   </button>
-                  <button @click="editFornitore(fornitore)" class="text-gray-600 hover:text-gray-700">
+                  <button @click="editFornitore(fornitore)" class="text-gray-600 hover:text-gray-700" title="Modifica fornitore">
                     <PencilIcon class="w-4 h-4" />
                   </button>
-                  <button @click="createOrder(fornitore)" class="text-green-600 hover:text-green-700">
+                  <button @click="createOrder(fornitore)" class="text-green-600 hover:text-green-700" title="Crea nuovo ordine">
                     <ShoppingCartIcon class="w-4 h-4" />
+                  </button>
+                  <button @click="deleteFornitore(fornitore)" class="text-red-600 hover:text-red-700" title="Elimina fornitore">
+                    <TrashIcon class="w-4 h-4" />
                   </button>
                 </td>
               </tr>
@@ -357,13 +360,16 @@
               </div>
             </div>
             <div class="flex items-center space-x-3">
-              <button @click="editFornitore(selectedFornitore)" class="btn-secondary p-2">
+              <button @click="editFornitore(selectedFornitore)" class="btn-secondary p-2" title="Modifica fornitore">
                 <PencilIcon class="w-5 h-5" />
               </button>
-              <button @click="createOrder(selectedFornitore)" class="btn-primary p-2">
+              <button @click="createOrder(selectedFornitore)" class="btn-primary p-2" title="Crea nuovo ordine">
                 <ShoppingCartIcon class="w-5 h-5" />
               </button>
-              <button @click="closeDetailModal" class="text-gray-400 hover:text-gray-600 p-2">
+              <button @click="deleteFornitore(selectedFornitore)" class="text-red-600 hover:text-red-700 border border-red-300 hover:bg-red-50 rounded-lg p-2" title="Elimina fornitore">
+                <TrashIcon class="w-5 h-5" />
+              </button>
+              <button @click="closeDetailModal" class="text-gray-400 hover:text-gray-600 p-2" title="Chiudi">
                 <XMarkIcon class="w-6 h-6" />
               </button>
             </div>
