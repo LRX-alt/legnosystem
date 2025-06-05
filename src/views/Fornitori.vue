@@ -196,20 +196,25 @@
 
       <!-- Mobile: Cards -->
       <div class="lg:hidden grid grid-cols-1 gap-4">
-        <div v-for="fornitore in filteredFornitori" :key="fornitore.id" class="card">
+        <div v-for="fornitore in filteredFornitori" :key="fornitore.id" class="card hover:shadow-md transition-shadow duration-200">
           <div class="flex items-start justify-between mb-4">
-            <div class="flex items-center">
-              <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center">
-                <span class="text-primary-600 font-bold">{{ fornitore.iniziali }}</span>
+            <div class="flex items-center flex-1 min-w-0">
+              <div class="w-14 h-14 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <span class="text-primary-600 font-bold text-lg">{{ fornitore.iniziali }}</span>
               </div>
-              <div class="ml-3">
-                <h3 class="text-sm font-semibold text-gray-900">{{ fornitore.nome }}</h3>
-                <p class="text-xs text-gray-600">{{ fornitore.citta }}</p>
+              <div class="ml-4 min-w-0 flex-1">
+                <h3 class="text-lg font-bold text-primary-800 truncate">{{ fornitore.nome }}</h3>
+                <p class="text-sm text-gray-600 truncate">{{ fornitore.citta }}</p>
+                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1" :class="getCategoryColor(fornitore.categoria)">
+                  {{ getCategoryLabel(fornitore.categoria) }}
+                </span>
               </div>
             </div>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatusColor(fornitore.stato)">
-              {{ getStatusLabel(fornitore.stato) }}
-            </span>
+            <div class="flex flex-col items-end space-y-2 ml-3">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatusColor(fornitore.stato)">
+                {{ getStatusLabel(fornitore.stato) }}
+              </span>
+            </div>
           </div>
           
           <div class="space-y-3">
@@ -242,16 +247,25 @@
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-4 border-t border-gray-200 mt-4">
-            <button @click="viewFornitore(fornitore)" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
-              Visualizza
+          <div class="flex flex-col space-y-3 pt-4 border-t border-gray-200 mt-4">
+            <!-- Pulsante principale -->
+            <button @click="viewFornitore(fornitore)" class="w-full btn-primary py-3 text-base font-medium">
+              👁️ Visualizza Dettagli
             </button>
-            <div class="flex space-x-2">
-              <button @click="editFornitore(fornitore)" class="text-gray-400 hover:text-gray-600">
-                <PencilIcon class="w-4 h-4" />
+            
+            <!-- Pulsanti azioni -->
+            <div class="grid grid-cols-3 gap-2">
+              <button @click="editFornitore(fornitore)" class="btn-secondary py-2 text-sm font-medium flex items-center justify-center">
+                <PencilIcon class="w-4 h-4 mr-1" />
+                Modifica
               </button>
-              <button @click="createOrder(fornitore)" class="text-green-500 hover:text-green-700">
-                <ShoppingCartIcon class="w-4 h-4" />
+              <button @click="createOrder(fornitore)" class="btn-secondary py-2 text-sm font-medium flex items-center justify-center text-green-600 border-green-300 hover:bg-green-50">
+                <ShoppingCartIcon class="w-4 h-4 mr-1" />
+                Ordina
+              </button>
+              <button @click="deleteFornitore(fornitore)" class="btn-secondary py-2 text-sm font-medium flex items-center justify-center text-red-600 border-red-300 hover:bg-red-50">
+                <TrashIcon class="w-4 h-4 mr-1" />
+                Elimina
               </button>
             </div>
           </div>
@@ -659,7 +673,8 @@ import {
   PencilIcon,
   XMarkIcon,
   StarIcon,
-  PaperClipIcon
+  PaperClipIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 import { useToast } from '@/composables/useToast'
 import MaterialAttachmentsModal from '@/components/MaterialAttachmentsModal.vue'
@@ -928,6 +943,25 @@ const editFornitore = (fornitore) => {
 
 const createOrder = (fornitore) => {
   alert(`🛒 Nuovo ordine per ${fornitore.nome} - Funzionalità in implementazione`)
+}
+
+const deleteFornitore = (fornitore) => {
+  const message = `⚠️ Eliminazione Fornitore\n\nSei sicuro di voler eliminare "${fornitore.nome}"?\n\n❗ Questa azione non può essere annullata.\n\n📊 Informazioni correnti:\n• Ordini 2024: ${fornitore.ordiniAnno}\n• Valore totale: €${fornitore.valoreAnno.toLocaleString()}\n• Cantieri attivi: ${getFornitoreRelations(fornitore.id).cantieri.length}`
+  
+  if (confirm(message)) {
+    const index = fornitori.value.findIndex(f => f.id === fornitore.id)
+    if (index > -1) {
+      fornitori.value.splice(index, 1)
+      stats.value.fornitoriAttivi--
+      
+      // Chiudi il modal se è aperto per questo fornitore
+      if (selectedFornitore.value?.id === fornitore.id) {
+        closeDetailModal()
+      }
+      
+      alert(`✅ Fornitore "${fornitore.nome}" eliminato con successo!`)
+    }
+  }
 }
 
 const viewOrder = (ordine) => {
