@@ -658,6 +658,105 @@
       </div>
     </div>
 
+    <!-- Modal Modifica Fornitore -->
+    <div v-if="showEditModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeEditModal">
+      <div class="relative top-4 mx-auto border w-full max-w-2xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-semibold text-gray-900">Modifica Fornitore</h3>
+            <button @click="closeEditModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+          
+          <form @submit.prevent="updateFornitore" class="space-y-6">
+            <!-- Info Base -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Ragione Sociale *</label>
+                <input v-model="editingFornitore.nome" type="text" required
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Categoria *</label>
+                <select v-model="editingFornitore.categoria" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+                  <option value="">Seleziona categoria</option>
+                  <option value="legno">Legno e Derivati</option>
+                  <option value="ferramenta">Ferramenta</option>
+                  <option value="isolanti">Isolanti</option>
+                  <option value="coperture">Coperture</option>
+                  <option value="trasporti">Trasporti</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Partita IVA *</label>
+                <input v-model="editingFornitore.partitaIva" type="text" required
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Codice Fiscale</label>
+                <input v-model="editingFornitore.codiceFiscale" type="text"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
+              </div>
+            </div>
+
+            <!-- Indirizzo -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Indirizzo *</label>
+              <textarea v-model="editingFornitore.indirizzo" rows="2" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Città *</label>
+                <input v-model="editingFornitore.citta" type="text" required
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">CAP *</label>
+                <input v-model="editingFornitore.cap" type="text" required
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Provincia *</label>
+                <input v-model="editingFornitore.provincia" type="text" required
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
+              </div>
+            </div>
+
+            <!-- Contatti -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Telefono *</label>
+                <input v-model="editingFornitore.telefono" type="tel" required
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                <input v-model="editingFornitore.email" type="email" required
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+              <button type="button" @click="closeEditModal" class="w-full sm:w-auto btn-secondary py-3 text-base">
+                Annulla
+              </button>
+              <button type="submit" class="w-full sm:w-auto btn-primary py-3 text-base">
+                💾 Salva Modifiche
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Allegati Materiale -->
     <MaterialAttachmentsModal 
       :is-open="showAttachmentsModal"
@@ -687,6 +786,7 @@ import MaterialAttachmentsModal from '@/components/MaterialAttachmentsModal.vue'
 
 // Stato della pagina
 const showAddModal = ref(false)
+const showEditModal = ref(false)
 const showDetailModal = ref(false)
 const showComparationModal = ref(false)
 const showAttachmentsModal = ref(false)
@@ -714,6 +814,21 @@ const tabs = ref([
 
 // Nuovo Fornitore
 const newFornitore = ref({
+  nome: '',
+  categoria: '',
+  partitaIva: '',
+  codiceFiscale: '',
+  indirizzo: '',
+  citta: '',
+  cap: '',
+  provincia: '',
+  telefono: '',
+  email: ''
+})
+
+// Fornitore in Modifica
+const editingFornitore = ref({
+  id: null,
   nome: '',
   categoria: '',
   partitaIva: '',
@@ -944,7 +1059,21 @@ const viewCantiereDetails = (cantiere) => {
 }
 
 const editFornitore = (fornitore) => {
-  alert(`✏️ Modifica fornitore ${fornitore.nome} - Funzionalità in implementazione`)
+  // Popola il form di modifica con i dati del fornitore selezionato
+  editingFornitore.value = {
+    id: fornitore.id,
+    nome: fornitore.nome,
+    categoria: fornitore.categoria,
+    partitaIva: fornitore.partitaIva,
+    codiceFiscale: fornitore.codiceFiscale || '',
+    indirizzo: fornitore.indirizzo,
+    citta: fornitore.citta,
+    cap: fornitore.cap,
+    provincia: fornitore.provincia,
+    telefono: fornitore.telefono,
+    email: fornitore.email
+  }
+  showEditModal.value = true
 }
 
 const createOrder = (fornitore) => {
@@ -1025,6 +1154,60 @@ const addFornitore = () => {
 const closeAddModal = () => {
   showAddModal.value = false
   newFornitore.value = {
+    nome: '',
+    categoria: '',
+    partitaIva: '',
+    codiceFiscale: '',
+    indirizzo: '',
+    citta: '',
+    cap: '',
+    provincia: '',
+    telefono: '',
+    email: ''
+  }
+}
+
+const updateFornitore = () => {
+  if (!editingFornitore.value.nome || !editingFornitore.value.categoria) {
+    alert('❌ Compila tutti i campi obbligatori!')
+    return
+  }
+
+  const index = fornitori.value.findIndex(f => f.id === editingFornitore.value.id)
+  if (index > -1) {
+    // Mantieni i dati esistenti che non sono nel form di modifica
+    const fornitoreEsistente = fornitori.value[index]
+    
+    fornitori.value[index] = {
+      ...fornitoreEsistente,
+      nome: editingFornitore.value.nome,
+      categoria: editingFornitore.value.categoria,
+      partitaIva: editingFornitore.value.partitaIva,
+      codiceFiscale: editingFornitore.value.codiceFiscale,
+      indirizzo: editingFornitore.value.indirizzo,
+      citta: editingFornitore.value.citta,
+      cap: editingFornitore.value.cap,
+      provincia: editingFornitore.value.provincia,
+      telefono: editingFornitore.value.telefono,
+      email: editingFornitore.value.email,
+      // Aggiorna le iniziali se il nome è cambiato
+      iniziali: editingFornitore.value.nome.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2)
+    }
+
+    // Aggiorna anche i dati nel modal dettaglio se aperto per lo stesso fornitore
+    if (selectedFornitore.value?.id === editingFornitore.value.id) {
+      selectedFornitore.value = fornitori.value[index]
+    }
+
+    closeEditModal()
+    alert(`✅ Fornitore "${editingFornitore.value.nome}" modificato con successo!`)
+  }
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingFornitore.value = {
+    id: null,
     nome: '',
     categoria: '',
     partitaIva: '',
