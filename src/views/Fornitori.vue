@@ -13,51 +13,51 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
       <div class="card">
         <div class="flex items-center">
-          <div class="p-2 bg-primary-100 rounded-lg">
-            <BuildingOfficeIcon class="w-6 h-6 text-primary-600" />
+          <div class="p-2 bg-primary-100 rounded-lg flex-shrink-0">
+            <BuildingOfficeIcon class="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
           </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">Fornitori Attivi</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.fornitoriAttivi }}</p>
+          <div class="ml-3 sm:ml-4 min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Fornitori Attivi</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.fornitoriAttivi }}</p>
           </div>
         </div>
       </div>
       
       <div class="card">
         <div class="flex items-center">
-          <div class="p-2 bg-blue-100 rounded-lg">
-            <ShoppingCartIcon class="w-6 h-6 text-blue-600" />
+          <div class="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+            <ShoppingCartIcon class="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
           </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">Ordini Aperti</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.ordiniAperti }}</p>
-          </div>
-        </div>
-      </div>
-      
-      <div class="card">
-        <div class="flex items-center">
-          <div class="p-2 bg-accent-100 rounded-lg">
-            <CurrencyEuroIcon class="w-6 h-6 text-accent-600" />
-          </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">Valore Ordini</p>
-            <p class="text-2xl font-bold text-gray-900">€{{ stats.valoreOrdini.toLocaleString() }}</p>
+          <div class="ml-3 sm:ml-4 min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Ordini Aperti</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.ordiniAperti }}</p>
           </div>
         </div>
       </div>
       
       <div class="card">
         <div class="flex items-center">
-          <div class="p-2 bg-green-100 rounded-lg">
-            <TruckIcon class="w-6 h-6 text-green-600" />
+          <div class="p-2 bg-accent-100 rounded-lg flex-shrink-0">
+            <CurrencyEuroIcon class="w-5 h-5 sm:w-6 sm:h-6 text-accent-600" />
           </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-600">In Consegna</p>
-            <p class="text-2xl font-bold text-gray-900">{{ stats.inConsegna }}</p>
+          <div class="ml-3 sm:ml-4 min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Valore Ordini</p>
+            <p class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">€{{ stats.valoreOrdini.toLocaleString() }}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="flex items-center">
+          <div class="p-2 bg-green-100 rounded-lg flex-shrink-0">
+            <TruckIcon class="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+          </div>
+          <div class="ml-3 sm:ml-4 min-w-0 flex-1">
+            <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">In Consegna</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.inConsegna }}</p>
           </div>
         </div>
       </div>
@@ -273,22 +273,22 @@
             </span>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            <div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div class="min-w-0">
               <p class="text-sm text-gray-600">Valore Ordine</p>
-              <p class="text-lg font-bold text-gray-900">€{{ ordine.valore.toLocaleString() }}</p>
+              <p class="text-lg font-bold text-gray-900 truncate">€{{ ordine.valore.toLocaleString() }}</p>
             </div>
-            <div>
+            <div class="min-w-0">
               <p class="text-sm text-gray-600">Articoli</p>
               <p class="text-lg font-bold text-gray-900">{{ ordine.articoli }} pz</p>
             </div>
-            <div>
+            <div class="min-w-0">
               <p class="text-sm text-gray-600">Consegna Prevista</p>
-              <p class="text-lg font-bold" :class="isScaduto(ordine.consegnaPrevista) ? 'text-red-600' : 'text-gray-900'">
+              <p class="text-lg font-bold truncate" :class="isScaduto(ordine.consegnaPrevista) ? 'text-red-600' : 'text-gray-900'">
                 {{ formatDate(ordine.consegnaPrevista) }}
               </p>
             </div>
-            <div>
+            <div class="min-w-0">
               <p class="text-sm text-gray-600">Progresso</p>
               <div class="flex items-center">
                 <div class="w-full bg-gray-200 rounded-full h-2 mr-2">
@@ -432,17 +432,17 @@
                   <CurrencyEuroIcon class="w-5 h-5 mr-2 text-green-600" />
                   Performance 2024
                 </h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div class="text-center p-4 bg-blue-50 rounded-lg">
-                    <p class="text-2xl font-bold text-blue-600">{{ selectedFornitore.ordiniAnno }}</p>
+                    <p class="text-xl sm:text-2xl font-bold text-blue-600">{{ selectedFornitore.ordiniAnno }}</p>
                     <p class="text-sm text-gray-600">Ordini Totali</p>
                   </div>
                   <div class="text-center p-4 bg-green-50 rounded-lg">
-                    <p class="text-2xl font-bold text-green-600">€{{ selectedFornitore.valoreAnno.toLocaleString() }}</p>
+                    <p class="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">€{{ selectedFornitore.valoreAnno.toLocaleString() }}</p>
                     <p class="text-sm text-gray-600">Valore Ordini</p>
                   </div>
                   <div class="text-center p-4 bg-purple-50 rounded-lg">
-                    <p class="text-2xl font-bold text-purple-600">{{ getFornitoreRelations(selectedFornitore.id).cantieri.length }}</p>
+                    <p class="text-xl sm:text-2xl font-bold text-purple-600">{{ getFornitoreRelations(selectedFornitore.id).cantieri.length }}</p>
                     <p class="text-sm text-gray-600">Cantieri Attivi</p>
                   </div>
                 </div>
