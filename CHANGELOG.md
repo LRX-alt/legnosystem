@@ -5,6 +5,50 @@ Tutte le modifiche significative al progetto Legnosystem.bio saranno documentate
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2024-12-21
+
+### 🗂️ SISTEMA ALLEGATI MATERIALI - RISOLUZIONE COMPLETA
+- **BUG CRITICO RISOLTO**: Eliminato problema allegati che sparivano durante navigazione
+- **Persistenza Assoluta**: File e documenti ora persistono sempre attraverso:
+  - ✅ Refresh pagina (F5)
+  - ✅ Navigazione tra sezioni (Cantieri ↔ Fornitori) 
+  - ✅ Chiusura/riapertura browser
+  - ✅ Riavvio sistema
+
+### 🔧 CORREZIONI TECNICHE FONDAMENTALI
+- **ReferenceError Fix**: Risolto "Cannot access 'Qt' before initialization" 
+- **MaterialId Format**: Correzione gestione IDs decimali (es. 1749149629939.1462)
+  - Prima: `parseInt()` troncava a `1749149629939` → allegati non trovati
+  - Ora: Gestione string-based preserva formato completo
+- **Cross-Page Sync**: Sincronizzazione perfetta allegati tra Cantieri e Fornitori
+- **Backward Compatibility**: Sistema gestisce sia MaterialId legacy che nuovi
+
+### 💾 SISTEMA STORAGE RIDISEGNATO  
+- **Base64 Encoding**: File convertiti in Base64 per storage permanente localStorage
+- **No More Blob URLs**: Eliminati URL temporanei che causavano perdite dati
+- **Unified Data Format**: Formato dati unificato cross-component:
+  - `name` ↔ `nome` mapping automatico
+  - `size` ↔ `dimensione` conversione
+  - `uploadDate` ↔ `dataCaricamento` sync
+- **Category System**: Gestione categorie uniforme (Documento, Foto, Fattura/DDT, Certificato, Generale)
+
+### 🎨 UX PROFESSIONAL ENHANCEMENT
+- **Modal Material Names**: Typography migliorata con `font-semibold text-gray-900 text-base tracking-wide`
+- **Visual Consistency**: Design pulito e professionale per documentazione materiali
+- **Error Handling**: Gestione errori robusta con try/catch e fallback
+
+### 🔄 ARCHITETTURA MIGLIORATA
+- **HMR Compatibility**: Risolti conflitti Hot Module Replacement in development
+- **Component Sync**: MaterialAttachmentsModal.vue sincronizzato con sistema storage
+- **Memory Management**: Ottimizzazione gestione memoria e cleanup automatico
+- **Performance**: Caricamento allegati ottimizzato con lazy loading
+
+### 💼 BUSINESS IMPACT
+- **Zero Data Loss**: Eliminazione totale perdita documenti e foto materiali
+- **Professional Workflow**: Gestione documentale affidabile per cantieri
+- **Cross-Team Access**: Allegati accessibili da ogni sezione del gestionale
+- **Client Confidence**: Sistema robusto per documentazione progetti
+
 ## [1.11.0] - 2024-12-21
 
 ### ♻️ SISTEMA CLEANUP & OTTIMIZZAZIONE

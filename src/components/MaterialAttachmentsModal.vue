@@ -10,7 +10,9 @@
             </h3>
             <div class="mt-2 space-y-1">
               <p class="text-sm text-gray-600">
-                <span class="font-medium">Materiale:</span> {{ material.nome }} ({{ material.codice }})
+                <span class="font-medium">Materiale:</span> 
+                <span class="font-semibold text-gray-900 text-base tracking-wide">{{ material.nome }}</span>
+                <span v-if="material.codice" class="ml-2 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded font-mono">{{ material.codice }}</span>
               </p>
               <p class="text-sm text-gray-600">
                 <span class="font-medium">Fornitore:</span> {{ material.fornitoreNome }}
@@ -294,11 +296,23 @@ const loadAttachments = () => {
   
   try {
     const allAttachments = JSON.parse(stored)
-    // Filtra per materiale e cantiere specifici
+    // Filtra per materiale e cantiere specifici usando confronto stringa
     attachments.value = allAttachments.filter(att => 
-      att.materialId === props.material.id && 
-      att.cantiereId == props.material.cantiere?.id
-    )
+      String(att.materialId) === String(props.material.id) && 
+      String(att.cantiereId) === String(props.material.cantiere?.id)
+    ).map(att => ({
+      // Converte i campi al formato atteso dal componente
+      id: att.id,
+      materialId: att.materialId,
+      cantiereId: att.cantiereId,
+      nome: att.name || att.nome,
+      categoria: att.category || att.categoria,
+      dimensione: att.size || att.dimensione,
+      tipo: att.type || att.tipo,
+      dataCaricamento: att.uploadDate || att.dataCaricamento,
+      fornitore: att.fornitore,
+      url: att.url
+    }))
   } catch (e) {
     console.error('Errore caricamento allegati:', e)
     attachments.value = []
@@ -328,20 +342,27 @@ const processFiles = (files) => {
   showUploadArea.value = false
 }
 
-const addAttachment = (file) => {
+const addAttachment = async (file) => {
   const categoria = categorizeFile(file.name, file.type)
+  
+  // Converte il file in Base64 per persistenza
+  const base64 = await new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => resolve(e.target.result)
+    reader.readAsDataURL(file)
+  })
   
   const newAttachment = {
     id: Date.now() + Math.random(),
-    materialId: props.material.id,
-    cantiereId: props.material.cantiere?.id,
+    materialId: String(props.material.id),
+    cantiereId: String(props.material.cantiere?.id),
     nome: file.name,
     categoria,
     dimensione: file.size,
-    tipo: file.type,
-    dataCaricamento: new Date().toISOString(),
+    tipo: file.type.split('/').pop(),
+    dataCaricamento: new Date().toISOString().split('T')[0],
     fornitore: props.material.fornitoreNome,
-    url: URL.createObjectURL(file) // Per demo
+    url: base64
   }
   
   attachments.value.push(newAttachment)
@@ -361,13 +382,27 @@ const saveAttachments = () => {
     }
   }
   
-  // Rimuovi i vecchi allegati di questo materiale
+  // Rimuovi i vecchi allegati di questo materiale usando confronto stringa
   allAttachments = allAttachments.filter(att => 
-    !(att.materialId === props.material.id && att.cantiereId == props.material.cantiere?.id)
+    !(String(att.materialId) === String(props.material.id) && 
+      String(att.cantiereId) === String(props.material.cantiere?.id))
   )
   
-  // Aggiungi i nuovi
-  allAttachments.push(...attachments.value)
+  // Converti e aggiungi i nuovi allegati nel formato compatibile
+  const newAttachments = attachments.value.map(att => ({
+    id: att.id,
+    materialId: String(att.materialId),
+    cantiereId: String(att.cantiereId),
+    name: att.nome,
+    category: att.categoria,
+    size: att.dimensione,
+    type: att.tipo,
+    uploadDate: att.dataCaricamento,
+    fornitore: att.fornitore,
+    url: att.url
+  }))
+  
+  allAttachments.push(...newAttachments)
   
   localStorage.setItem('legnosystem_material_attachments', JSON.stringify(allAttachments))
 }
@@ -375,45 +410,38 @@ const saveAttachments = () => {
 const categorizeFile = (fileName, fileType) => {
   const ext = fileName.split('.').pop().toLowerCase()
   
-  if (['pdf'].includes(ext)) return 'document'
-  if (['xls', 'xlsx'].includes(ext)) return 'invoice'
-  if (['jpg', 'jpeg', 'png'].includes(ext)) return 'photo'
-  if (['doc', 'docx'].includes(ext)) return 'certificate'
+  if (['pdf'].includes(ext)) return 'Documento'
+  if (['xls', 'xlsx'].includes(ext)) return 'Fattura/DDT'
+  if (['jpg', 'jpeg', 'png'].includes(ext)) return 'Foto'
+  if (['doc', 'docx'].includes(ext)) return 'Certificato'
   
-  return 'other'
+  return 'Generale'
 }
 
 const getFileTypeColor = (categoria) => {
   const colors = {
-    document: 'bg-red-500',
-    invoice: 'bg-green-500',
-    photo: 'bg-blue-500',
-    certificate: 'bg-purple-500',
-    other: 'bg-gray-500'
+    'Documento': 'bg-red-500',
+    'Fattura/DDT': 'bg-green-500',
+    'Foto': 'bg-blue-500',
+    'Certificato': 'bg-purple-500',
+    'Generale': 'bg-gray-500'
   }
-  return colors[categoria] || colors.other
+  return colors[categoria] || 'bg-gray-500'
 }
 
 const getFileTypeIcon = (categoria) => {
   const icons = {
-    document: 'PDF',
-    invoice: 'XLS',
-    photo: 'IMG',
-    certificate: 'DOC',
-    other: 'FILE'
+    'Documento': 'PDF',
+    'Fattura/DDT': 'XLS',
+    'Foto': 'IMG',
+    'Certificato': 'DOC',
+    'Generale': 'FILE'
   }
-  return icons[categoria] || icons.other
+  return icons[categoria] || 'FILE'
 }
 
 const getCategoryLabel = (categoria) => {
-  const labels = {
-    document: 'Documento',
-    invoice: 'Fattura',
-    photo: 'Foto',
-    certificate: 'Certificato',
-    other: 'Altro'
-  }
-  return labels[categoria] || labels.other
+  return categoria || 'Generale'
 }
 
 const formatFileSize = (bytes) => {

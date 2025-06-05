@@ -2051,7 +2051,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { 
   PlusIcon,
   BuildingOfficeIcon,
@@ -3270,7 +3270,8 @@ const loadMaterialAttachmentsFromStorage = () => {
       if (Array.isArray(data)) {
         materialiAttachments.value = {}
         data.forEach(attachment => {
-          const materialId = attachment.materialId
+          // Mantiene il materialId come stringa per compatibilità con ID decimali
+          const materialId = String(attachment.materialId)
           if (!materialiAttachments.value[materialId]) {
             materialiAttachments.value[materialId] = []
           }
@@ -3314,18 +3315,17 @@ const saveMaterialAttachmentsToStorage = () => {
       attachments.forEach(attachment => {
         newAttachmentsArray.push({
           ...attachment,
-          materialId: parseInt(materialId)
+          materialId: materialId // Mantiene come stringa per preservare i decimali
         })
       })
     })
     
     // Merge: rimuove i vecchi allegati di questi materiali e aggiunge i nuovi
-    const materialIds = Object.keys(materialiAttachments.value).map(id => parseInt(id))
-    const filteredExisting = existingAttachments.filter(att => !materialIds.includes(att.materialId))
+    const materialIds = Object.keys(materialiAttachments.value) // Mantiene come stringa
+    const filteredExisting = existingAttachments.filter(att => !materialIds.includes(String(att.materialId)))
     const mergedAttachments = [...filteredExisting, ...newAttachmentsArray]
     
     localStorage.setItem('legnosystem_material_attachments', JSON.stringify(mergedAttachments))
-    // Allegati salvati con successo
   } catch (e) {
     console.error('❌ Errore nel salvataggio allegati:', e)
   }
@@ -3333,7 +3333,12 @@ const saveMaterialAttachmentsToStorage = () => {
 
 const getMaterialAttachmentCount = (materiale) => {
   if (!materialiAttachments.value || !materiale) return 0
-  return materialiAttachments.value[materiale.id]?.length || 0
+  
+  // Cerca sia con ID numerico che stringa per compatibilità
+  const materialIdStr = String(materiale.id)
+  const count = materialiAttachments.value[materialIdStr]?.length || materialiAttachments.value[materiale.id]?.length || 0
+  
+  return count
 }
 
 const manageMaterialAttachments = (materiale) => {
@@ -3382,8 +3387,7 @@ const removeAttachmentFromMaterial = (materialId, attachmentId) => {
   }
 }
 
-// Inizializza allegati materiali all'avvio
-loadMaterialAttachmentsFromStorage()
+// Nota: loadMaterialAttachmentsFromStorage() ora viene chiamato in onMounted
 
 const getMaterialAttachments = () => {
   if (!selectedMaterial.value) return []
@@ -3511,6 +3515,13 @@ const handleMaterialFileUpload = async (event) => {
     if (['xls', 'xlsx'].includes(extension)) category = 'Fattura/DDT'
     if (['doc', 'docx'].includes(extension)) category = 'Certificato'
     
+    // Converte il file in Base64 per persistenza nel localStorage
+    const base64 = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = (e) => resolve(e.target.result)
+      reader.readAsDataURL(file)
+    })
+    
     // Crea oggetto allegato
     const attachment = {
       id: Date.now() + Math.random(),
@@ -3523,8 +3534,8 @@ const handleMaterialFileUpload = async (event) => {
       fornitore: fornitore?.nome || 'N/A',
       materialId: materialId,
       cantiereId: selectedCantiere.value.id,
-      // In una vera implementazione, qui si caricherà il file su un server
-      url: URL.createObjectURL(file) // Temporaneo per la demo
+      // Salva il file come Base64 per persistenza
+      url: base64
     }
     
     materialiAttachments.value[materialId].push(attachment)
@@ -3766,4 +3777,10 @@ const getTipoLabel = (tipo) => {
   }
   return labels[tipo] || tipo
 }
+
+// Hook lifecycle per inizializzazione
+onMounted(() => {
+  // Carica allegati materiali dal localStorage solo al mount del componente
+  loadMaterialAttachmentsFromStorage()
+})
 </script> 

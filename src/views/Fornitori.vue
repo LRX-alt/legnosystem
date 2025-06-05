@@ -1065,12 +1065,13 @@ const getMaterialAttachmentCount = (materiale) => {
     // Supporta entrambi i formati: array diretto e oggetto con chiavi materialId
     if (Array.isArray(attachments)) {
       return attachments.filter(att => 
-        att.materialId === materiale.id && 
-        att.cantiereId == materiale.cantiere?.id
+        String(att.materialId) === String(materiale.id) && 
+        String(att.cantiereId) === String(materiale.cantiere?.id)
       ).length
     } else {
       // Formato legacy: oggetto con chiavi materialId
-      return attachments[materiale.id]?.length || 0
+      const materialIdStr = String(materiale.id)
+      return attachments[materialIdStr]?.length || attachments[materiale.id]?.length || 0
     }
   } catch (e) {
     console.error('Errore nel conteggio allegati:', e)
