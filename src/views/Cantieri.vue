@@ -3260,18 +3260,14 @@ const openFile = (file) => {
 
 // Funzione per caricare allegati materiali dal localStorage
 const loadMaterialAttachmentsFromStorage = () => {
-  console.log('🔄 Caricamento allegati materiali dal localStorage...')
   const stored = localStorage.getItem('legnosystem_material_attachments')
-  console.log('📦 Dati localStorage raw:', stored)
   
   if (stored) {
     try {
       const data = JSON.parse(stored)
-      console.log('📦 Dati parserti:', data)
       
       // Se è un array (nuovo formato), converte in oggetto per uso interno
       if (Array.isArray(data)) {
-        console.log('📋 Formato array rilevato, conversione in oggetto...')
         materialiAttachments.value = {}
         data.forEach(attachment => {
           const materialId = attachment.materialId
@@ -3280,19 +3276,15 @@ const loadMaterialAttachmentsFromStorage = () => {
           }
           materialiAttachments.value[materialId].push(attachment)
         })
-        console.log('✅ Allegati caricati (formato array):', materialiAttachments.value)
       } else {
-        console.log('📋 Formato oggetto rilevato (legacy)...')
         // Formato legacy (oggetto)
         materialiAttachments.value = data
-        console.log('✅ Allegati caricati (formato legacy):', materialiAttachments.value)
       }
     } catch (e) {
-      console.warn('❌ Errore nel caricamento allegati materiali:', e)
+      console.warn('Errore nel caricamento allegati materiali:', e)
       materialiAttachments.value = {}
     }
   } else {
-    console.log('🔍 Nessun dato allegati nel localStorage')
     materialiAttachments.value = {}
   }
 }
@@ -3333,7 +3325,7 @@ const saveMaterialAttachmentsToStorage = () => {
     const mergedAttachments = [...filteredExisting, ...newAttachmentsArray]
     
     localStorage.setItem('legnosystem_material_attachments', JSON.stringify(mergedAttachments))
-    console.log('💾 Salvati allegati nel localStorage:', mergedAttachments.length, 'totali')
+    // Allegati salvati con successo
   } catch (e) {
     console.error('❌ Errore nel salvataggio allegati:', e)
   }
@@ -3499,8 +3491,6 @@ const handleMaterialFileUpload = async (event) => {
   const materialId = selectedMaterial.value.id
   const fornitore = getFornitoreById(selectedMaterial.value.fornitoreId)
   
-  console.log('🔧 Debug upload - MaterialId:', materialId, 'CantiereId:', selectedCantiere.value.id)
-  
   // Inizializza array allegati se non esiste
   if (!materialiAttachments.value[materialId]) {
     materialiAttachments.value[materialId] = []
@@ -3538,20 +3528,14 @@ const handleMaterialFileUpload = async (event) => {
     }
     
     materialiAttachments.value[materialId].push(attachment)
-    console.log('📎 Allegato aggiunto:', attachment.name, 'per materiale:', materialId)
   }
   
-  console.log('💾 Allegati prima del salvataggio:', materialiAttachments.value[materialId])
   saveMaterialAttachmentsToStorage()
-  
-  // Verifica che il salvataggio sia andato a buon fine
-  const stored = localStorage.getItem('legnosystem_material_attachments')
-  console.log('✅ Verifica localStorage dopo salvataggio:', stored ? JSON.parse(stored) : 'VUOTO')
   
   // Reset input
   event.target.value = ''
   
-  alert(`✅ ${files.length} file caricati con successo per ${selectedMaterial.value.nome}!\n\n🔍 Debug: MaterialId=${materialId}, Files salvati nel localStorage`)
+  alert(`✅ ${files.length} file caricati con successo per ${selectedMaterial.value.nome}!`)
 }
 
 const generateMaterialReport = () => {
