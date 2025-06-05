@@ -3263,7 +3263,21 @@ const loadMaterialAttachmentsFromStorage = () => {
   const stored = localStorage.getItem('legnosystem_material_attachments')
   if (stored) {
     try {
-      materialiAttachments.value = JSON.parse(stored)
+      const data = JSON.parse(stored)
+      // Se è un array (nuovo formato), converte in oggetto per uso interno
+      if (Array.isArray(data)) {
+        materialiAttachments.value = {}
+        data.forEach(attachment => {
+          const materialId = attachment.materialId
+          if (!materialiAttachments.value[materialId]) {
+            materialiAttachments.value[materialId] = []
+          }
+          materialiAttachments.value[materialId].push(attachment)
+        })
+      } else {
+        // Formato legacy (oggetto)
+        materialiAttachments.value = data
+      }
     } catch (e) {
       console.warn('Errore nel caricamento allegati materiali:', e)
       materialiAttachments.value = {}
@@ -3271,9 +3285,19 @@ const loadMaterialAttachmentsFromStorage = () => {
   }
 }
 
-// Funzione per salvare allegati materiali nel localStorage
+// Funzione per salvare allegati materiali nel localStorage (formato compatibile con fornitori)
 const saveMaterialAttachmentsToStorage = () => {
-  localStorage.setItem('legnosystem_material_attachments', JSON.stringify(materialiAttachments.value))
+  // Converte da formato oggetto a formato array per compatibilità
+  const attachmentsArray = []
+  Object.entries(materialiAttachments.value).forEach(([materialId, attachments]) => {
+    attachments.forEach(attachment => {
+      attachmentsArray.push({
+        ...attachment,
+        materialId: parseInt(materialId)
+      })
+    })
+  })
+  localStorage.setItem('legnosystem_material_attachments', JSON.stringify(attachmentsArray))
 }
 
 const getMaterialAttachmentCount = (materiale) => {

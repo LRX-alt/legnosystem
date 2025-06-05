@@ -1062,10 +1062,16 @@ const getMaterialAttachmentCount = (materiale) => {
   
   try {
     const attachments = JSON.parse(stored)
-    return attachments.filter(att => 
-      att.materialId === materiale.id && 
-      att.cantiereId == materiale.cantiere?.id
-    ).length
+    // Supporta entrambi i formati: array diretto e oggetto con chiavi materialId
+    if (Array.isArray(attachments)) {
+      return attachments.filter(att => 
+        att.materialId === materiale.id && 
+        att.cantiereId == materiale.cantiere?.id
+      ).length
+    } else {
+      // Formato legacy: oggetto con chiavi materialId
+      return attachments[materiale.id]?.length || 0
+    }
   } catch (e) {
     console.error('Errore nel conteggio allegati:', e)
     return 0
@@ -1074,7 +1080,10 @@ const getMaterialAttachmentCount = (materiale) => {
 
 // Funzione per aprire la modal documentazione materiale
 const viewMaterialDocuments = (materiale) => {
-  selectedMaterial.value = materiale
+  selectedMaterial.value = {
+    ...materiale,
+    fornitoreNome: selectedFornitore.value.nome
+  }
   showAttachmentsModal.value = true
 }
 
