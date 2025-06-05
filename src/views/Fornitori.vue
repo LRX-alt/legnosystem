@@ -318,7 +318,7 @@
 
     <!-- Modal Visualizzazione Fornitore Dettagliato -->
     <div v-if="showDetailModal && selectedFornitore" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeDetailModal">
-      <div class="relative top-4 mx-auto border w-full max-w-6xl shadow-lg rounded-md bg-white" @click.stop>
+      <div class="relative top-4 mx-auto border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto mb-8" @click.stop>
         <div class="p-6">
           <!-- Header con info principale -->
           <div class="flex items-start justify-between mb-6 pb-6 border-b border-gray-200">
@@ -453,7 +453,7 @@
                 <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   🏗️ Cantieri Associati ({{ getFornitoreRelations(selectedFornitore.id).cantieri.length }})
                 </h3>
-                <div class="space-y-3 max-h-64 overflow-y-auto">
+                <div class="space-y-3 max-h-80 overflow-y-auto">
                   <div v-for="cantiere in getFornitoreRelations(selectedFornitore.id).cantieri" :key="cantiere.id" 
                        class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                     <div>
@@ -484,7 +484,7 @@
                     Totale: €{{ getFornitoreRelations(selectedFornitore.id).totaleValore.toFixed(2) }}
                   </p>
                 </div>
-                <div class="space-y-2 max-h-64 overflow-y-auto">
+                <div class="space-y-2 max-h-96 overflow-y-auto">
                   <div v-for="materiale in getFornitoreRelations(selectedFornitore.id).materiali" :key="`${materiale.cantiere.id}-${materiale.id}`" 
                        class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                     <div class="flex-1">
