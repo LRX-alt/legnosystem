@@ -491,6 +491,11 @@
                       <div class="flex items-center">
                         <p class="font-medium text-gray-900">{{ materiale.nome }}</p>
                         <span class="ml-2 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">{{ materiale.codice }}</span>
+                        <!-- Badge allegati -->
+                        <span v-if="getMaterialAttachmentCount(materiale)" 
+                              class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          📎 {{ getMaterialAttachmentCount(materiale) }}
+                        </span>
                       </div>
                       <p class="text-sm text-gray-600">{{ materiale.cantiere.nome }} - {{ materiale.cantiere.cliente }}</p>
                       <div class="flex items-center mt-1 space-x-4">
@@ -502,8 +507,18 @@
                         </span>
                       </div>
                     </div>
-                    <div class="text-right">
-                      <p class="text-sm font-bold text-gray-900">€{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}</p>
+                    <div class="flex items-center space-x-2 ml-4">
+                      <!-- Bottone Documentazione -->
+                      <button
+                        @click="viewMaterialDocuments(materiale)"
+                        class="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Visualizza Documentazione"
+                      >
+                        <PaperClipIcon class="w-4 h-4" />
+                      </button>
+                      <div class="text-right">
+                        <p class="text-sm font-bold text-gray-900">€{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -622,6 +637,13 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal Allegati Materiale -->
+    <MaterialAttachmentsModal 
+      :is-open="showAttachmentsModal"
+      :material="selectedMaterial"
+      @close="closeAttachmentsModal"
+    />
   </div>
 </template>
 
@@ -636,15 +658,19 @@ import {
   EyeIcon,
   PencilIcon,
   XMarkIcon,
-  StarIcon
+  StarIcon,
+  PaperClipIcon
 } from '@heroicons/vue/24/outline'
 import { useToast } from '@/composables/useToast'
+import MaterialAttachmentsModal from '@/components/MaterialAttachmentsModal.vue'
 
 // Stato della pagina
 const showAddModal = ref(false)
 const showDetailModal = ref(false)
 const showComparationModal = ref(false)
+const showAttachmentsModal = ref(false)
 const selectedFornitore = ref(null)
+const selectedMaterial = ref(null)
 const activeTab = ref('fornitori')
 const searchTerm = ref('')
 const selectedCategory = ref('')
@@ -1027,5 +1053,34 @@ const getFornitoreRelations = (fornitoreId) => {
     console.error('Errore nel caricamento relazioni fornitore:', e)
     return { materiali: [], cantieri: [], totaleValore: 0 }
   }
+}
+
+// Funzione per contare gli allegati di un materiale specifico
+const getMaterialAttachmentCount = (materiale) => {
+  const stored = localStorage.getItem('legnosystem_material_attachments')
+  if (!stored) return 0
+  
+  try {
+    const attachments = JSON.parse(stored)
+    return attachments.filter(att => 
+      att.materialId === materiale.id && 
+      att.cantiereId == materiale.cantiere?.id
+    ).length
+  } catch (e) {
+    console.error('Errore nel conteggio allegati:', e)
+    return 0
+  }
+}
+
+// Funzione per aprire la modal documentazione materiale
+const viewMaterialDocuments = (materiale) => {
+  selectedMaterial.value = materiale
+  showAttachmentsModal.value = true
+}
+
+// Funzione per chiudere la modal allegati
+const closeAttachmentsModal = () => {
+  showAttachmentsModal.value = false
+  selectedMaterial.value = null
 }
 </script> 
