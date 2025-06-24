@@ -46,8 +46,8 @@
                 <span class="text-white text-xs sm:text-sm font-medium">U</span>
               </div>
               <div class="hidden md:block text-left">
-                <p class="text-sm font-medium text-gray-900">Utente Admin</p>
-                <p class="text-xs text-gray-500">Amministratore</p>
+                <p class="text-sm font-medium text-gray-900">{{ userName }}</p>
+                <p class="text-xs text-gray-500">{{ userRole === 'admin' ? 'Amministratore' : 'Utente' }}</p>
               </div>
               <ChevronDownIcon class="w-4 h-4 text-gray-400 hidden sm:block" />
             </button>
@@ -55,10 +55,20 @@
             <!-- User Dropdown -->
             <div v-if="showUserMenu" 
                  class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              
+              <!-- Se autenticato -->
+              <template v-if="isAuthenticated">
               <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profilo</a>
               <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Impostazioni</a>
               <hr class="my-1">
-              <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                <button @click="handleLogout" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</button>
+              </template>
+              
+              <!-- Se NON autenticato -->
+              <template v-else>
+                <button @click="showLoginForm" class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 font-medium">🔑 Login</button>
+                <button @click="createFirebaseAdmin" class="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 font-medium">🔥 Crea Admin Firebase</button>
+              </template>
             </div>
           </div>
         </div>
@@ -85,21 +95,77 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { BellIcon, ChevronDownIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { useAuthStore } from '@/stores/auth'
 
 // Emit per comunicare con il componente padre
 defineEmits(['toggle-sidebar'])
 
+// Firebase Auth Store
+const authStore = useAuthStore()
+
+// UI State
 const showNotifications = ref(false)
 const showUserMenu = ref(false)
 const unreadNotifications = ref(3)
+
+// Firebase Auth Data
+const userName = computed(() => authStore.userName || 'Utente')
+const userRole = computed(() => authStore.userRole)
+const isAuthenticated = computed(() => authStore.isAuthenticated)
 
 const notifications = ref([
   { id: 1, message: 'Scorte legno di quercia sotto il minimo', time: '5 min fa' },
   { id: 2, message: 'Cantiere Via Roma: fase completata', time: '1 ora fa' },
   { id: 3, message: 'Nuovo preventivo richiesto', time: '2 ore fa' }
 ])
+
+// Logout function
+const handleLogout = async () => {
+  await authStore.logout()
+  showUserMenu.value = false
+}
+
+// Login function
+const showLoginForm = async () => {
+  const email = prompt('Email per Login:')
+  const password = prompt('Password:')
+  
+  if (email && password) {
+    try {
+      const result = await authStore.login(email, password)
+      if (result.success) {
+        alert('✅ Login effettuato con successo!')
+        showUserMenu.value = false
+      } else {
+        alert('❌ Errore login: ' + result.error)
+      }
+    } catch (error) {
+      alert('❌ Errore: ' + error.message)
+    }
+  }
+}
+
+// Create Firebase Admin function
+const createFirebaseAdmin = async () => {
+  const email = prompt('Email per Admin Firebase:')
+  const password = prompt('Password per Admin Firebase:')
+  
+  if (email && password) {
+    try {
+      const result = await authStore.register(email, password, 'Admin Legnosystem', 'admin')
+      if (result.success) {
+        alert('✅ Admin Firebase creato con successo!')
+        showUserMenu.value = false
+      } else {
+        alert('❌ Errore: ' + result.error)
+      }
+    } catch (error) {
+      alert('❌ Errore: ' + error.message)
+    }
+  }
+}
 
 // Chiudi dropdown quando si clicca fuori
 document.addEventListener('click', (e) => {

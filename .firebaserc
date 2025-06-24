@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "legnosystem-bio-92aca",
+    "staging": "legnosystem-bio-92aca"
+  },
+  "targets": {},
+  "etags": {}
+}

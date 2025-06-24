@@ -264,67 +264,26 @@ import {
 // Stato della pagina
 const selectedPeriod = ref('30d')
 
-// KPIs
+// KPI - resettati a 0
 const kpis = ref({
-  fatturato: 285000,
-  fatturatoChange: 12,
-  progettiCompletati: 8,
-  progettiChange: 25,
-  nuoviClienti: 5,
-  clientiChange: -8,
-  oreLavorate: 326,
-  oreChange: 15
+  fatturato: 0,
+  fatturatoChange: 0,
+  progettiCompletati: 0,
+  progettiChange: 0,
+  nuoviClienti: 0,
+  clientiChange: 0,
+  oreLavorate: 0,
+  oreChange: 0
 })
 
-// Performance Team
-const teamPerformance = ref([
-  {
-    id: 1,
-    nome: 'Marco Bianchi',
-    iniziali: 'MB',
-    ruolo: 'Capo Squadra',
-    oreTotali: 160,
-    progetti: 3,
-    efficienza: 92,
-    valutazione: 'Eccellente'
-  },
-  {
-    id: 2,
-    nome: 'Luca Verdi',
-    iniziali: 'LV',
-    ruolo: 'Carpentiere',
-    oreTotali: 152,
-    progetti: 2,
-    efficienza: 88,
-    valutazione: 'Ottimo'
-  },
-  {
-    id: 3,
-    nome: 'Anna Russo',
-    iniziali: 'AR',
-    ruolo: 'Operaio Spec.',
-    oreTotali: 144,
-    progetti: 2,
-    efficienza: 85,
-    valutazione: 'Buono'
-  }
-])
+// Performance team - vuoto, da caricare da Firestore
+const teamPerformance = ref([])
 
-// Top Materiali
-const topMateriali = ref([
-  { nome: 'Travetti in Abete', quantita: '245 pz', percentuale: 85, color: '#9d6b3e' },
-  { nome: 'Pannelli OSB', quantita: '180 mq', percentuale: 72, color: '#369e5d' },
-  { nome: 'Isolante Termico', quantita: '320 mq', percentuale: 68, color: '#4f46e5' },
-  { nome: 'Tegole Coppo', quantita: '1200 pz', percentuale: 45, color: '#dc2626' }
-])
+// Top Materiali - vuoto, da caricare da Firestore
+const topMateriali = ref([])
 
-// Top Clienti
-const topClienti = ref([
-  { nome: 'Industrie SpA', iniziali: 'IS', fatturato: 125000, progetti: 3 },
-  { nome: 'Famiglia Rossi', iniziali: 'FR', fatturato: 85000, progetti: 2 },
-  { nome: 'Comune di Verona', iniziali: 'CV', fatturato: 65000, progetti: 1 },
-  { nome: 'Villa Bianchi', iniziali: 'VB', fatturato: 45000, progetti: 1 }
-])
+// Top Clienti - vuoto, da caricare da Firestore
+const topClienti = ref([])
 
 // Methods
 const getValutazioneColor = (valutazione) => {

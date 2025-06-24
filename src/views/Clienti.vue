@@ -206,11 +206,365 @@
         </table>
       </div>
     </div>
+
+    <!-- Modal Nuovo Cliente -->
+    <div v-if="showAddModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+          <!-- Header Modal -->
+          <div class="flex items-center justify-between pb-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Nuovo Cliente</h3>
+            <button @click="showAddModal = false" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Form Nuovo Cliente -->
+          <form @submit.prevent="createCliente" class="mt-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Nome -->
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nome/Ragione Sociale *</label>
+                <input 
+                  v-model="newCliente.nome" 
+                  type="text" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Es. Mario Rossi o Azienda SpA"
+                />
+              </div>
+
+              <!-- Email -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                <input 
+                  v-model="newCliente.email" 
+                  type="email" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="email@esempio.com"
+                />
+              </div>
+
+              <!-- Telefono -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Telefono *</label>
+                <input 
+                  v-model="newCliente.telefono" 
+                  type="tel" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="+39 123 456 7890"
+                />
+              </div>
+
+              <!-- Tipo -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tipo Cliente *</label>
+                <select 
+                  v-model="newCliente.tipo" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">Seleziona tipo</option>
+                  <option value="privato">Privato</option>
+                  <option value="azienda">Azienda</option>
+                  <option value="ente-pubblico">Ente Pubblico</option>
+                </select>
+              </div>
+
+              <!-- Partita IVA -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Partita IVA</label>
+                <input 
+                  v-model="newCliente.partitaIva" 
+                  type="text" 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="IT12345678901"
+                />
+              </div>
+
+              <!-- Indirizzo -->
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Indirizzo</label>
+                <input 
+                  v-model="newCliente.indirizzo" 
+                  type="text" 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Via Roma 123, Milano"
+                />
+              </div>
+
+              <!-- Note -->
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+                <textarea 
+                  v-model="newCliente.note" 
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="Note aggiuntive sul cliente..."
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+              <button 
+                type="button" 
+                @click="showAddModal = false"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Annulla
+              </button>
+              <button 
+                type="submit" 
+                :disabled="loading"
+                class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-50"
+              >
+                {{ loading ? 'Creazione...' : 'Crea Cliente' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Visualizza Cliente -->
+    <div v-if="showViewModal && selectedCliente" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+          <!-- Header Modal -->
+          <div class="flex items-center justify-between pb-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Dettagli Cliente</h3>
+            <button @click="showViewModal = false" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Dettagli Cliente -->
+          <div class="mt-4 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-500">Nome/Ragione Sociale</label>
+                <p class="text-lg font-semibold text-gray-900">{{ selectedCliente.nome }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-500">Tipo</label>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium" :class="getTipoColor(selectedCliente.tipo)">
+                  {{ getTipoLabel(selectedCliente.tipo) }}
+                </span>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-500">Email</label>
+                <p class="text-base text-gray-900">{{ selectedCliente.email }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-500">Telefono</label>
+                <p class="text-base text-gray-900">{{ selectedCliente.telefono }}</p>
+              </div>
+              <div v-if="selectedCliente.partitaIva">
+                <label class="block text-sm font-medium text-gray-500">Partita IVA</label>
+                <p class="text-base text-gray-900">{{ selectedCliente.partitaIva }}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-500">Stato</label>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium" :class="getStatoColor(selectedCliente.stato)">
+                  {{ getStatoLabel(selectedCliente.stato) }}
+                </span>
+              </div>
+            </div>
+            
+            <div v-if="selectedCliente.indirizzo">
+              <label class="block text-sm font-medium text-gray-500">Indirizzo</label>
+              <p class="text-base text-gray-900">{{ selectedCliente.indirizzo }}</p>
+            </div>
+            
+            <div v-if="selectedCliente.note">
+              <label class="block text-sm font-medium text-gray-500">Note</label>
+              <p class="text-base text-gray-900">{{ selectedCliente.note }}</p>
+            </div>
+
+            <!-- Stats Cliente -->
+            <div class="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+              <div class="text-center">
+                <p class="text-2xl font-bold text-primary-600">{{ selectedCliente.numeroProgetti }}</p>
+                <p class="text-sm text-gray-500">Progetti</p>
+              </div>
+              <div class="text-center">
+                <p class="text-2xl font-bold text-green-600">€{{ selectedCliente.valoreTotale.toLocaleString() }}</p>
+                <p class="text-sm text-gray-500">Valore Totale</p>
+              </div>
+              <div class="text-center">
+                <p class="text-lg font-semibold text-gray-900">{{ formatDate(selectedCliente.ultimoContatto) }}</p>
+                <p class="text-sm text-gray-500">Ultimo Contatto</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buttons -->
+          <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+            <button 
+              @click="editCliente(selectedCliente)"
+              class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors"
+            >
+              Modifica
+            </button>
+            <button 
+              @click="deleteCliente(selectedCliente.id)"
+              class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+            >
+              Elimina
+            </button>
+            <button 
+              @click="showViewModal = false"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            >
+              Chiudi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Modifica Cliente -->
+    <div v-if="showEditModal && selectedCliente" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+          <!-- Header Modal -->
+          <div class="flex items-center justify-between pb-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Modifica Cliente</h3>
+            <button @click="showEditModal = false" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Form Modifica Cliente -->
+          <form @submit.prevent="updateCliente" class="mt-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Nome -->
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nome/Ragione Sociale *</label>
+                <input 
+                  v-model="selectedCliente.nome" 
+                  type="text" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+
+              <!-- Email -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                <input 
+                  v-model="selectedCliente.email" 
+                  type="email" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+
+              <!-- Telefono -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Telefono *</label>
+                <input 
+                  v-model="selectedCliente.telefono" 
+                  type="tel" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+
+              <!-- Tipo -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Tipo Cliente *</label>
+                <select 
+                  v-model="selectedCliente.tipo" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="privato">Privato</option>
+                  <option value="azienda">Azienda</option>
+                  <option value="ente-pubblico">Ente Pubblico</option>
+                </select>
+              </div>
+
+              <!-- Stato -->
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Stato *</label>
+                <select 
+                  v-model="selectedCliente.stato" 
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="potenziale">Potenziale</option>
+                  <option value="attivo">Attivo</option>
+                  <option value="inattivo">Inattivo</option>
+                </select>
+              </div>
+
+              <!-- Partita IVA -->
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Partita IVA</label>
+                <input 
+                  v-model="selectedCliente.partitaIva" 
+                  type="text" 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+
+              <!-- Indirizzo -->
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Indirizzo</label>
+                <input 
+                  v-model="selectedCliente.indirizzo" 
+                  type="text" 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+
+              <!-- Note -->
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+                <textarea 
+                  v-model="selectedCliente.note" 
+                  rows="3"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+              <button 
+                type="button" 
+                @click="showEditModal = false"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Annulla
+              </button>
+              <button 
+                type="submit" 
+                :disabled="loading"
+                class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-50"
+              >
+                {{ loading ? 'Aggiornamento...' : 'Aggiorna Cliente' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { 
   PlusIcon, 
   UserGroupIcon, 
@@ -218,50 +572,45 @@ import {
   BuildingOfficeIcon,
   StarIcon
 } from '@heroicons/vue/24/outline'
+import { useFirestoreStore } from '@/stores/firestore'
+import { useToast } from '@/composables/useToast'
+
+// Stores
+const firestoreStore = useFirestoreStore()
+const { showToast } = useToast()
 
 // Stato della pagina
 const showAddModal = ref(false)
+const showViewModal = ref(false)
+const showEditModal = ref(false)
 const searchTerm = ref('')
 const selectedTipo = ref('')
 const selectedStato = ref('')
+const loading = ref(false)
+const selectedCliente = ref(null)
+
+// Form nuovo cliente
+const newCliente = ref({
+  nome: '',
+  email: '',
+  telefono: '',
+  tipo: '',
+  partitaIva: '',
+  indirizzo: '',
+  note: '',
+  stato: 'potenziale'
+})
 
 // Stats
 const stats = ref({
-  clientiTotali: 47,
-  fatturatoAnnuo: 485000,
-  progettiAttivi: 8,
-  soddisfazione: 96
+  clientiTotali: 0,
+  fatturatoAnnuo: 0,
+  progettiAttivi: 0,
+  soddisfazione: 0
 })
 
-// Dati clienti
-const clienti = ref([
-  {
-    id: 1,
-    nome: 'Famiglia Rossi',
-    email: 'mario.rossi@email.com',
-    telefono: '331 123 4567',
-    iniziali: 'FR',
-    tipo: 'privato',
-    stato: 'attivo',
-    numeroProgetti: 2,
-    valoreTotale: 125000,
-    ultimoContatto: '2024-01-15',
-    indirizzo: 'Via delle Rose 12, Milano'
-  },
-  {
-    id: 2,
-    nome: 'Industrie SpA',
-    email: 'info@industriespa.it',
-    telefono: '02 234 5678',
-    iniziali: 'IS',
-    tipo: 'azienda',
-    stato: 'attivo',
-    numeroProgetti: 3,
-    valoreTotale: 285000,
-    ultimoContatto: '2024-01-20',
-    indirizzo: 'Zona Industriale Nord, Bergamo'
-  }
-])
+// Dati clienti - inizialmente vuoto, caricato da Firestore
+const clienti = ref([])
 
 // Computed
 const filteredClienti = computed(() => {
@@ -327,10 +676,157 @@ const formatDate = (dateString) => {
 }
 
 const viewCliente = (cliente) => {
-  console.log('Visualizza cliente:', cliente)
+  selectedCliente.value = cliente
+  showViewModal.value = true
 }
 
 const editCliente = (cliente) => {
-  console.log('Modifica cliente:', cliente)
+  selectedCliente.value = { ...cliente }
+  showEditModal.value = true
 }
+
+// Aggiorna cliente esistente
+const updateCliente = async () => {
+  loading.value = true
+  
+  try {
+    const { id, ...clienteData } = selectedCliente.value
+    const result = await firestoreStore.updateDocument('clienti', id, clienteData)
+    
+    if (result.success) {
+      // Aggiorna nella lista locale
+      const index = clienti.value.findIndex(c => c.id === id)
+      if (index !== -1) {
+        clienti.value[index] = { ...selectedCliente.value }
+      }
+      
+      showEditModal.value = false
+      selectedCliente.value = null
+      
+      showToast('Cliente aggiornato con successo!', 'success')
+    } else {
+      showToast('Errore nell\'aggiornamento del cliente: ' + result.error, 'error')
+    }
+  } catch (error) {
+    console.error('Errore aggiornamento cliente:', error)
+    showToast('Errore nell\'aggiornamento del cliente', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+// Elimina cliente
+const deleteCliente = async (clienteId) => {
+  if (!confirm('Sei sicuro di voler eliminare questo cliente?')) {
+    return
+  }
+  
+  loading.value = true
+  
+  try {
+    const result = await firestoreStore.deleteDocument('clienti', clienteId)
+    
+    if (result.success) {
+      // Rimuovi dalla lista locale
+      clienti.value = clienti.value.filter(c => c.id !== clienteId)
+      
+      showToast('Cliente eliminato con successo!', 'success')
+    } else {
+      showToast('Errore nell\'eliminazione del cliente: ' + result.error, 'error')
+    }
+  } catch (error) {
+    console.error('Errore eliminazione cliente:', error)
+    showToast('Errore nell\'eliminazione del cliente', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+// Crea nuovo cliente
+const createCliente = async () => {
+  loading.value = true
+  
+  try {
+    const clienteData = {
+      ...newCliente.value,
+      numeroProgetti: 0,
+      valoreTotale: 0,
+      ultimoContatto: new Date().toISOString().split('T')[0],
+      iniziali: getInitials(newCliente.value.nome)
+    }
+    
+    const result = await firestoreStore.createCliente(clienteData)
+    
+    if (result.success) {
+      // Aggiungi alla lista locale
+      clienti.value.push({
+        id: result.id,
+        ...clienteData
+      })
+      
+      // Reset form
+      resetForm()
+      showAddModal.value = false
+      
+      showToast('Cliente creato con successo!', 'success')
+    } else {
+      showToast('Errore nella creazione del cliente: ' + result.error, 'error')
+    }
+  } catch (error) {
+    console.error('Errore creazione cliente:', error)
+    showToast('Errore nella creazione del cliente', 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+// Reset form
+const resetForm = () => {
+  newCliente.value = {
+    nome: '',
+    email: '',
+    telefono: '',
+    tipo: '',
+    partitaIva: '',
+    indirizzo: '',
+    note: '',
+    stato: 'potenziale'
+  }
+}
+
+// Genera iniziali dal nome
+const getInitials = (nome) => {
+  return nome
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .substring(0, 2)
+}
+
+// Carica clienti da Firestore
+const loadClienti = async () => {
+  loading.value = true
+  try {
+    const result = await firestoreStore.loadClienti()
+    if (result.success) {
+      clienti.value = result.data.map(cliente => ({
+        ...cliente,
+        iniziali: getInitials(cliente.nome),
+        numeroProgetti: cliente.numeroProgetti || 0,
+        valoreTotale: cliente.valoreTotale || 0,
+        ultimoContatto: cliente.ultimoContatto || new Date().toISOString().split('T')[0]
+      }))
+    }
+  } catch (error) {
+    console.error('Errore caricamento clienti:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Carica dati all'avvio
+onMounted(() => {
+  loadClienti()
+})
 </script> 

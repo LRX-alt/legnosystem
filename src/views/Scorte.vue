@@ -487,13 +487,16 @@ const searchTerm = ref('')
 const selectedStatus = ref('')
 const selectedCategory = ref('')
 
-// Stats
+// Stats - resettate a 0
 const stats = ref({
-  sottoScorta: 8,
-  inAttesa: 5,
-  inArrivo: 3,
-  valoreOrdini: 25000
+  sottoScorta: 0,
+  inAttesa: 0,
+  inArrivo: 0,
+  valoreOrdini: 0
 })
+
+// Materiali - vuoto, da caricare da Firestore
+const materiali = ref([])
 
 // Nuovo ordine
 const newOrder = ref({
@@ -515,85 +518,8 @@ const editingMateriale = ref({
   unita: ''
 })
 
-// Materiali sotto scorta
-const materiali = ref([
-  {
-    id: 1,
-    codice: 'ISO003',
-    nome: 'Isolante Termico',
-    descrizione: 'Lana di roccia 10cm',
-    categoria: 'isolanti',
-    quantitaAttuale: 5,
-    scortaMinima: 20,
-    quantitaSuggerita: 50,
-    unita: 'm²',
-    statoScorta: 'critico',
-    fornitore: 'Isolanti Nord Srl',
-    prezzoUnitario: 12.50
-  },
-  {
-    id: 2,
-    codice: 'VIT004',
-    nome: 'Viti per Legno',
-    descrizione: '6x120mm Torx',
-    categoria: 'ferramenta',
-    quantitaAttuale: 800,
-    scortaMinima: 1000,
-    quantitaSuggerita: 2000,
-    unita: 'pz',
-    statoScorta: 'basso',
-    fornitore: 'Ferramenta Italiana',
-    prezzoUnitario: 0.35
-  },
-  {
-    id: 3,
-    codice: 'TRV005',
-    nome: 'Travetti Abete',
-    descrizione: '8x12cm - Classe C24',
-    categoria: 'travi',
-    quantitaAttuale: 15,
-    scortaMinima: 25,
-    quantitaSuggerita: 50,
-    unita: 'pz',
-    statoScorta: 'basso',
-    fornitore: 'LegnoAlp Spa',
-    prezzoUnitario: 24.50
-  }
-])
-
-// Ordini recenti
-const ordiniRecenti = ref([
-  {
-    id: 1,
-    materiale: 'Travi Lamellari GL24h',
-    fornitore: 'LegnoAlp Spa',
-    quantita: 30,
-    unita: 'pz',
-    importo: 2565.00,
-    dataOrdine: '15/01/2024',
-    stato: 'consegnato'
-  },
-  {
-    id: 2,
-    materiale: 'Tavole Abete C24',
-    fornitore: 'Segheria Montana',
-    quantita: 100,
-    unita: 'm²',
-    importo: 4500.00,
-    dataOrdine: '12/01/2024',
-    stato: 'in-transito'
-  },
-  {
-    id: 3,
-    materiale: 'Isolante Termico',
-    fornitore: 'Isolanti Nord Srl',
-    quantita: 80,
-    unita: 'm²',
-    importo: 1000.00,
-    dataOrdine: '10/01/2024',
-    stato: 'ordinato'
-  }
-])
+// Ordini recenti - vuoto, da caricare da Firestore
+const ordiniRecenti = ref([])
 
 // Computed
 const filteredMateriali = computed(() => {

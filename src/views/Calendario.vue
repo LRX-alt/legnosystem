@@ -513,20 +513,20 @@ const currentView = ref('month')
 const currentDate = ref(new Date())
 const filterType = ref('')
 
-// Stats
+// Stats - resettate a 0
 const stats = ref({
-  eventiOggi: 8,
-  cantieriAttivi: 5,
-  personeImpegnate: 12,
-  totalePers: 15,
-  scadenzeUrgenti: 3
+  eventiOggi: 0,
+  cantieriAttivi: 0,
+  personeImpegnate: 0,
+  totalePers: 0,
+  scadenzeUrgenti: 0
 })
 
-// Tabs
+// Tabs - reset count a 0
 const tabs = ref([
-  { id: 'calendario', name: 'Calendario', count: 24 },
-  { id: 'planning', name: 'Planning Cantieri', count: 5 },
-  { id: 'risorse', name: 'Gestione Risorse', count: 15 }
+  { id: 'calendario', name: 'Calendario', count: 0 },
+  { id: 'planning', name: 'Planning Cantieri', count: 0 },
+  { id: 'risorse', name: 'Gestione Risorse', count: 0 }
 ])
 
 // Viste
@@ -536,21 +536,8 @@ const viste = ref([
   { id: 'day', label: 'Giorno' }
 ])
 
-// Alert Conflitti
-const alertConflitti = ref([
-  {
-    id: 1,
-    risorsa: 'Marco Rossi',
-    conflitto: 'Doppio impegno Villa Montebello + Condominio Aurora',
-    data: '15 Gen'
-  },
-  {
-    id: 2,
-    risorsa: 'Camion Iveco',
-    conflitto: 'Richiesto su 2 cantieri contemporaneamente',
-    data: '18 Gen'
-  }
-])
+// Alert Conflitti - vuoto, da caricare da Firestore
+const alertConflitti = ref([])
 
 // Nuovo Evento
 const newEvent = ref({
@@ -564,102 +551,17 @@ const newEvent = ref({
   assignedResources: []
 })
 
-// Eventi
-const eventi = ref([
-  {
-    id: 1,
-    title: 'Villa Montebello - Inizio lavori',
-    type: 'cantiere',
-    date: '2024-01-15',
-    startTime: '08:00',
-    endTime: '17:00',
-    description: 'Inizio rifacimento tetto',
-    status: 'confirmed'
-  },
-  {
-    id: 2,
-    title: 'Appuntamento Sig. Bianchi',
-    type: 'appuntamento',
-    date: '2024-01-16',
-    startTime: '14:00',
-    endTime: '15:00',
-    description: 'Sopralluogo nuovo preventivo',
-    status: 'confirmed'
-  },
-  {
-    id: 3,
-    title: 'Consegna materiali LegnoAlp',
-    type: 'scadenza',
-    date: '2024-01-17',
-    startTime: '10:00',
-    endTime: '12:00',
-    description: 'Arrivo travi e isolanti',
-    status: 'pending'
-  },
-  {
-    id: 4,
-    title: 'Manutenzione gru',
-    type: 'manutenzione',
-    date: '2024-01-20',
-    startTime: '09:00',
-    endTime: '11:00',
-    description: 'Controllo annuale',
-    status: 'scheduled'
-  }
-])
+// Eventi - vuoto, da caricare da Firestore
+const eventi = ref([])
 
-// Planning Cantieri
-const planningCantieri = ref([
-  {
-    id: 1,
-    nome: 'Villa Montebello',
-    cliente: 'Famiglia Rossi',
-    stato: 'in_corso',
-    startDay: 15,
-    endDay: 28
-  },
-  {
-    id: 2,
-    nome: 'Condominio Aurora',
-    cliente: 'Amministrazione',
-    stato: 'pianificato',
-    startDay: 22,
-    endDay: 31
-  },
-  {
-    id: 3,
-    nome: 'Casa Rustica',
-    cliente: 'Sig. Bianchi',
-    stato: 'completato',
-    startDay: 2,
-    endDay: 12
-  },
-  {
-    id: 4,
-    nome: 'Ristorante Alpino',
-    cliente: 'Gestione Locale',
-    stato: 'in_ritardo',
-    startDay: 8,
-    endDay: 25
-  }
-])
+// Planning Cantieri - vuoto, da caricare da Firestore
+const planningCantieri = ref([])
 
-// Personale
-const personale = ref([
-  { id: 1, nome: 'Marco Rossi', ruolo: 'Capocantiere', iniziali: 'MR', occupato: true, cantiere: 'Villa Montebello' },
-  { id: 2, nome: 'Luigi Verdi', ruolo: 'Carpentiere', iniziali: 'LV', occupato: true, cantiere: 'Villa Montebello' },
-  { id: 3, nome: 'Anna Bianchi', ruolo: 'Tecnico', iniziali: 'AB', occupato: false, cantiere: null },
-  { id: 4, nome: 'Paolo Neri', ruolo: 'Operaio', iniziali: 'PN', occupato: true, cantiere: 'Condominio Aurora' },
-  { id: 5, nome: 'Sofia Gialli', ruolo: 'Geometra', iniziali: 'SG', occupato: false, cantiere: null }
-])
+// Personale - vuoto, da caricare da Firestore
+const personale = ref([])
 
-// Mezzi
-const mezzi = ref([
-  { id: 1, nome: 'Camion Iveco', tipo: 'Trasporto materiali', type: 'camion', occupato: true, location: 'Villa Montebello' },
-  { id: 2, nome: 'Gru Mobile', tipo: 'Sollevamento', type: 'attrezzatura', occupato: false, location: 'Base' },
-  { id: 3, nome: 'Furgone Fiat', tipo: 'Trasporto personale', type: 'camion', occupato: true, location: 'Condominio Aurora' },
-  { id: 4, nome: 'Ponteggi', tipo: 'Sicurezza', type: 'attrezzatura', occupato: true, location: 'Villa Montebello' }
-])
+// Mezzi - vuoto, da caricare da Firestore
+const mezzi = ref([])
 
 // Ore del giorno
 const hours = ref(Array.from({ length: 10 }, (_, i) => i + 8)) // 8:00 - 17:00

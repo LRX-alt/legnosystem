@@ -94,8 +94,23 @@
       </div>
     </div>
 
+    <!-- Empty State -->
+    <div v-if="filteredCantieri.length === 0" class="text-center py-12">
+      <div class="mx-auto h-24 w-24 text-gray-400 flex items-center justify-center text-4xl mb-4">
+        🏗️
+      </div>
+      <h3 class="mt-2 text-lg font-medium text-gray-900">Nessun cantiere trovato</h3>
+      <p class="mt-1 text-sm text-gray-500 mb-6">
+        {{ cantieri.length === 0 ? 'Inizia creando il tuo primo cantiere.' : 'Prova a modificare i filtri di ricerca.' }}
+      </p>
+      <button v-if="cantieri.length === 0" @click="showAddModal = true" class="btn-primary">
+        <span class="mr-2">➕</span>
+        Crea Primo Cantiere
+      </button>
+    </div>
+
     <!-- Grid Cantieri -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
       <div v-for="cantiere in filteredCantieri" :key="cantiere.id" class="card hover:shadow-md transition-shadow duration-200">
         <!-- Header Card -->
         <div class="flex items-start justify-between mb-4">
@@ -133,7 +148,11 @@
           </div>
           <div class="flex items-center justify-between text-sm min-w-0">
             <span class="text-gray-600 flex-shrink-0">Valore:</span>
-            <span class="font-medium truncate ml-2">€{{ cantiere.valore.toLocaleString() }}</span>
+            <span class="font-medium truncate ml-2">€{{ cantiere.valore ? cantiere.valore.toLocaleString() : '0' }}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm min-w-0">
+            <span class="text-gray-600 flex-shrink-0">Manodopera/giorno:</span>
+            <span class="font-medium truncate ml-2 text-orange-600">€{{ calculateDailyCost(cantiere).toLocaleString() }}</span>
           </div>
           <div class="flex items-center justify-between text-sm min-w-0">
             <span class="text-gray-600 flex-shrink-0">Scadenza:</span>
@@ -147,13 +166,13 @@
         <div class="mb-4">
           <p class="text-xs text-gray-500 mb-2">Team Assegnato</p>
           <div class="flex -space-x-2">
-            <div v-for="membro in cantiere.team.slice(0, 3)" :key="membro.id" 
+            <div v-for="membro in (cantiere.team || []).slice(0, 3)" :key="membro.id" 
                  class="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white text-xs font-medium border-2 border-white">
               {{ membro.iniziali }}
             </div>
-            <div v-if="cantiere.team.length > 3" 
+            <div v-if="(cantiere.team || []).length > 3" 
                  class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 text-xs font-medium border-2 border-white">
-              +{{ cantiere.team.length - 3 }}
+              +{{ (cantiere.team || []).length - 3 }}
             </div>
           </div>
         </div>
@@ -228,6 +247,15 @@
                 <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
               </div>
             </div>
+            <div class="relative group">
+              <button @click="deleteCantiere(cantiere)" class="text-red-500 hover:text-red-700">
+                <TrashIcon class="w-5 h-5" />
+              </button>
+              <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                Elimina cantiere
+                <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -265,7 +293,11 @@
                   </div>
                   <div class="flex justify-between min-w-0">
                     <span class="text-gray-600 flex-shrink-0">Valore:</span> 
-                    <span class="font-medium truncate ml-2">€{{ selectedCantiere.valore.toLocaleString() }}</span>
+                    <span class="font-medium truncate ml-2">€{{ selectedCantiere.valore ? selectedCantiere.valore.toLocaleString() : '0' }}</span>
+                  </div>
+                  <div class="flex justify-between min-w-0">
+                    <span class="text-gray-600 flex-shrink-0">Manodopera/giorno:</span> 
+                    <span class="font-medium truncate ml-2 text-orange-600">€{{ calculateDailyCost(selectedCantiere).toLocaleString() }}</span>
                   </div>
                   <div class="flex justify-between min-w-0">
                     <span class="text-gray-600 flex-shrink-0">Data Inizio:</span> 
@@ -282,7 +314,7 @@
               <div>
                 <h4 class="font-semibold text-gray-900 mb-4">Timeline Progetto</h4>
                 <div class="space-y-4">
-                  <div v-for="fase in selectedCantiere.fasi" :key="fase.id" class="flex items-start space-x-3">
+                  <div v-for="fase in (selectedCantiere.fasi || [])" :key="fase.id" class="flex items-start space-x-3">
                     <div class="w-6 h-6 rounded-full flex items-center justify-center mt-1" :class="fase.completata ? 'bg-green-500' : 'bg-gray-300'">
                       <CheckIcon v-if="fase.completata" class="w-4 h-4 text-white" />
                     </div>
@@ -306,7 +338,8 @@
                   <div><span class="text-gray-600">Cliente:</span> {{ selectedCantiere.cliente }}</div>
                   <div><span class="text-gray-600">Indirizzo:</span> {{ selectedCantiere.indirizzo }}</div>
                   <div><span class="text-gray-600">Tipo Lavoro:</span> {{ selectedCantiere.tipoLavoro }}</div>
-                  <div><span class="text-gray-600">Valore:</span> €{{ selectedCantiere.valore.toLocaleString() }}</div>
+                  <div><span class="text-gray-600">Valore:</span> €{{ selectedCantiere.valore ? selectedCantiere.valore.toLocaleString() : '0' }}</div>
+                  <div><span class="text-gray-600">Manodopera/giorno:</span> <span class="text-orange-600 font-medium">€{{ calculateDailyCost(selectedCantiere).toLocaleString() }}</span></div>
                   <div><span class="text-gray-600">Data Inizio:</span> {{ formatDate(selectedCantiere.dataInizio) }}</div>
                   <div><span class="text-gray-600">Scadenza:</span> {{ formatDate(selectedCantiere.scadenza) }}</div>
                 </div>
@@ -316,7 +349,7 @@
               <div class="space-y-4">
                 <h4 class="font-medium text-gray-900">Timeline Progetto</h4>
                 <div class="space-y-3">
-                  <div v-for="fase in selectedCantiere.fasi" :key="fase.id" class="flex items-center space-x-3">
+                  <div v-for="fase in (selectedCantiere.fasi || [])" :key="fase.id" class="flex items-center space-x-3">
                     <div class="w-4 h-4 rounded-full" :class="fase.completata ? 'bg-green-500' : 'bg-gray-300'"></div>
                     <div class="flex-1">
                       <p class="text-sm font-medium" :class="fase.completata ? 'text-green-700' : 'text-gray-900'">
@@ -354,9 +387,14 @@
 
             <!-- Action Buttons Mobile -->
             <div class="pt-6 border-t border-gray-200">
-              <button @click="closeModal" class="w-full btn-secondary py-3 text-base">
+              <div class="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3">
+                <button @click="deleteCantiere(selectedCantiere)" class="btn-danger py-3 text-base flex-1">
+                  🗑️ Elimina Cantiere
+                </button>
+                <button @click="closeModal" class="btn-secondary py-3 text-base flex-1">
                 Chiudi
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1259,7 +1297,7 @@
 
             <!-- Riepilogo -->
             <div class="bg-primary-50 p-4 rounded-lg border border-primary-200">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
                 <div>
                   <p class="text-sm text-primary-600">Team Assegnato</p>
                   <p class="text-2xl font-bold text-primary-800">{{ selectedCantiere?.team?.length || 0 }}</p>
@@ -1271,6 +1309,18 @@
                 <div>
                   <p class="text-sm text-primary-600">Costo Orario Team</p>
                   <p class="text-2xl font-bold text-primary-800">€{{ calculateTeamHourlyCost() }}/h</p>
+                </div>
+                <div>
+                  <p class="text-sm text-primary-600">Costo Giornaliero</p>
+                  <p class="text-2xl font-bold text-orange-600">€{{ calculateDailyCost(selectedCantiere) }}/giorno</p>
+                </div>
+              </div>
+              
+              <!-- Costo Mensile (riga separata per evitare sovraffollamento) -->
+              <div v-if="selectedCantiere?.team?.length > 0" class="mt-4 pt-4 border-t border-primary-200">
+                <div class="text-center">
+                  <p class="text-sm text-primary-600">💰 Costo Mensile Stimato (22 gg lavorativi)</p>
+                  <p class="text-3xl font-bold text-red-600">€{{ calculateMonthlyCost(selectedCantiere).toLocaleString() }}</p>
                 </div>
               </div>
             </div>
@@ -2076,9 +2126,14 @@ import {
   ClockIcon,
   UsersIcon,
   PaperClipIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 import { useToast } from '@/composables/useToast'
+import { useFirestoreStore } from '@/stores/firestore'
+
+// Store Firestore
+const firestoreStore = useFirestoreStore()
 
 // Stato della pagina
 const showDetailModal = ref(false)
@@ -2142,196 +2197,63 @@ const newCantiere = ref({
 
 
 
-// Stats
-const stats = ref({
-  attivi: 8,
-  valoreTotale: 345000,
-  inScadenza: 3,
-  completatiMese: 5
+// Stats - Calcolate dinamicamente dai dati Firestore
+const stats = computed(() => {
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  
+  return {
+    attivi: cantieri.value.filter(c => c.stato === 'in-corso').length,
+    valoreTotale: cantieri.value.reduce((total, c) => total + (c.valore || 0), 0),
+    inScadenza: cantieri.value.filter(c => {
+      if (!c.scadenza) return false
+      const scadenza = new Date(c.scadenza)
+      const diffDays = Math.ceil((scadenza - now) / (1000 * 60 * 60 * 24))
+      return diffDays <= 7 && diffDays >= 0
+    }).length,
+    completatiMese: cantieri.value.filter(c => {
+      if (c.stato !== 'completato' || !c.dataCompletamento) return false
+      const completamento = new Date(c.dataCompletamento)
+      return completamento >= startOfMonth
+    }).length
+  }
 })
 
-// Dati cantieri
-const cantieri = ref([
-  {
-    id: 1,
-    nome: 'Rifacimento Tetto Villa Rossi',
-    cliente: 'Famiglia Rossi',
-    indirizzo: 'Via delle Rose 15, Milano',
-    tipoLavoro: 'Rifacimento Completo',
-    stato: 'in-corso',
-    priorita: 'alta',
-    progresso: 75,
-    valore: 85000,
-    dataInizio: '2024-01-15',
-    scadenza: '2024-02-28',
-    team: [
-      { id: 1, nome: 'Marco Bianchi', iniziali: 'MB' },
-      { id: 2, nome: 'Luca Verdi', iniziali: 'LV' },
-      { id: 3, nome: 'Anna Russo', iniziali: 'AR' }
-    ],
-    fasi: [
-      { id: 1, nome: 'Smontaggio tetto esistente', durata: '3 giorni', completata: true },
-      { id: 2, nome: 'Rifacimento struttura portante', durata: '5 giorni', completata: true },
-      { id: 3, nome: 'Posa manto di copertura', durata: '4 giorni', completata: false },
-      { id: 4, nome: 'Finiture e grondaie', durata: '2 giorni', completata: false }
-    ]
-  },
-  {
-    id: 2,
-    nome: 'Copertura Capannone Industriale',
-    cliente: 'Industrie SpA',
-    indirizzo: 'Zona Industriale Nord, Bergamo',
-    tipoLavoro: 'Nuova Costruzione',
-    stato: 'pianificato',
-    priorita: 'media',
-    progresso: 15,
-    valore: 125000,
-    dataInizio: '2024-02-01',
-    scadenza: '2024-03-30',
-    team: [
-      { id: 4, nome: 'Giuseppe Neri', iniziali: 'GN' },
-      { id: 5, nome: 'Francesco Blu', iniziali: 'FB' }
-    ],
-    fasi: [
-      { id: 1, nome: 'Progettazione esecutiva', durata: '5 giorni', completata: true },
-      { id: 2, nome: 'Preparazione area', durata: '3 giorni', completata: false },
-      { id: 3, nome: 'Montaggio struttura', durata: '10 giorni', completata: false },
-      { id: 4, nome: 'Copertura e isolamento', durata: '7 giorni', completata: false }
-    ]
-  },
-  {
-    id: 3,
-    nome: 'Ristrutturazione Tetto Storico',
-    cliente: 'Comune di Verona',
-    indirizzo: 'Centro Storico, Verona',
-    tipoLavoro: 'Restauro Conservativo',
-    stato: 'sospeso',
-    priorita: 'bassa',
-    progresso: 30,
-    valore: 65000,
-    dataInizio: '2024-01-20',
-    scadenza: '2024-04-15',
-    team: [
-      { id: 6, nome: 'Elena Gialli', iniziali: 'EG' }
-    ],
-    fasi: [
-      { id: 1, nome: 'Analisi strutturale', durata: '7 giorni', completata: true },
-      { id: 2, nome: 'Consolidamento travi', durata: '8 giorni', completata: false },
-      { id: 3, nome: 'Rifacimento copertura', durata: '6 giorni', completata: false }
-    ]
-  }
-])
+// Dati da Firestore - computed per reattività
+const cantieri = computed(() => firestoreStore.cantieri)
+const dipendentiDisponibili = computed(() => firestoreStore.dipendenti)
+const materialiMagazzino = computed(() => firestoreStore.materiali)
+const fornitori = computed(() => firestoreStore.fornitori)
 
-// Lista dipendenti disponibili (sincronizzata con localStorage)
-const dipendentiDisponibili = ref([])
-
-// Gestione allegati
+// Gestione allegati locali (da migrare a Firestore Storage in futuro)
 const cantieriAttachments = ref({})
-
-// Gestione allegati materiali per cantiere
 const materialiAttachments = ref({})
 const selectedMaterial = ref(null)
 
-// Dati magazzino (sincronizzato con localStorage)
-const materialiMagazzino = ref([])
-
-// Dati fornitori
-const fornitori = ref([
-  { id: 1, nome: 'LegnoAlp Spa', telefono: '0123 456789', email: 'info@legnoalp.it' },
-  { id: 2, nome: 'Segheria Montana', telefono: '0456 789123', email: 'vendite@montana.com' },
-  { id: 3, nome: 'Isolanti Nord Srl', telefono: '0789 123456', email: 'ordini@isolantinord.it' },
-  { id: 4, nome: 'Ferramenta Italiana', telefono: '0321 654987', email: 'info@ferramentaitaliana.com' }
-])
-
-// Funzione per caricare dipendenti dal localStorage
-const loadDipendentiFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_dipendenti')
-  if (stored) {
-    try {
-      const dipendenti = JSON.parse(stored)
-      dipendentiDisponibili.value = dipendenti
-    } catch (e) {
-      console.warn('Errore nel caricamento dipendenti:', e)
-    }
-  }
-}
-
-// Funzione per caricare allegati dal localStorage
+// TODO: Migrare allegati a Firestore Storage quando disponibile
+// Funzione per caricare allegati (TEMPORANEO - localStorage)
 const loadAttachmentsFromStorage = () => {
+  try {
   const stored = localStorage.getItem('legnosystem_attachments')
   if (stored) {
-    try {
       cantieriAttachments.value = JSON.parse(stored)
+    }
     } catch (e) {
       console.warn('Errore nel caricamento allegati:', e)
       cantieriAttachments.value = {}
-    }
   }
 }
 
-// Funzione per caricare materiali magazzino dal localStorage
-const loadMaterialiMagazzinoFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_materiali')
-  if (stored) {
-    try {
-      materialiMagazzino.value = JSON.parse(stored)
-    } catch (e) {
-      console.warn('Errore nel caricamento materiali magazzino:', e)
-      // Materiali di default se non ci sono dati
-      materialiMagazzino.value = [
-        { id: 1, codice: 'TRV001', nome: 'Trave Lamellare GL24h', categoria: 'travi', quantita: 45, unita: 'pz', prezzoUnitario: 85.50 },
-        { id: 2, codice: 'TAV002', nome: 'Tavole Abete', categoria: 'tavole', quantita: 120, unita: 'm²', prezzoUnitario: 45.00 },
-        { id: 3, codice: 'ISO003', nome: 'Isolante Termico', categoria: 'isolanti', quantita: 80, unita: 'm²', prezzoUnitario: 12.50 },
-        { id: 4, codice: 'VIT004', nome: 'Viti per Legno', categoria: 'ferramenta', quantita: 2500, unita: 'pz', prezzoUnitario: 0.35 }
-      ]
-    }
-  } else {
-    // Materiali di default
-    materialiMagazzino.value = [
-      { id: 1, codice: 'TRV001', nome: 'Trave Lamellare GL24h', categoria: 'travi', quantita: 45, unita: 'pz', prezzoUnitario: 85.50 },
-      { id: 2, codice: 'TAV002', nome: 'Tavole Abete', categoria: 'tavole', quantita: 120, unita: 'm²', prezzoUnitario: 45.00 },
-      { id: 3, codice: 'ISO003', nome: 'Isolante Termico', categoria: 'isolanti', quantita: 80, unita: 'm²', prezzoUnitario: 12.50 },
-      { id: 4, codice: 'VIT004', nome: 'Viti per Legno', categoria: 'ferramenta', quantita: 2500, unita: 'pz', prezzoUnitario: 0.35 }
-    ]
-  }
-}
-
-// Funzione per salvare allegati nel localStorage
+// Funzione per salvare allegati (TEMPORANEO - localStorage)
 const saveAttachmentsToStorage = () => {
-  localStorage.setItem('legnosystem_attachments', JSON.stringify(cantieriAttachments.value))
-}
-
-// Carica cantieri dal localStorage all'avvio
-const loadCantieriFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_cantieri')
-  if (stored) {
-    try {
-      cantieri.value = JSON.parse(stored)
+  try {
+    localStorage.setItem('legnosystem_attachments', JSON.stringify(cantieriAttachments.value))
     } catch (e) {
-      console.warn('Errore nel caricamento cantieri dal localStorage:', e)
-    }
+    console.warn('Errore nel salvataggio allegati:', e)
   }
 }
 
-// Salva cantieri nel localStorage
-const saveCantieriToStorage = () => {
-  localStorage.setItem('legnosystem_cantieri', JSON.stringify(cantieri.value))
-  
-  // Trigger evento storage per altre finestre/tab
-  window.dispatchEvent(new StorageEvent('storage', {
-    key: 'legnosystem_cantieri',
-    newValue: JSON.stringify(cantieri.value)
-  }))
-  
-  // Trigger evento personalizzato per aggiornamenti nella stessa pagina
-  window.dispatchEvent(new CustomEvent('cantieri-updated'))
-}
-
-// Carica i dati all'avvio
-loadCantieriFromStorage()
-
-// Carica dipendenti all'avvio
-// Funzione per caricare storico progresso dal localStorage
+// Funzione per caricare storico progresso dal localStorage (temporaneo)
 const loadProgressHistoryFromStorage = () => {
   const stored = localStorage.getItem('legnosystem_progress_history')
   if (stored) {
@@ -2344,22 +2266,11 @@ const loadProgressHistoryFromStorage = () => {
   }
 }
 
-loadDipendentiFromStorage()
-
 // Carica allegati all'avvio
 loadAttachmentsFromStorage()
 
-// Carica materiali magazzino all'avvio
-loadMaterialiMagazzinoFromStorage()
-
 // Carica storico progresso all'avvio
 loadProgressHistoryFromStorage()
-
-// Carica allegati materiali all'avvio  
-// loadMaterialAttachmentsFromStorage() // RIMOSSA: causava errore hoisting
-
-// Ascolta gli eventi di aggiornamento dipendenti
-window.addEventListener('dipendenti-updated', loadDipendentiFromStorage)
 
 // Computed
 const filteredCantieri = computed(() => {
@@ -2462,17 +2373,86 @@ const closeEditModal = () => {
   editingCantiere.value = null
 }
 
-const saveCantiereChanges = () => {
-  const index = cantieri.value.findIndex(c => c.id === editingCantiere.value.id)
-  if (index !== -1) {
-    cantieri.value[index] = { ...editingCantiere.value }
-  }
+const saveCantiereChanges = async () => {
+  const { success, error } = useToast()
   
-  // Salva nel localStorage per sincronizzazione
-  saveCantieriToStorage()
+  try {
+    // Aggiorna in Firestore
+    const result = await firestoreStore.updateDocument('cantieri', editingCantiere.value.id, editingCantiere.value)
+    
+    if (result.success) {
+      // Ricarica i cantieri per aggiornare la lista
+      await firestoreStore.loadCantieri()
   
   closeEditModal()
-  alert(`✅ Cantiere "${editingCantiere.value.nome}" aggiornato con successo!`)
+      success(`Cantiere "${editingCantiere.value.nome}" aggiornato con successo!`, '✅ Cantiere Aggiornato')
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore aggiornamento cantiere:', err)
+    error(`Errore nell'aggiornamento del cantiere: ${err.message}`, '❌ Errore Aggiornamento')
+  }
+}
+
+// Funzione per eliminare un cantiere
+const deleteCantiere = async (cantiere) => {
+  const { success, error } = useToast()
+  
+  // Conferma eliminazione
+  const conferma = confirm(
+    `⚠️ ATTENZIONE: Sei sicuro di voler eliminare il cantiere "${cantiere.nome}"?\n\n` +
+    `🔴 Questa operazione:\n` +
+    `• Eliminerà il cantiere definitivamente\n` +
+    `• Rimuoverà tutti i materiali associati\n` +
+    `• Cancellerà lo storico del progresso\n` +
+    `• Eliminerà tutti gli allegati\n\n` +
+    `❌ QUESTA AZIONE NON PUÒ ESSERE ANNULLATA!`
+  )
+  
+  if (!conferma) return
+  
+  try {
+    // Elimina da Firestore
+    const result = await firestoreStore.deleteDocument('cantieri', cantiere.id)
+    
+    if (result.success) {
+      // Ricarica i cantieri per aggiornare la lista
+      await firestoreStore.loadCantieri()
+      
+      // Pulisci dati locali associati
+      delete cantieriAttachments.value[cantiere.id]
+      delete cantieriProgressHistory.value[cantiere.id]
+      
+      // Rimuovi materiali del cantiere dal localStorage
+      const stored = localStorage.getItem('legnosystem_materiali_cantieri')
+      if (stored) {
+        try {
+          const materialiCantieriData = JSON.parse(stored)
+          delete materialiCantieriData[cantiere.id]
+          localStorage.setItem('legnosystem_materiali_cantieri', JSON.stringify(materialiCantieriData))
+        } catch (e) {
+          console.warn('Errore nella pulizia materiali cantiere:', e)
+        }
+      }
+      
+      // Salva modifiche al localStorage
+      saveAttachmentsToStorage()
+      localStorage.setItem('legnosystem_progress_history', JSON.stringify(cantieriProgressHistory.value))
+      
+      // Chiudi modal se è quello eliminato
+      if (selectedCantiere.value?.id === cantiere.id) {
+        closeModal()
+      }
+      
+      success(`Cantiere "${cantiere.nome}" eliminato con successo`, '🗑️ Cantiere Eliminato')
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore eliminazione cantiere:', err)
+    error(`Errore nell'eliminazione del cantiere: ${err.message}`, '❌ Errore Eliminazione')
+  }
 }
 
 const updateProgress = (cantiere) => {
@@ -2500,47 +2480,44 @@ const closeProgressModal = () => {
   }
 }
 
-const saveProgressUpdate = () => {
-  const { success } = useToast()
+const saveProgressUpdate = async () => {
+  const { success, error } = useToast()
   
   if (!progressUpdate.value.fase) {
-    alert('❌ Inserisci il nome della fase completata!')
+    error('Inserisci il nome della fase completata!')
     return
   }
 
   if (!progressUpdate.value.dataCompletamento) {
-    alert('❌ Inserisci la data di completamento!')
+    error('Inserisci la data di completamento!')
     return
   }
 
+  try {
   const nuovoProgresso = Math.min(selectedCantiere.value.progresso + progressUpdate.value.incremento, 100)
   const progressoPrecedente = selectedCantiere.value.progresso
   
-  // Aggiorna il progresso del cantiere
-  selectedCantiere.value.progresso = nuovoProgresso
-  
-  // Salva nell'array cantieri principale
-  const cantiereIndex = cantieri.value.findIndex(c => c.id === selectedCantiere.value.id)
-  if (cantiereIndex !== -1) {
-    cantieri.value[cantiereIndex].progresso = nuovoProgresso
+    // Aggiorna in Firestore
+    const result = await firestoreStore.updateCantiereProgress(selectedCantiere.value.id, {
+      nuovoProgresso,
+      progressoPrecedente,
+      fase: progressUpdate.value.fase,
+      nota: progressUpdate.value.nota,
+      dataCompletamento: progressUpdate.value.dataCompletamento,
+      incremento: progressUpdate.value.incremento
+    })
     
-    // Se raggiunge il 100%, marca come completato
-    if (nuovoProgresso === 100) {
-      cantieri.value[cantiereIndex].stato = 'completato'
-      selectedCantiere.value.stato = 'completato'
-    }
-  }
-  
-  // Salva aggiornamento nello storico
+         if (result.success) {
+       // Ricarica i cantieri per aggiornare la lista
+       await firestoreStore.loadCantieri()
+       
+       // Salva aggiornamento nello storico locale
   saveProgressToHistory(selectedCantiere.value.id, {
     ...progressUpdate.value,
     progressoPrecedente,
     nuovoProgresso,
     timestamp: new Date().toISOString()
   })
-  
-  // Salva nel localStorage
-  saveCantieriToStorage()
   
   closeProgressModal()
   
@@ -2549,6 +2526,13 @@ const saveProgressUpdate = () => {
     success(`🎉 Cantiere completato al 100%! "${progressUpdate.value.fase}" è stata l'ultima fase.`, '✅ Progetto Completato')
   } else {
     success(`Progresso aggiornato a ${nuovoProgresso}% (+${progressUpdate.value.incremento}%)`, '📊 Progresso Aggiornato')
+       }
+     } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore aggiornamento progresso:', err)
+    error(`Errore nell'aggiornamento del progresso: ${err.message}`, '❌ Errore Aggiornamento')
   }
 }
 
@@ -2598,113 +2582,8 @@ const getMaterialsByCantiere = (cantiereId) => {
     return materialiCantieriData[cantiereId]
   }
   
-  // Altrimenti, usa i dati di esempio (backwards compatibility)
-  const materialiDatabase = {
-    1: [
-      {
-        id: 1,
-        codice: 'TRV01',
-        nome: 'Travi Lamellari GL24h',
-        descrizione: '20x30cm - Lunghezza 6m',
-        quantitaRichiesta: 15,
-        quantitaUtilizzata: 12,
-        unita: 'pz',
-        prezzoUnitario: 85.50,
-        stato: 'utilizzato',
-        fornitoreId: 1,
-        fornitoreNome: 'LegnoAlp Spa',
-        prezzoEffettivo: 85.50,
-        dataAcquisto: '2024-01-15',
-        note: ''
-      },
-      {
-        id: 2,
-        codice: 'TAV03',
-        nome: 'Tavole Abete C24',
-        descrizione: 'Spessore 30mm - Larghezza 200mm',
-        quantitaRichiesta: 80,
-        quantitaUtilizzata: 65,
-        unita: 'm²',
-        prezzoUnitario: 45.00,
-        stato: 'in-uso',
-        fornitoreId: 2,
-        fornitoreNome: 'Segheria Montana',
-        prezzoEffettivo: 42.50,
-        dataAcquisto: '2024-01-10',
-        note: 'Sconto 5% per quantità'
-      },
-      {
-        id: 3,
-        codice: 'ISO02',
-        nome: 'Isolante Termico',
-        descrizione: 'Lana di roccia 12cm',
-        quantitaRichiesta: 120,
-        quantitaUtilizzata: 120,
-        unita: 'm²',
-        prezzoUnitario: 14.20,
-        stato: 'completato',
-        fornitoreId: 3,
-        fornitoreNome: 'Isolanti Nord Srl',
-        prezzoEffettivo: 13.80,
-        dataAcquisto: '2024-01-08',
-        note: 'Consegna anticipata'
-      }
-    ],
-    2: [
-      {
-        id: 4,
-        codice: 'TRV05',
-        nome: 'Travetti Industriali',
-        descrizione: 'Sezione 12x40cm - Classe GL32h',
-        quantitaRichiesta: 50,
-        quantitaUtilizzata: 0,
-        unita: 'pz',
-        prezzoUnitario: 125.00,
-        stato: 'ordinato',
-        fornitoreId: 1,
-        fornitoreNome: 'LegnoAlp Spa',
-        prezzoEffettivo: 120.00,
-        dataAcquisto: '2024-02-01',
-        note: 'In attesa di consegna'
-      },
-      {
-        id: 5,
-        codice: 'PAN01',
-        nome: 'Pannelli OSB',
-        descrizione: 'Spessore 18mm - Formato 250x125cm',
-        quantitaRichiesta: 200,
-        quantitaUtilizzata: 0,
-        unita: 'pz',
-        prezzoUnitario: 28.50,
-        stato: 'pianificato',
-        fornitoreId: 4,
-        fornitoreNome: 'Ferramenta Italiana',
-        prezzoEffettivo: 28.50,
-        dataAcquisto: '',
-        note: 'Da ordinare'
-      }
-    ],
-    3: [
-      {
-        id: 6,
-        codice: 'TRA01',
-        nome: 'Travi Antiche Restaurate',
-        descrizione: 'Castagno secolare - Sezione variabile',
-        quantitaRichiesta: 8,
-        quantitaUtilizzata: 3,
-        unita: 'pz',
-        prezzoUnitario: 450.00,
-        stato: 'in-lavorazione',
-        fornitoreId: 2,
-        fornitoreNome: 'Segheria Montana',
-        prezzoEffettivo: 420.00,
-        dataAcquisto: '2024-01-20',
-        note: 'Materiale storico'
-      }
-    ]
-  }
-  
-  return materialiDatabase[cantiereId] || []
+  // Nessun dato di esempio - carica da Firestore
+  return []
 }
 
 const getTotalMaterialsValue = () => {
@@ -2719,84 +2598,60 @@ const getCompletedMaterials = () => {
 
 
 
-const saveNewCantiere = () => {
-  const { error, cantiereCreated } = useToast()
+const saveNewCantiere = async () => {
+  const { error, success } = useToast()
   
   if (!newCantiere.value.nome || !newCantiere.value.cliente || !newCantiere.value.valore) {
     error('Compila tutti i campi obbligatori!')
     return
   }
 
+  try {
   // Salvo il nome prima di resettare il form
   const nomeCantiere = newCantiere.value.nome
   
-  // Se è un nuovo cliente, lo aggiungo all'anagrafica
+    // Se è un nuovo cliente, lo aggiungo all'anagrafica Firestore
   if (clientSelectionMode.value === 'new') {
     const nuovoCliente = {
-      id: Date.now() + Math.random(),
       nome: newCantiere.value.cliente,
       tipo: newCantiere.value.clienteTipo,
       email: newCantiere.value.clienteEmail || '',
       telefono: newCantiere.value.clienteTelefono || '',
       indirizzo: newCantiere.value.clienteIndirizzo || '',
-      iniziali: newCantiere.value.cliente.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2),
       stato: 'attivo',
       numeroProgetti: 1,
       valoreTotale: newCantiere.value.valore,
       ultimoContatto: new Date().toISOString().split('T')[0]
     }
     
-    // Aggiungi alla lista clienti e salva nel localStorage
-    availableClients.value.push(nuovoCliente)
-    localStorage.setItem('legnosystem_clienti', JSON.stringify(availableClients.value))
-    
-    console.log('✅ Nuovo cliente aggiunto all\'anagrafica:', nuovoCliente.nome)
-  } else {
-    // Se cliente esistente, aggiorna numero progetti e valore
-    const clienteEsistente = getSelectedClient()
-    if (clienteEsistente) {
-      clienteEsistente.numeroProgetti += 1
-      clienteEsistente.valoreTotale += newCantiere.value.valore
-      clienteEsistente.ultimoContatto = new Date().toISOString().split('T')[0]
-      localStorage.setItem('legnosystem_clienti', JSON.stringify(availableClients.value))
+      const clienteResult = await firestoreStore.createCliente(nuovoCliente)
+      if (!clienteResult.success) {
+        throw new Error('Errore nella creazione del cliente: ' + clienteResult.error)
+      }
+      
+      // Ricarica i clienti per aggiornare la lista
+      await firestoreStore.loadClienti()
+      
+      console.log('✅ Nuovo cliente aggiunto all\'anagrafica Firestore:', nuovoCliente.nome)
     }
-  }
-  
-  const newId = Math.max(...cantieri.value.map(c => c.id)) + 1
-  const nuovoCantiere = {
+    
+    // Crea il cantiere in Firestore
+    const cantiereData = {
     ...newCantiere.value,
-    id: newId,
     progresso: 0,
     team: [],
     fasi: []
   }
   
-  cantieri.value.unshift(nuovoCantiere)
-
-  // Salva nel localStorage per sincronizzazione con altre pagine
-  saveCantieriToStorage()
-
-  // 🔧 INIZIALIZZA L'ENTRY MATERIALI PER IL NUOVO CANTIERE
-  const stored = localStorage.getItem('legnosystem_materiali_cantieri')
-  let materialiCantieriData = {}
-  
-  if (stored) {
-    try {
-      materialiCantieriData = JSON.parse(stored)
-    } catch (e) {
-      console.warn('Errore nel caricamento materiali cantieri:', e)
-      materialiCantieriData = {}
-    }
-  }
-  
-  // Inizializza array vuoto per il nuovo cantiere
-  materialiCantieriData[newId] = []
-  localStorage.setItem('legnosystem_materiali_cantieri', JSON.stringify(materialiCantieriData))
-  console.log(`✅ Sistema materiali inizializzato per cantiere ID: ${newId}`)
-
-  // Mostra toast di successo invece dell'alert
+    const result = await firestoreStore.createCantiere(cantiereData)
+    
+    if (result.success) {
+      // Ricarica i cantieri per aggiornare la lista
+      await firestoreStore.loadCantieri()
+      
+      // Mostra toast di successo
   const tipoClienteText = clientSelectionMode.value === 'new' ? 'nuovo cliente aggiunto' : 'cliente esistente'
-  cantiereCreated(nomeCantiere, newCantiere.value.cliente, tipoClienteText)
+      success(`Cantiere "${nomeCantiere}" creato con successo! Cliente: ${newCantiere.value.cliente} (${tipoClienteText})`, '🏗️ Cantiere Creato')
 
   // Reset form
   newCantiere.value = {
@@ -2820,6 +2675,13 @@ const saveNewCantiere = () => {
   selectedClientFromList.value = ''
 
   closeAddModal()
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto nella creazione del cantiere')
+    }
+  } catch (err) {
+    console.error('Errore creazione cantiere:', err)
+    error(`Errore nella creazione del cantiere: ${err.message}`, '❌ Errore Creazione')
+  }
 }
 
 const closeAddModal = () => {
@@ -2864,6 +2726,21 @@ const calculateTeamHourlyCost = () => {
   }, 0)
 }
 
+// Calcola il costo giornaliero della manodopera per un cantiere (8 ore lavorative)
+const calculateDailyCost = (cantiere) => {
+  if (!cantiere?.team?.length) return 0
+  const costoOrario = cantiere.team.reduce((total, membro) => {
+    const dipendente = dipendentiDisponibili.value.find(d => d.id === membro.id)
+    return total + (dipendente?.pagaOraria || 25)
+  }, 0)
+  return costoOrario * 8 // 8 ore lavorative giornaliere
+}
+
+// Calcola il costo mensile stimato della manodopera (22 giorni lavorativi)
+const calculateMonthlyCost = (cantiere) => {
+  return calculateDailyCost(cantiere) * 22
+}
+
 const addMemberToTeam = (dipendente) => {
   if (!selectedCantiere.value.team) {
     selectedCantiere.value.team = []
@@ -2885,21 +2762,29 @@ const removeMemberFromTeam = (memberId) => {
   }
 }
 
-const saveTeamChanges = () => {
-  // Aggiorna il cantiere nella lista principale
-  const index = cantieri.value.findIndex(c => c.id === selectedCantiere.value.id)
-  if (index !== -1) {
-    cantieri.value[index] = { ...selectedCantiere.value }
-  }
+const saveTeamChanges = async () => {
+  const { success, error } = useToast()
   
-  // Salva nel localStorage
-  saveCantieriToStorage()
+  try {
+    // Aggiorna in Firestore
+    const result = await firestoreStore.updateDocument('cantieri', selectedCantiere.value.id, selectedCantiere.value)
+    
+         if (result.success) {
+       // Ricarica i cantieri per aggiornare la lista
+       await firestoreStore.loadCantieri()
   
   // Aggiorna i dipendenti con i nuovi cantieri assegnati
   updateEmployeeAssignments()
   
   closeTeamModal()
-  alert(`✅ Team del cantiere "${selectedCantiere.value.nome}" aggiornato con successo!`)
+       success(`Team del cantiere "${selectedCantiere.value.nome}" aggiornato con successo!`, '👥 Team Aggiornato')
+     } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore aggiornamento team:', err)
+    error(`Errore nell'aggiornamento del team: ${err.message}`, '❌ Errore Aggiornamento')
+  }
 }
 
 const updateEmployeeAssignments = () => {
@@ -3731,29 +3616,8 @@ const fillMaterialFromStock = () => {
 const clientSelectionMode = ref('existing')
 const selectedClientFromList = ref('')
 
-const availableClients = ref([
-  { id: 1, nome: 'Famiglia Rossi', tipo: 'privato', email: 'info@famigliarossi.it', telefono: '0123 456789', indirizzo: 'Via delle Rose 15, Milano', numeroProgetti: 3, iniziali: 'FR' },
-  { id: 2, nome: 'Industrie SpA', tipo: 'azienda', email: 'vendite@industriespa.com', telefono: '0456 789123', indirizzo: 'Zona Industriale Nord, Bergamo', numeroProgetti: 2, iniziali: 'IS' },
-  { id: 3, nome: 'Comune di Verona', tipo: 'ente-pubblico', email: 'info@comunediverona.it', telefono: '0789 123456', indirizzo: 'Centro Storico, Verona', numeroProgetti: 1, iniziali: 'CV' }
-])
-
-// Carica clienti dal localStorage se esistono
-const loadClientsFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_clienti')
-  if (stored) {
-    try {
-      const clientiSalvati = JSON.parse(stored)
-      if (clientiSalvati.length > 0) {
-        availableClients.value = clientiSalvati
-      }
-    } catch (e) {
-      console.error('Errore nel caricamento clienti:', e)
-    }
-  }
-}
-
-// Carica clienti all'avvio
-loadClientsFromStorage()
+// Clienti da Firestore
+const availableClients = computed(() => firestoreStore.clienti)
 
 const getSelectedClient = () => {
   return availableClients.value.find(cliente => cliente.id === selectedClientFromList.value)
@@ -3789,9 +3653,22 @@ const getTipoLabel = (tipo) => {
 }
 
 // Hook lifecycle per inizializzazione
-onMounted(() => {
+onMounted(async () => {
   // Carica allegati materiali dal localStorage solo al mount del componente
   loadMaterialAttachmentsFromStorage()
+  
+  // Carica tutti i dati da Firestore
+  try {
+    await Promise.all([
+      firestoreStore.loadCantieri(),
+      firestoreStore.loadDipendenti(),
+      firestoreStore.loadMateriali(),
+      firestoreStore.loadFornitori(),
+      firestoreStore.loadClienti()
+    ])
+  } catch (error) {
+    console.error('Errore nel caricamento dati Cantieri:', error)
+  }
 })
 
 const openDailyLog = (cantiere) => {

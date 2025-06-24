@@ -21,7 +21,7 @@
           </div>
           <div class="ml-3 sm:ml-4 min-w-0 flex-1">
             <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Fornitori Attivi</p>
-            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.fornitoriAttivi }}</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.attivi }}</p>
           </div>
         </div>
       </div>
@@ -33,7 +33,7 @@
           </div>
           <div class="ml-3 sm:ml-4 min-w-0 flex-1">
             <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Ordini Aperti</p>
-            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.ordiniAperti }}</p>
+            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ stats.ordiniMese }}</p>
           </div>
         </div>
       </div>
@@ -45,7 +45,7 @@
           </div>
           <div class="ml-3 sm:ml-4 min-w-0 flex-1">
             <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Valore Ordini</p>
-            <p class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">€{{ stats.valoreOrdini.toLocaleString() }}</p>
+            <p class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 truncate">€{{ stats.valoreMese.toLocaleString() }}</p>
           </div>
         </div>
       </div>
@@ -767,7 +767,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useFirestoreStore } from '../stores/firestore.js'
+import { useToast } from '../composables/useToast.js'
 import { 
   PlusIcon, 
   BuildingOfficeIcon,
@@ -781,8 +783,11 @@ import {
   PaperClipIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'
-import { useToast } from '@/composables/useToast'
 import MaterialAttachmentsModal from '@/components/MaterialAttachmentsModal.vue'
+
+// Stores
+const firestoreStore = useFirestoreStore()
+const { success, error } = useToast()
 
 // Stato della pagina
 const showAddModal = ref(false)
@@ -797,19 +802,30 @@ const searchTerm = ref('')
 const selectedCategory = ref('')
 const selectedStatus = ref('')
 
-// Stats
-const stats = ref({
-  fornitoriAttivi: 15,
-  ordiniAperti: 8,
-  valoreOrdini: 145000,
-  inConsegna: 5
+// Stats - calcolate dinamicamente dai dati Firestore
+const stats = computed(() => {
+  const totale = fornitori.value.length
+  const attivi = fornitori.value.filter(f => f.stato === 'attivo').length
+  const ordiniMese = 0 // Da implementare con sistema ordini
+  const valoreMese = fornitori.value.reduce((total, f) => total + (f.valoreAnno || 0), 0) / 12
+  const inScadenza = 0 // Da implementare con sistema ordini
+  const inConsegna = 0 // Da implementare con sistema ordini
+  
+  return {
+    totale,
+    attivi,
+    ordiniMese,
+    valoreMese: Math.round(valoreMese),
+    inScadenza,
+    inConsegna
+  }
 })
 
-// Tabs
+// Tabs - reset count a 0
 const tabs = ref([
-  { id: 'fornitori', name: 'Fornitori', count: 15 },
-  { id: 'ordini', name: 'Ordini', count: 23 },
-  { id: 'listini', name: 'Listini', count: 8 }
+  { id: 'fornitori', name: 'Fornitori', count: 0 },
+  { id: 'ordini', name: 'Ordini', count: 0 },
+  { id: 'listini', name: 'Listini', count: 0 }
 ])
 
 // Nuovo Fornitore
@@ -841,100 +857,12 @@ const editingFornitore = ref({
   email: ''
 })
 
-// Dati Fornitori
-const fornitori = ref([
-  {
-    id: 1,
-    nome: 'LegnoAlp Spa',
-    iniziali: 'LA',
-    categoria: 'legno',
-    partitaIva: '12345678901',
-    indirizzo: 'Via Industria 15',
-    citta: 'Bolzano',
-    cap: '39100',
-    provincia: 'BZ',
-    telefono: '+39 0471 123456',
-    email: 'ordini@legnoalp.it',
-    rating: 5,
-    stato: 'attivo',
-    ordiniAnno: 24,
-    valoreAnno: 89500,
-    tempoConsegna: 7
-  },
-  {
-    id: 2,
-    nome: 'Segheria Montana Srl',
-    iniziali: 'SM',
-    categoria: 'legno',
-    partitaIva: '98765432109',
-    indirizzo: 'Strada Montana 82',
-    citta: 'Trento',
-    cap: '38123',
-    provincia: 'TN',
-    telefono: '+39 0461 987654',
-    email: 'info@segheriamont.it',
-    rating: 4,
-    stato: 'attivo',
-    ordiniAnno: 18,
-    valoreAnno: 67200,
-    tempoConsegna: 5
-  },
-  {
-    id: 3,
-    nome: 'Isolanti Nord Srl',
-    iniziali: 'IN',
-    categoria: 'isolanti',
-    partitaIva: '11223344556',
-    indirizzo: 'Via Nazionale 234',
-    citta: 'Verona',
-    cap: '37100',
-    provincia: 'VR',
-    telefono: '+39 045 567890',
-    email: 'vendite@isolantinord.com',
-    rating: 4,
-    stato: 'attivo',
-    ordiniAnno: 12,
-    valoreAnno: 34800,
-    tempoConsegna: 3
-  }
-])
+// Dati Fornitori - inizialmente vuoto, caricato da Firestore
+// Dati fornitori - caricati da Firestore
+const fornitori = computed(() => firestoreStore.fornitori)
 
-// Ordini
-const ordini = ref([
-  {
-    id: 1,
-    numero: '2024-001',
-    fornitore: 'LegnoAlp Spa',
-    dataOrdine: '2024-01-15',
-    consegnaPrevista: '2024-01-22',
-    valore: 12500,
-    articoli: 15,
-    stato: 'consegnato',
-    progresso: 100
-  },
-  {
-    id: 2,
-    numero: '2024-002',
-    fornitore: 'Segheria Montana Srl',
-    dataOrdine: '2024-01-16',
-    consegnaPrevista: '2024-01-21',
-    valore: 8900,
-    articoli: 23,
-    stato: 'spedito',
-    progresso: 80
-  },
-  {
-    id: 3,
-    numero: '2024-003',
-    fornitore: 'Isolanti Nord Srl',
-    dataOrdine: '2024-01-17',
-    consegnaPrevista: '2024-01-20',
-    valore: 5600,
-    articoli: 8,
-    stato: 'ordinato',
-    progresso: 30
-  }
-])
+// Ordini - vuoto, da caricare da Firestore
+const ordini = ref([])
 
 // Computed
 const filteredFornitori = computed(() => {
@@ -1054,8 +982,7 @@ const viewHistory = (fornitore) => {
 }
 
 const viewCantiereDetails = (cantiere) => {
-  const { cantiereDetails } = useToast()
-  cantiereDetails(cantiere, { materialiCount: cantiere.materialiCount })
+  success(`Dettagli Cantiere: ${cantiere.nome}`, `📊 Cantiere`)
 }
 
 const editFornitore = (fornitore) => {
@@ -1087,7 +1014,7 @@ const deleteFornitore = (fornitore) => {
     const index = fornitori.value.findIndex(f => f.id === fornitore.id)
     if (index > -1) {
       fornitori.value.splice(index, 1)
-      stats.value.fornitoriAttivi--
+      stats.value.attivi--
       
       // Chiudi il modal se è aperto per questo fornitore
       if (selectedFornitore.value?.id === fornitore.id) {
@@ -1113,14 +1040,14 @@ const confirmDelivery = (ordine) => {
   alert(`✅ Consegna confermata!\n\nOrdine #${ordine.numero} ricevuto e verificato.`)
 }
 
-const addFornitore = () => {
+const addFornitore = async () => {
   if (!newFornitore.value.nome || !newFornitore.value.categoria) {
-    alert('❌ Compila tutti i campi obbligatori!')
+    error('Compila tutti i campi obbligatori!')
     return
   }
 
-  const nuovoFornitore = {
-    id: Date.now(),
+  try {
+    const result = await firestoreStore.createFornitore({
     ...newFornitore.value,
     iniziali: newFornitore.value.nome.split(' ').map(word => word[0]).join('').toUpperCase().substring(0, 2),
     rating: 0,
@@ -1128,27 +1055,21 @@ const addFornitore = () => {
     ordiniAnno: 0,
     valoreAnno: 0,
     tempoConsegna: 7
-  }
-
-  fornitori.value.push(nuovoFornitore)
-  stats.value.fornitoriAttivi++
-
-  // Reset form
-  newFornitore.value = {
-    nome: '',
-    categoria: '',
-    partitaIva: '',
-    codiceFiscale: '',
-    indirizzo: '',
-    citta: '',
-    cap: '',
-    provincia: '',
-    telefono: '',
-    email: ''
-  }
+    })
+    
+    if (result.success) {
+      // Ricarica fornitori
+      await firestoreStore.loadFornitori()
 
   closeAddModal()
-  alert(`✅ Fornitore "${nuovoFornitore.nome}" aggiunto con successo!`)
+      success(`Fornitore "${newFornitore.value.nome}" aggiunto con successo!`, '🏢 Fornitore Creato')
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore creazione fornitore:', err)
+    error(`Errore nella creazione del fornitore: ${err.message}`, '❌ Errore Creazione')
+  }
 }
 
 const closeAddModal = () => {
@@ -1316,4 +1237,13 @@ const closeAttachmentsModal = () => {
   showAttachmentsModal.value = false
   selectedMaterial.value = null
 }
+
+// Carica dati all'avvio
+onMounted(async () => {
+  try {
+    await firestoreStore.loadFornitori()
+  } catch (err) {
+    console.error('Errore caricamento fornitori:', err)
+  }
+})
 </script> 

@@ -22,12 +22,7 @@ const router = createRouter({
       component: () => import('../views/Scorte.vue'),
       meta: { title: 'Gestione Scorte - Legnosystem.bio' }
     },
-    {
-      path: '/sfridi',
-      name: 'sfridi',
-      component: () => import('../views/Sfridi.vue'),
-      meta: { title: 'Gestione Sfridi - Legnosystem.bio' }
-    },
+
     {
       path: '/cantieri',
       name: 'cantieri',
@@ -58,12 +53,7 @@ const router = createRouter({
       component: () => import('../views/Calendario.vue'),
       meta: { title: 'Calendario & Planning - Legnosystem.bio' }
     },
-    {
-      path: '/fatturazione',
-      name: 'fatturazione',
-      component: () => import('../views/Fatturazione.vue'),
-      meta: { title: 'Fatturazione & Admin - Legnosystem.bio' }
-    },
+
     {
       path: '/personale',
       name: 'personale',

@@ -49,10 +49,7 @@
               <ExclamationTriangleIcon class="w-5 h-5" />
               <span>Gestione Scorte</span>
             </router-link>
-            <router-link to="/sfridi" @click="$emit('close-sidebar')" class="nav-link" active-class="active">
-              <ArrowPathRoundedSquareIcon class="w-5 h-5" />
-              <span>Sfridi</span>
-            </router-link>
+
           </div>
         </div>
 
@@ -97,16 +94,7 @@
           </div>
         </div>
 
-        <!-- Sezione Amministrazione -->
-        <div class="pt-4">
-          <h3 class="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Amministrazione</h3>
-          <div class="mt-2 space-y-1">
-            <router-link to="/fatturazione" @click="$emit('close-sidebar')" class="nav-link" active-class="active">
-              <DocumentTextIcon class="w-5 h-5" />
-              <span>Fatturazione & Admin</span>
-            </router-link>
-          </div>
-        </div>
+
 
         <!-- Sezione Clienti -->
         <div class="pt-4">
@@ -162,7 +150,6 @@ import {
   HomeIcon,
   CubeIcon,
   ExclamationTriangleIcon,
-  ArrowPathRoundedSquareIcon,
   BuildingOfficeIcon,
   UsersIcon,
   UserGroupIcon,

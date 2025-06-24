@@ -318,63 +318,8 @@ const entryForm = ref({
   team: []
 })
 
-// Dati di esempio
-const entries = ref([
-  {
-    id: 1,
-    data: '2024-01-15',
-    turno: 'giornata',
-    responsabile: 'Marco Bianchi',
-    meteo: {
-      condizioni: 'sereno',
-      temperatura: 15,
-      note: 'Giornata ideale per lavori esterni'
-    },
-    attivita: [
-      'Montaggio travi principali',
-      'Installazione pannelli isolanti',
-      'Controllo livellamento struttura'
-    ],
-    note: 'Lavori proceduti senza intoppi. Team molto efficiente.',
-    problemi: [],
-    oreTotali: 32,
-    team: [
-      { id: 1, nome: 'Marco Bianchi', ore: 8 },
-      { id: 2, nome: 'Luca Verdi', ore: 8 },
-      { id: 3, nome: 'Anna Russo', ore: 8 },
-      { id: 4, nome: 'Giuseppe Neri', ore: 8 }
-    ],
-    allegati: [
-      { id: 1, nome: 'foto_struttura_01.jpg', tipo: 'immagine' },
-      { id: 2, nome: 'foto_struttura_02.jpg', tipo: 'immagine' }
-    ]
-  },
-  {
-    id: 2,
-    data: '2024-01-16',
-    turno: 'mattino',
-    responsabile: 'Marco Bianchi',
-    meteo: {
-      condizioni: 'pioggia',
-      temperatura: 8,
-      note: 'Pioggia intensa dalle 10:00'
-    },
-    attivita: [
-      'Preparazione materiali al coperto',
-      'Controllo qualità pannelli'
-    ],
-    note: 'Lavori sospesi per maltempo alle 10:00',
-    problemi: ['Ritardo consegna viti speciali', 'Maltempo ha interrotto lavori esterni'],
-    oreTotali: 16,
-    team: [
-      { id: 1, nome: 'Marco Bianchi', ore: 4 },
-      { id: 2, nome: 'Luca Verdi', ore: 4 },
-      { id: 3, nome: 'Anna Russo', ore: 4 },
-      { id: 4, nome: 'Giuseppe Neri', ore: 4 }
-    ],
-    allegati: []
-  }
-])
+// Registrazioni giornale - vuoto, da caricare da Firestore
+const entries = ref([])
 
 // Computed
 const filteredEntries = computed(() => {
@@ -512,21 +457,8 @@ onMounted(() => {
 })
 
 const loadCantiereData = () => {
-  // Simula il caricamento dei dati del cantiere
-  cantiere.value = {
-    id: props.cantiereId || 1,
-    nome: 'Villa Rossi',
-    cliente: 'Mario Rossi',
-    indirizzo: 'Via Roma 123, Milano',
-    progresso: 65,
-    responsabile: 'Marco Bianchi',
-    team: [
-      { id: 1, nome: 'Marco Bianchi', iniziali: 'MB' },
-      { id: 2, nome: 'Luca Verdi', iniziali: 'LV' },
-      { id: 3, nome: 'Anna Russo', iniziali: 'AR' },
-      { id: 4, nome: 'Giuseppe Neri', iniziali: 'GN' }
-    ]
-  }
+  // Carica i dati del cantiere da Firestore
+  cantiere.value = null
 }
 </script>
 

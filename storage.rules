@@ -1,0 +1,76 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // 🔐 Funzioni di utilità
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isValidFileSize() {
+      return request.resource.size <= 10 * 1024 * 1024; // 10MB
+    }
+    
+    function isValidFileType() {
+      return request.resource.contentType.matches('image/.*') ||
+             request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats.*') ||
+             request.resource.contentType.matches('text/plain');
+    }
+    
+    function isValidUpload() {
+      return isValidFileSize() && isValidFileType();
+    }
+    
+    // 📁 Avatar utenti - Solo il proprietario può gestire
+    match /users/{userId}/avatar/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) && isValidUpload();
+    }
+    
+    // 🏗️ Allegati cantieri - Utenti autenticati possono caricare/leggere
+    match /cantieri/{cantiereId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidUpload();
+    }
+    
+    // 📦 Documenti materiali - Utenti autenticati possono gestire
+    match /materiali/{materialeId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidUpload();
+    }
+    
+    // 📋 Documenti aziendali (preventivi, fatture)
+    match /preventivi/{preventivoId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidUpload();
+    }
+    
+    match /fatture/{fatturaId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidUpload();
+    }
+    
+    // 👥 Documenti dipendenti - Solo HR e admin
+    match /dipendenti/{dipendenteId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidUpload();
+    }
+    
+    // 💾 Backup - Solo admin (tramite Cloud Functions)
+    match /backups/{date}/{fileName} {
+      allow read: if false; // Solo tramite Cloud Functions
+      allow write: if false; // Solo tramite Cloud Functions
+    }
+    
+    // 🚫 Nega tutto il resto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 

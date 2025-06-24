@@ -7,6 +7,9 @@
         <p class="text-gray-600 text-base">Dipendenti e timesheet - Legnosystem.bio</p>
       </div>
       <div class="flex space-x-3">
+        <button v-if="dipendenti.length > 0" @click="clearAllData" class="btn-danger text-base font-medium" title="Pulisci tutti i dati di esempio">
+          🗑️ Pulisci Dati
+        </button>
         <button @click="showTimesheetModal = true" class="btn-secondary text-base font-medium">
           <ClockIcon class="w-5 h-5 mr-2" />
           Registra Ore
@@ -615,7 +618,7 @@
               </div>
               <div>
                 <label class="block text-base font-medium text-gray-700 mb-2">Paga Oraria (€) *</label>
-                <input v-model.number="newDipendente.pagaOraria" type="number" step="0.5" min="15" max="50" required
+                <input v-model.number="newDipendente.pagaOraria" type="number" step="0.5" min="15" required
                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
               </div>
               <div>
@@ -739,7 +742,7 @@
             </button>
           </div>
           
-          <form @submit.prevent="saveEditDipendente" class="space-y-6">
+          <form @submit.prevent="saveEditedDipendente" class="space-y-6">
             <!-- Dati Anagrafici -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -783,7 +786,7 @@
               </div>
               <div>
                 <label class="block text-base font-medium text-gray-700 mb-2">Paga Oraria (€) *</label>
-                <input v-model.number="editingDipendente.pagaOraria" type="number" step="0.5" min="15" max="50" required
+                <input v-model.number="editingDipendente.pagaOraria" type="number" step="0.5" min="15" required
                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
               </div>
               <div>
@@ -951,6 +954,11 @@ import {
   PencilIcon,
   XMarkIcon
 } from '@heroicons/vue/24/outline'
+import { useFirestoreStore } from '../stores/firestore.js'
+import { useToast } from '../composables/useToast.js'
+
+// Firestore store
+const firestoreStore = useFirestoreStore()
 
 // Stato della pagina
 const activeTab = ref('dipendenti')
@@ -966,147 +974,38 @@ const selectedWeek = ref('current')
 const selectedDipendente = ref(null)
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 
-// Stats
-const stats = ref({
-  dipendentiAttivi: 12,
-  oreSettimana: 162,
-  presentiOggi: 8,
-  costoOrarioMedio: 28
+// Stats - calcolate dinamicamente dai dati Firestore
+const stats = computed(() => {
+  const dipendentiAttivi = dipendenti.value.filter(d => d.stato === 'attivo').length
+  const oreSettimana = dipendenti.value.reduce((total, d) => total + (d.ore_settimana || 0), 0)
+  const costoOrarioMedio = dipendentiAttivi > 0 
+    ? dipendenti.value.reduce((total, d) => total + (d.pagaOraria || 0), 0) / dipendentiAttivi 
+    : 0
+  
+  return {
+    dipendentiAttivi,
+    oreSettimana,
+    presentiOggi: 0, // Da implementare con sistema presenze
+    costoOrarioMedio: Math.round(costoOrarioMedio * 100) / 100
+  }
 })
 
 // Presenze giornaliere
 const presenze = ref({})
 
-// Lista cantieri dinamica (sincronizzata con localStorage)
-const cantieriDisponibili = ref([
-  'Villa Rossi',
-  'Capannone Industriale', 
-  'Tetto Storico',
-  'Condominio Aurora'
-])
+// Lista cantieri dinamica (caricata da Firestore)
+const cantieriDisponibili = computed(() => {
+  return firestoreStore.cantieri.map(cantiere => cantiere.nome)
+})
 
-// Dati dipendenti - inizializzo con dati di default
-const dipendenti = ref([
-  {
-    id: 1,
-    nome: 'Marco',
-    cognome: 'Bianchi',
-    iniziali: 'MB',
-    email: 'marco.bianchi@legnosystem.bio',
-    telefono: '340 123 4567',
-    ruolo: 'capo-squadra',
-    stato: 'attivo',
-    dataAssunzione: '2022-03-15',
-    pagaOraria: 32,
-    cantiereAttuale: 'Villa Rossi',
-    oreTotaliSettimana: 38
-  },
-  {
-    id: 2,
-    nome: 'Luca',
-    cognome: 'Verdi',
-    iniziali: 'LV',
-    email: 'luca.verdi@legnosystem.bio',
-    telefono: '347 234 5678',
-    ruolo: 'carpentiere',
-    stato: 'attivo',
-    dataAssunzione: '2021-09-10',
-    pagaOraria: 28,
-    cantiereAttuale: 'Villa Rossi',
-    oreTotaliSettimana: 40
-  },
-  {
-    id: 3,
-    nome: 'Anna',
-    cognome: 'Russo',
-    iniziali: 'AR',
-    email: 'anna.russo@legnosystem.bio',
-    telefono: '333 345 6789',
-    ruolo: 'operaio',
-    stato: 'attivo',
-    dataAssunzione: '2023-01-20',
-    pagaOraria: 24,
-    cantiereAttuale: 'Villa Rossi',
-    oreTotaliSettimana: 36
-  },
-  {
-    id: 4,
-    nome: 'Giuseppe',
-    cognome: 'Neri',
-    iniziali: 'GN',
-    email: 'giuseppe.neri@legnosystem.bio',
-    telefono: '349 456 7890',
-    ruolo: 'carpentiere',
-    stato: 'attivo',
-    dataAssunzione: '2022-11-05',
-    pagaOraria: 30,
-    cantiereAttuale: 'Capannone Industriale',
-    oreTotaliSettimana: 42
-  },
-  {
-    id: 5,
-    nome: 'Sofia',
-    cognome: 'Gialli',
-    iniziali: 'SG',
-    email: 'sofia.gialli@legnosystem.bio',
-    telefono: '338 567 8901',
-    ruolo: 'amministrativo',
-    stato: 'attivo',
-    dataAssunzione: '2023-04-12',
-    pagaOraria: 26,
-    cantiereAttuale: null,
-    oreTotaliSettimana: 40
-  }
-])
+// Dati dipendenti - caricati da Firestore
+const dipendenti = computed(() => firestoreStore.dipendenti)
 
-// Dati timesheet sample
-const timesheetData = ref([
-  {
-    dipendenteId: 1,
-    nome: 'Marco Bianchi',
-    iniziali: 'MB',
-    cantiere: 'Villa Rossi',
-    lunedi: 8,
-    martedi: 8,
-    mercoledi: 8,
-    giovedi: 7,
-    venerdi: 7,
-    totale: 38
-  },
-  {
-    dipendenteId: 2,
-    nome: 'Luca Verdi',
-    iniziali: 'LV',
-    cantiere: 'Villa Rossi',
-    lunedi: 8,
-    martedi: 8,
-    mercoledi: 8,
-    giovedi: 8,
-    venerdi: 8,
-    totale: 40
-  },
-  {
-    dipendenteId: 3,
-    nome: 'Anna Russo',
-    iniziali: 'AR',
-    cantiere: 'Villa Rossi',
-    lunedi: 8,
-    martedi: 7,
-    mercoledi: 8,
-    giovedi: 7,
-    venerdi: 6,
-    totale: 36
-  }
-])
+// Dati timesheet - vuoto, da caricare da Firestore
+const timesheetData = ref([])
 
-// Dati timesheet dettagliati
-const timesheetDettagli = ref([
-  { id: 1, dipendenteId: 1, data: '2024-01-15', cantiere: 'Villa Rossi', ore: 8, note: 'Montaggio travi principali' },
-  { id: 2, dipendenteId: 1, data: '2024-01-16', cantiere: 'Villa Rossi', ore: 8, note: 'Completamento struttura' },
-  { id: 3, dipendenteId: 1, data: '2024-01-17', cantiere: 'Villa Rossi', ore: 8, note: 'Isolamento termico' },
-  { id: 4, dipendenteId: 2, data: '2024-01-15', cantiere: 'Villa Rossi', ore: 8, note: 'Supporto montaggio' },
-  { id: 5, dipendenteId: 2, data: '2024-01-16', cantiere: 'Villa Rossi', ore: 8, note: 'Finitura pannelli' }
-])
+// Dati timesheet dettagliati - vuoto, da caricare da Firestore
+const timesheetDettagli = ref([])
 
 // Nuovo dipendente
 const newDipendente = ref({
@@ -1146,38 +1045,24 @@ const editingDipendente = ref({
   note: ''
 })
 
-// Funzioni per la gestione dei cantieri
-const loadCantieriFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_cantieri')
-  if (stored) {
-    try {
-      const cantieri = JSON.parse(stored)
-      const nuoviCantieri = cantieri.map(c => c.nome)
-      if (JSON.stringify(nuoviCantieri) !== JSON.stringify(cantieriDisponibili.value)) {
-        cantieriDisponibili.value = nuoviCantieri
-        console.log('✅ Lista cantieri aggiornata:', nuoviCantieri)
-      }
-    } catch (e) {
-      console.warn('Errore nel caricamento cantieri:', e)
-    }
+// Funzioni per la gestione dei cantieri - ora usa Firestore
+const loadCantieri = async () => {
+  try {
+    await firestoreStore.loadCantieri()
+    console.log('✅ Lista cantieri caricata da Firestore:', cantieriDisponibili.value)
+  } catch (e) {
+    console.warn('Errore nel caricamento cantieri da Firestore:', e)
   }
 }
 
-// Funzioni per la gestione dei dipendenti
-const loadDipendentiFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_dipendenti')
-  if (stored) {
-    try {
-      dipendenti.value = JSON.parse(stored)
-    } catch (e) {
-      console.warn('Errore nel caricamento dipendenti dal localStorage:', e)
-    }
+// Funzioni per la gestione dei dipendenti - ora usa Firestore
+const loadDipendenti = async () => {
+  try {
+    await firestoreStore.loadDipendenti()
+    console.log('✅ Dipendenti caricati da Firestore:', dipendenti.value.length)
+  } catch (e) {
+    console.warn('Errore nel caricamento dipendenti da Firestore:', e)
   }
-}
-
-const saveDipendentiToStorage = () => {
-  localStorage.setItem('legnosystem_dipendenti', JSON.stringify(dipendenti.value))
-  window.dispatchEvent(new CustomEvent('dipendenti-updated'))
 }
 
 // Computed
@@ -1237,33 +1122,30 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('it-IT')
 }
 
-const saveDipendente = () => {
+const saveDipendente = async () => {
+  const { success, error } = useToast()
+  
   if (!newDipendente.value.nome || !newDipendente.value.cognome || !newDipendente.value.email) {
-    alert('❌ Compila tutti i campi obbligatori!')
+    error('Compila tutti i campi obbligatori!')
     return
   }
 
-  const nuovoDipendente = {
-    id: Date.now(),
-    nome: newDipendente.value.nome,
-    cognome: newDipendente.value.cognome,
-    iniziali: newDipendente.value.nome.charAt(0) + newDipendente.value.cognome.charAt(0),
-    email: newDipendente.value.email,
-    telefono: newDipendente.value.telefono,
-    ruolo: newDipendente.value.ruolo,
-    stato: newDipendente.value.stato,
-    dataAssunzione: newDipendente.value.dataAssunzione,
-    pagaOraria: newDipendente.value.pagaOraria,
-    cantiereAttuale: newDipendente.value.cantiereAttuale || null,
-    oreTotaliSettimana: 0
+  try {
+    const result = await firestoreStore.createDipendente(newDipendente.value)
+    
+    if (result.success) {
+      // Ricarica dipendenti
+      await loadDipendenti()
+      
+      closeAddModal()
+      success(`Dipendente ${newDipendente.value.nome} ${newDipendente.value.cognome} aggiunto con successo!`, '👤 Dipendente Creato')
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore creazione dipendente:', err)
+    error(`Errore nella creazione del dipendente: ${err.message}`, '❌ Errore Creazione')
   }
-
-  dipendenti.value.push(nuovoDipendente)
-  stats.value.dipendentiAttivi++
-
-  saveDipendentiToStorage()
-  closeAddModal()
-  alert(`✅ Dipendente ${nuovoDipendente.nome} ${nuovoDipendente.cognome} aggiunto con successo!`)
 }
 
 const saveTimesheet = () => {
@@ -1313,6 +1195,61 @@ const editDipendente = (dipendente) => {
     note: dipendente.note || ''
   }
   showEditModal.value = true
+}
+
+const saveEditedDipendente = async () => {
+  const { success, error } = useToast()
+  
+  if (!editingDipendente.value.nome || !editingDipendente.value.cognome || !editingDipendente.value.email) {
+    error('Compila tutti i campi obbligatori!')
+    return
+  }
+
+  try {
+    const result = await firestoreStore.updateDocument('dipendenti', editingDipendente.value.id, {
+      nome: editingDipendente.value.nome,
+      cognome: editingDipendente.value.cognome,
+      email: editingDipendente.value.email,
+      telefono: editingDipendente.value.telefono,
+      ruolo: editingDipendente.value.ruolo,
+      stato: editingDipendente.value.stato,
+      dataAssunzione: editingDipendente.value.dataAssunzione,
+      pagaOraria: editingDipendente.value.pagaOraria,
+      cantiereAttuale: editingDipendente.value.cantiereAttuale,
+      note: editingDipendente.value.note,
+      iniziali: editingDipendente.value.nome.charAt(0) + editingDipendente.value.cognome.charAt(0)
+    })
+    
+    if (result.success) {
+      // Ricarica dipendenti
+      await loadDipendenti()
+      
+      closeEditModal()
+      success(`Dipendente ${editingDipendente.value.nome} ${editingDipendente.value.cognome} aggiornato!`, '✏️ Dipendente Modificato')
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore aggiornamento dipendente:', err)
+    error(`Errore nell'aggiornamento del dipendente: ${err.message}`, '❌ Errore Modifica')
+  }
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingDipendente.value = {
+    id: null,
+    nome: '',
+    cognome: '',
+    email: '',
+    telefono: '',
+    ruolo: '',
+    pagaOraria: 25,
+    dataAssunzione: '',
+    stato: 'attivo',
+    cantiereAttuale: '',
+    note: ''
+  }
 }
 
 const viewSchedule = (dipendente) => {
@@ -1426,73 +1363,43 @@ const getRiepilogoPresenze = () => {
   return { presenti, assenti, ferie, malattia, oreTotali }
 }
 
-const saveEditDipendente = () => {
-  if (!editingDipendente.value.nome || !editingDipendente.value.cognome || !editingDipendente.value.email) {
-    alert('❌ Compila tutti i campi obbligatori!')
-    return
-  }
 
-  const index = dipendenti.value.findIndex(d => d.id === editingDipendente.value.id)
-  if (index !== -1) {
-    dipendenti.value[index] = {
-      ...editingDipendente.value,
-      iniziali: editingDipendente.value.nome.charAt(0) + editingDipendente.value.cognome.charAt(0),
-      cantiereAttuale: editingDipendente.value.cantiereAttuale || null
-    }
-  }
-
-  saveDipendentiToStorage()
-  closeEditModal()
-  alert(`✅ Dipendente ${editingDipendente.value.nome} ${editingDipendente.value.cognome} aggiornato con successo!`)
-}
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingDipendente.value = {
-    id: null,
-    nome: '',
-    cognome: '',
-    email: '',
-    telefono: '',
-    ruolo: '',
-    pagaOraria: 25,
-    dataAssunzione: '',
-    stato: 'attivo',
-    cantiereAttuale: '',
-    note: ''
-  }
-}
 
 const closeScheduleModal = () => {
   showScheduleModal.value = false
   selectedDipendente.value = null
 }
 
-// Inizializzazione del componente
-onMounted(() => {
-  // Carica cantieri dal localStorage
-  loadCantieriFromStorage()
-  
-  // Carica dipendenti dal localStorage all'avvio
-  loadDipendentiFromStorage()
-  
-  // Se non ci sono dipendenti nel localStorage, salva quelli attuali
-  if (!localStorage.getItem('legnosystem_dipendenti')) {
-    saveDipendentiToStorage()
-  }
-
-  // Ascolta i cambiamenti nel localStorage (per sincronizzazione tra pagine)
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'legnosystem_cantieri') {
-      loadCantieriFromStorage()
+// Funzione per pulire tutti i dati di esempio
+const clearAllData = () => {
+  if (confirm('⚠️ Sei sicuro di voler eliminare TUTTI i dipendenti e i dati? Questa operazione non può essere annullata.')) {
+    // Pulisci tutti i dati
+    dipendenti.value = []
+    timesheetData.value = []
+    timesheetDettagli.value = []
+    presenze.value = {}
+    
+    // Reset statistiche
+    stats.value = {
+      dipendentiAttivi: 0,
+      oreSettimana: 0,
+      presentiOggi: 0,
+      costoOrarioMedio: 0
     }
-  })
+    
+    // Pulisci localStorage
+    localStorage.removeItem('legnosystem_dipendenti')
+    
+    alert('✅ Tutti i dati sono stati eliminati! La pagina è ora pulita.')
+  }
+}
 
-  // Ascolta anche gli eventi personalizzati (per aggiornamenti nella stessa pagina)
-  window.addEventListener('cantieri-updated', loadCantieriFromStorage)
-  window.addEventListener('dipendenti-updated', loadDipendentiFromStorage)
-
-  // Check periodico per essere sicuri della sincronizzazione
-  setInterval(loadCantieriFromStorage, 5000)
+// Inizializzazione del componente
+onMounted(async () => {
+  // Carica cantieri da Firestore
+  await loadCantieri()
+  
+  // Carica dipendenti da Firestore
+  await loadDipendenti()
 })
 </script> 

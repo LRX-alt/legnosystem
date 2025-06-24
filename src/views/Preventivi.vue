@@ -82,11 +82,8 @@
           <option value="rifiutato">Rifiutato</option>
           <option value="scaduto">Scaduto</option>
         </select>
-        <select v-model="selectedCliente" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500">
+        <select v-model="selectedCliente" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
           <option value="">Tutti i clienti</option>
-          <option value="Famiglia Rossi">Famiglia Rossi</option>
-          <option value="Industrie SpA">Industrie SpA</option>
-          <option value="Comune di Verona">Comune di Verona</option>
         </select>
       </div>
     </div>
@@ -220,53 +217,16 @@ const searchTerm = ref('')
 const selectedStato = ref('')
 const selectedCliente = ref('')
 
-// Stats
+// Stats - resettate a 0
 const stats = ref({
-  preventiviAperti: 15,
-  valorePipeline: 425000,
-  tassoConversione: 72,
-  tempoMedio: 14
+  preventiviAperti: 0,
+  valorePipeline: 0,
+  tassoConversione: 0,
+  tempoMedio: 0
 })
 
-// Dati preventivi
-const preventivi = ref([
-  {
-    id: 1,
-    numero: 'PRV-2024-001',
-    cliente: 'Famiglia Rossi',
-    contatto: 'mario.rossi@email.com',
-    progetto: 'Tetto Villa Rossi',
-    tipoLavoro: 'Rifacimento Completo',
-    importo: 85000,
-    dataInvio: '2024-01-10',
-    scadenza: '2024-02-10',
-    stato: 'accettato'
-  },
-  {
-    id: 2,
-    numero: 'PRV-2024-002',
-    cliente: 'Industrie SpA',
-    contatto: 'info@industriespa.it',
-    progetto: 'Copertura Capannone',
-    tipoLavoro: 'Nuova Costruzione',
-    importo: 125000,
-    dataInvio: '2024-01-15',
-    scadenza: '2024-02-15',
-    stato: 'inviato'
-  },
-  {
-    id: 3,
-    numero: 'PRV-2024-003',
-    cliente: 'Comune di Verona',
-    contatto: 'tecnico@comune.verona.it',
-    progetto: 'Restauro Tetto Storico',
-    tipoLavoro: 'Restauro Conservativo',
-    importo: 75000,
-    dataInvio: '2024-01-20',
-    scadenza: '2024-02-20',
-    stato: 'bozza'
-  }
-])
+// Dati preventivi - vuoto, da caricare da Firestore
+const preventivi = ref([])
 
 // Computed
 const filteredPreventivi = computed(() => {

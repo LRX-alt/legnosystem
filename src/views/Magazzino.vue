@@ -432,9 +432,9 @@ const selectedCategory = ref('')
 
 // Stats
 const stats = ref({
-  totaleArticoli: 156,
-  valoreTotale: 125000,
-  sottoScorta: 8
+  totaleArticoli: 0,
+  valoreTotale: 0,
+  sottoScorta: 0
 })
 
 // Nuovo materiale
@@ -462,53 +462,8 @@ const editingMateriale = ref({
   scorteMinime: 0
 })
 
-// Dati materiali
-const materiali = ref([
-  {
-    id: 1,
-    codice: 'TRV001',
-    nome: 'Trave Lamellare GL24h',
-    descrizione: '160x240mm - Abete',
-    categoria: 'travi',
-    quantita: 45,
-    unita: 'pz',
-    prezzoUnitario: 85.50,
-    scorteMinime: 10
-  },
-  {
-    id: 2,
-    codice: 'TAV002',
-    nome: 'Tavole Abete',
-    descrizione: '30x150mm - Classe C24',
-    categoria: 'tavole',
-    quantita: 120,
-    unita: 'm²',
-    prezzoUnitario: 45.00,
-    scorteMinime: 50
-  },
-  {
-    id: 3,
-    codice: 'ISO003',
-    nome: 'Isolante Termico',
-    descrizione: 'Lana di roccia 10cm',
-    categoria: 'isolanti',
-    quantita: 5,
-    unita: 'm²',
-    prezzoUnitario: 12.50,
-    scorteMinime: 20
-  },
-  {
-    id: 4,
-    codice: 'VIT004',
-    nome: 'Viti per Legno',
-    descrizione: '6x120mm Torx',
-    categoria: 'ferramenta',
-    quantita: 2500,
-    unita: 'pz',
-    prezzoUnitario: 0.35,
-    scorteMinime: 1000
-  }
-])
+// Dati materiali - inizialmente vuoto, caricato da Firestore
+const materiali = ref([])
 
 // Computed
 const filteredMateriali = computed(() => {
