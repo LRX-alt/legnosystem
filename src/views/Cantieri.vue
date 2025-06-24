@@ -115,7 +115,7 @@
         <!-- Header Card -->
         <div class="flex items-start justify-between mb-4">
           <div class="flex-1">
-            <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ cantiere.nome }}</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ cantiere.nome || 'Cantiere senza nome' }}</h3>
             <p class="text-sm text-gray-600">{{ cantiere.cliente }}</p>
             <p class="text-xs text-gray-500">{{ cantiere.indirizzo }}</p>
           </div>
@@ -2364,6 +2364,13 @@ const closeModal = () => {
 }
 
 const editCantiere = (cantiere) => {
+  // Verifica che il cantiere sia valido prima di copiarlo
+  if (!cantiere || !cantiere.id || !cantiere.nome) {
+    const { error } = useToast()
+    error('Errore: cantiere non valido per la modifica!', '❌ Errore Validazione')
+    return
+  }
+  
   editingCantiere.value = { ...cantiere }
   showEditModal.value = true
 }
@@ -2376,16 +2383,28 @@ const closeEditModal = () => {
 const saveCantiereChanges = async () => {
   const { success, error } = useToast()
   
+  // Verifica che editingCantiere sia valido
+  if (!editingCantiere.value || !editingCantiere.value.id || !editingCantiere.value.nome) {
+    error('Errore: cantiere non valido per il salvataggio!', '❌ Errore Validazione')
+    return
+  }
+  
   try {
     // Aggiorna in Firestore
     const result = await firestoreStore.updateDocument('cantieri', editingCantiere.value.id, editingCantiere.value)
     
     if (result.success) {
+      // SALVA IL NOME PRIMA di chiamare closeEditModal()
+      const nomeCantiereAggiornato = editingCantiere.value.nome
+      
       // Ricarica i cantieri per aggiornare la lista
       await firestoreStore.loadCantieri()
-  
-  closeEditModal()
-      success(`Cantiere "${editingCantiere.value.nome}" aggiornato con successo!`, '✅ Cantiere Aggiornato')
+      
+      // Chiudi modal (questo setta editingCantiere.value = null)
+      closeEditModal()
+      
+      // Ora usa il nome salvato invece di editingCantiere.value.nome
+      success(`Cantiere "${nomeCantiereAggiornato}" aggiornato con successo!`, '✅ Cantiere Aggiornato')
     } else {
       throw new Error(result.error || 'Errore sconosciuto')
     }
@@ -2399,9 +2418,15 @@ const saveCantiereChanges = async () => {
 const deleteCantiere = async (cantiere) => {
   const { success, error } = useToast()
   
+  // Verifica che il cantiere sia valido
+  if (!cantiere || !cantiere.id) {
+    error('Errore: cantiere non valido!', '❌ Errore Validazione')
+    return
+  }
+
   // Conferma eliminazione
   const conferma = confirm(
-    `⚠️ ATTENZIONE: Sei sicuro di voler eliminare il cantiere "${cantiere.nome}"?\n\n` +
+    `⚠️ ATTENZIONE: Sei sicuro di voler eliminare il cantiere "${cantiere.nome || 'Senza nome'}"?\n\n` +
     `🔴 Questa operazione:\n` +
     `• Eliminerà il cantiere definitivamente\n` +
     `• Rimuoverà tutti i materiali associati\n` +
@@ -2445,7 +2470,7 @@ const deleteCantiere = async (cantiere) => {
         closeModal()
       }
       
-      success(`Cantiere "${cantiere.nome}" eliminato con successo`, '🗑️ Cantiere Eliminato')
+      success(`Cantiere "${cantiere.nome || 'Senza nome'}" eliminato con successo`, '🗑️ Cantiere Eliminato')
     } else {
       throw new Error(result.error || 'Errore sconosciuto')
     }
@@ -2456,6 +2481,13 @@ const deleteCantiere = async (cantiere) => {
 }
 
 const updateProgress = (cantiere) => {
+  // Verifica che il cantiere sia valido
+  if (!cantiere || !cantiere.id) {
+    const { error } = useToast()
+    error('Errore: cantiere non valido!', '❌ Errore Validazione')
+    return
+  }
+
   selectedCantiere.value = cantiere
   
   // Reset form con valori di default
@@ -2553,6 +2585,13 @@ const getProgressHistory = (cantiereId) => {
 }
 
 const viewMaterials = (cantiere) => {
+  // Verifica che il cantiere sia valido
+  if (!cantiere || !cantiere.id) {
+    const { error } = useToast()
+    error('Errore: cantiere non valido!', '❌ Errore Validazione')
+    return
+  }
+
   selectedCantiere.value = cantiere
   materialiCantiere.value = getMaterialsByCantiere(cantiere.id)
   showMaterialsModal.value = true

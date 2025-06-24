@@ -99,7 +99,7 @@
       <!-- Cantieri Overview - Mobile Optimized -->
       <div class="card">
         <div class="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4">
-          <h3 class="text-lg font-semibold text-gray-900">Cantieri in Corso</h3>
+          <h3 class="text-lg font-semibold text-gray-900">Cantieri Attivi</h3>
           <router-link to="/cantieri" class="text-primary-600 hover:text-primary-700 text-sm font-medium self-start sm:self-auto">
             Vedi tutti →
           </router-link>
@@ -284,23 +284,23 @@ const firestoreStore = useFirestoreStore()
 
 // KPI Data - Calcolati dinamicamente dai dati Firestore
 const kpis = computed(() => ({
-  cantieriAttivi: firestoreStore.cantieri.filter(c => c.stato === 'in_corso').length,
+  cantieriAttivi: firestoreStore.cantieri.filter(c => c.stato === 'in_corso' || c.stato === 'pianificato' || c.stato === 'in-corso').length,
   valoreMagazzino: firestoreStore.materiali.reduce((total, m) => total + (m.prezzo_unitario * m.quantita), 0),
   oreLavorate: firestoreStore.dipendenti.reduce((total, d) => total + (d.ore_settimana || 0), 0),
   mezziDisponibili: firestoreStore.mezzi.filter(m => m.stato === 'disponibile').length
 }))
 
-// Cantieri attivi - Filtrati da Firestore (primi 3)
+// Cantieri attivi - Filtrati da Firestore (primi 3) - Include pianificati e in corso
 const cantieri = computed(() => 
   firestoreStore.cantieri
-    .filter(c => c.stato === 'in_corso')
+    .filter(c => c.stato === 'in_corso' || c.stato === 'pianificato' || c.stato === 'in-corso')
     .slice(0, 3)
     .map(c => ({
       id: c.id,
       nome: c.nome,
       cliente: c.cliente,
       progresso: c.progresso || 0,
-      scadenza: c.data_fine ? new Date(c.data_fine.seconds * 1000).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : 'N/D'
+      scadenza: c.scadenza ? new Date(c.scadenza).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) : 'N/D'
     }))
 )
 
