@@ -2130,10 +2130,10 @@ import {
   TrashIcon
 } from '@heroicons/vue/24/outline'
 import { useToast } from '@/composables/useToast'
-import { useFirestoreStore } from '@/stores/firestore'
+import { useFirestore } from '@/composables/useFirestore'
 
-// Store Firestore
-const firestoreStore = useFirestoreStore()
+// Firestore operations with validation and error handling
+const firestore = useFirestore()
 
 // Stato della pagina
 const showDetailModal = ref(false)
@@ -2218,6 +2218,10 @@ const stats = computed(() => {
     }).length
   }
 })
+
+// Import diretto dal Firestore store per dati reattivi
+import { useFirestoreStore } from '@/stores/firestore'
+const firestoreStore = useFirestoreStore()
 
 // Dati da Firestore - computed per reattività
 const cantieri = computed(() => firestoreStore.cantieri)
@@ -2390,27 +2394,22 @@ const saveCantiereChanges = async () => {
   }
   
   try {
-    // Aggiorna in Firestore
-    const result = await firestoreStore.updateDocument('cantieri', editingCantiere.value.id, editingCantiere.value)
+    // SALVA IL NOME PRIMA di chiamare l'API per evitare errori
+    const nomeCantiereAggiornato = editingCantiere.value.nome
     
-    if (result.success) {
-      // SALVA IL NOME PRIMA di chiamare closeEditModal()
-      const nomeCantiereAggiornato = editingCantiere.value.nome
-      
-      // Ricarica i cantieri per aggiornare la lista
-      await firestoreStore.loadCantieri()
-      
-      // Chiudi modal (questo setta editingCantiere.value = null)
-      closeEditModal()
-      
-      // Ora usa il nome salvato invece di editingCantiere.value.nome
-      success(`Cantiere "${nomeCantiereAggiornato}" aggiornato con successo!`, '✅ Cantiere Aggiornato')
-    } else {
-      throw new Error(result.error || 'Errore sconosciuto')
-    }
+    // Aggiorna usando il composable con validazione
+    await firestore.cantieri.update(editingCantiere.value.id, editingCantiere.value)
+    
+    // Ricarica i cantieri per aggiornare la lista
+    await firestore.cantieri.load()
+    
+    // Chiudi modal
+    closeEditModal()
+    
+    success(`Cantiere "${nomeCantiereAggiornato}" aggiornato con successo!`, '✅ Cantiere Aggiornato')
   } catch (err) {
+    // L'errore è già gestito dal composable, ma possiamo aggiungere logica specifica
     console.error('Errore aggiornamento cantiere:', err)
-    error(`Errore nell'aggiornamento del cantiere: ${err.message}`, '❌ Errore Aggiornamento')
   }
 }
 
@@ -2438,45 +2437,41 @@ const deleteCantiere = async (cantiere) => {
   if (!conferma) return
   
   try {
-    // Elimina da Firestore
-    const result = await firestoreStore.deleteDocument('cantieri', cantiere.id)
+    // Elimina usando il composable con gestione errori
+    await firestore.cantieri.delete(cantiere.id)
     
-    if (result.success) {
-      // Ricarica i cantieri per aggiornare la lista
-      await firestoreStore.loadCantieri()
-      
-      // Pulisci dati locali associati
-      delete cantieriAttachments.value[cantiere.id]
-      delete cantieriProgressHistory.value[cantiere.id]
-      
-      // Rimuovi materiali del cantiere dal localStorage
-      const stored = localStorage.getItem('legnosystem_materiali_cantieri')
-      if (stored) {
-        try {
-          const materialiCantieriData = JSON.parse(stored)
-          delete materialiCantieriData[cantiere.id]
-          localStorage.setItem('legnosystem_materiali_cantieri', JSON.stringify(materialiCantieriData))
-        } catch (e) {
-          console.warn('Errore nella pulizia materiali cantiere:', e)
-        }
+    // Ricarica i cantieri per aggiornare la lista
+    await firestore.cantieri.load()
+    
+    // Pulisci dati locali associati
+    delete cantieriAttachments.value[cantiere.id]
+    delete cantieriProgressHistory.value[cantiere.id]
+    
+    // Rimuovi materiali del cantiere dal localStorage
+    const stored = localStorage.getItem('legnosystem_materiali_cantieri')
+    if (stored) {
+      try {
+        const materialiCantieriData = JSON.parse(stored)
+        delete materialiCantieriData[cantiere.id]
+        localStorage.setItem('legnosystem_materiali_cantieri', JSON.stringify(materialiCantieriData))
+      } catch (e) {
+        console.warn('Errore nella pulizia materiali cantiere:', e)
       }
-      
-      // Salva modifiche al localStorage
-      saveAttachmentsToStorage()
-      localStorage.setItem('legnosystem_progress_history', JSON.stringify(cantieriProgressHistory.value))
-      
-      // Chiudi modal se è quello eliminato
-      if (selectedCantiere.value?.id === cantiere.id) {
-        closeModal()
-      }
-      
-      success(`Cantiere "${cantiere.nome || 'Senza nome'}" eliminato con successo`, '🗑️ Cantiere Eliminato')
-    } else {
-      throw new Error(result.error || 'Errore sconosciuto')
     }
+    
+    // Salva modifiche al localStorage
+    saveAttachmentsToStorage()
+    localStorage.setItem('legnosystem_progress_history', JSON.stringify(cantieriProgressHistory.value))
+    
+    // Chiudi modal se è quello eliminato
+    if (selectedCantiere.value?.id === cantiere.id) {
+      closeModal()
+    }
+    
+    success(`Cantiere "${cantiere.nome || 'Senza nome'}" eliminato con successo`, '🗑️ Cantiere Eliminato')
   } catch (err) {
+    // L'errore è già gestito dal composable
     console.error('Errore eliminazione cantiere:', err)
-    error(`Errore nell'eliminazione del cantiere: ${err.message}`, '❌ Errore Eliminazione')
   }
 }
 
@@ -2515,6 +2510,12 @@ const closeProgressModal = () => {
 const saveProgressUpdate = async () => {
   const { success, error } = useToast()
   
+  // Verifica che selectedCantiere sia valido
+  if (!selectedCantiere.value || !selectedCantiere.value.id) {
+    error('Errore: cantiere non valido per aggiornamento progresso!', '❌ Errore Validazione')
+    return
+  }
+  
   if (!progressUpdate.value.fase) {
     error('Inserisci il nome della fase completata!')
     return
@@ -2526,11 +2527,11 @@ const saveProgressUpdate = async () => {
   }
 
   try {
-  const nuovoProgresso = Math.min(selectedCantiere.value.progresso + progressUpdate.value.incremento, 100)
-  const progressoPrecedente = selectedCantiere.value.progresso
+    const nuovoProgresso = Math.min(selectedCantiere.value.progresso + progressUpdate.value.incremento, 100)
+    const progressoPrecedente = selectedCantiere.value.progresso
   
-    // Aggiorna in Firestore
-    const result = await firestoreStore.updateCantiereProgress(selectedCantiere.value.id, {
+    // Aggiorna progresso usando il composable
+    await firestore.cantieri.updateProgress(selectedCantiere.value.id, {
       nuovoProgresso,
       progressoPrecedente,
       fase: progressUpdate.value.fase,
@@ -2539,28 +2540,24 @@ const saveProgressUpdate = async () => {
       incremento: progressUpdate.value.incremento
     })
     
-         if (result.success) {
-       // Ricarica i cantieri per aggiornare la lista
-       await firestoreStore.loadCantieri()
-       
-       // Salva aggiornamento nello storico locale
-  saveProgressToHistory(selectedCantiere.value.id, {
-    ...progressUpdate.value,
-    progressoPrecedente,
-    nuovoProgresso,
-    timestamp: new Date().toISOString()
-  })
-  
-  closeProgressModal()
-  
-  // Messaggio di successo
-  if (nuovoProgresso === 100) {
-    success(`🎉 Cantiere completato al 100%! "${progressUpdate.value.fase}" è stata l'ultima fase.`, '✅ Progetto Completato')
-  } else {
-    success(`Progresso aggiornato a ${nuovoProgresso}% (+${progressUpdate.value.incremento}%)`, '📊 Progresso Aggiornato')
-       }
-     } else {
-      throw new Error(result.error || 'Errore sconosciuto')
+    // Ricarica i cantieri per aggiornare la lista
+    await firestore.cantieri.load()
+     
+    // Salva aggiornamento nello storico locale
+    saveProgressToHistory(selectedCantiere.value.id, {
+      ...progressUpdate.value,
+      progressoPrecedente,
+      nuovoProgresso,
+      timestamp: new Date().toISOString()
+    })
+
+    closeProgressModal()
+
+    // Messaggio di successo
+    if (nuovoProgresso === 100) {
+      success(`🎉 Cantiere completato al 100%! "${progressUpdate.value.fase}" è stata l'ultima fase.`, '✅ Progetto Completato')
+    } else {
+      success(`Progresso aggiornato a ${nuovoProgresso}% (+${progressUpdate.value.incremento}%)`, '📊 Progresso Aggiornato')
     }
   } catch (err) {
     console.error('Errore aggiornamento progresso:', err)
@@ -2663,13 +2660,10 @@ const saveNewCantiere = async () => {
       ultimoContatto: new Date().toISOString().split('T')[0]
     }
     
-      const clienteResult = await firestoreStore.createCliente(nuovoCliente)
-      if (!clienteResult.success) {
-        throw new Error('Errore nella creazione del cliente: ' + clienteResult.error)
-      }
+      await firestore.clienti.create(nuovoCliente)
       
       // Ricarica i clienti per aggiornare la lista
-      await firestoreStore.loadClienti()
+      await firestore.clienti.load()
       
       console.log('✅ Nuovo cliente aggiunto all\'anagrafica Firestore:', nuovoCliente.nome)
     }
@@ -2682,41 +2676,37 @@ const saveNewCantiere = async () => {
     fasi: []
   }
   
-    const result = await firestoreStore.createCantiere(cantiereData)
+    await firestore.cantieri.create(cantiereData)
     
-    if (result.success) {
-      // Ricarica i cantieri per aggiornare la lista
-      await firestoreStore.loadCantieri()
-      
-      // Mostra toast di successo
-  const tipoClienteText = clientSelectionMode.value === 'new' ? 'nuovo cliente aggiunto' : 'cliente esistente'
-      success(`Cantiere "${nomeCantiere}" creato con successo! Cliente: ${newCantiere.value.cliente} (${tipoClienteText})`, '🏗️ Cantiere Creato')
+    // Ricarica i cantieri per aggiornare la lista
+    await firestore.cantieri.load()
+    
+    // Mostra toast di successo
+    const tipoClienteText = clientSelectionMode.value === 'new' ? 'nuovo cliente aggiunto' : 'cliente esistente'
+    success(`Cantiere "${nomeCantiere}" creato con successo! Cliente: ${newCantiere.value.cliente} (${tipoClienteText})`, '🏗️ Cantiere Creato')
 
-  // Reset form
-  newCantiere.value = {
-    nome: '',
-    cliente: '',
-    clienteTipo: 'privato',
-    clienteEmail: '',
-    clienteTelefono: '',
-    clienteIndirizzo: '',
-    indirizzo: '',
-    tipoLavoro: '',
-    valore: 0,
-    dataInizio: '',
-    scadenza: '',
-    stato: 'pianificato',
-    priorita: 'media'
-  }
-  
-  // Reset selezione cliente
-  clientSelectionMode.value = 'existing'
-  selectedClientFromList.value = ''
-
-  closeAddModal()
-    } else {
-      throw new Error(result.error || 'Errore sconosciuto nella creazione del cantiere')
+    // Reset form
+    newCantiere.value = {
+      nome: '',
+      cliente: '',
+      clienteTipo: 'privato',
+      clienteEmail: '',
+      clienteTelefono: '',
+      clienteIndirizzo: '',
+      indirizzo: '',
+      tipoLavoro: '',
+      valore: 0,
+      dataInizio: '',
+      scadenza: '',
+      stato: 'pianificato',
+      priorita: 'media'
     }
+    
+    // Reset selezione cliente
+    clientSelectionMode.value = 'existing'
+    selectedClientFromList.value = ''
+
+    closeAddModal()
   } catch (err) {
     console.error('Errore creazione cantiere:', err)
     error(`Errore nella creazione del cantiere: ${err.message}`, '❌ Errore Creazione')
@@ -2804,35 +2794,48 @@ const removeMemberFromTeam = (memberId) => {
 const saveTeamChanges = async () => {
   const { success, error } = useToast()
   
+  // Verifica che selectedCantiere sia valido
+  if (!selectedCantiere.value || !selectedCantiere.value.id) {
+    error('Errore: cantiere non valido per l\'aggiornamento team!', '❌ Errore Validazione')
+    return
+  }
+  
+  // Salva il nome prima di potenziali modifiche
+  const nomeCantiereTeam = selectedCantiere.value.nome || 'Cantiere senza nome'
+  
   try {
-    // Aggiorna in Firestore
-    const result = await firestoreStore.updateDocument('cantieri', selectedCantiere.value.id, selectedCantiere.value)
+    // Aggiorna usando il composable con validazione
+    await firestore.cantieri.update(selectedCantiere.value.id, selectedCantiere.value)
     
-         if (result.success) {
-       // Ricarica i cantieri per aggiornare la lista
-       await firestoreStore.loadCantieri()
-  
-  // Aggiorna i dipendenti con i nuovi cantieri assegnati
-  updateEmployeeAssignments()
-  
-  closeTeamModal()
-       success(`Team del cantiere "${selectedCantiere.value.nome}" aggiornato con successo!`, '👥 Team Aggiornato')
-     } else {
-      throw new Error(result.error || 'Errore sconosciuto')
-    }
+    // Ricarica i cantieri per aggiornare la lista
+    await firestore.cantieri.load()
+
+    // Aggiorna i dipendenti con i nuovi cantieri assegnati
+    updateEmployeeAssignments()
+
+    closeTeamModal()
+    success(`Team del cantiere "${nomeCantiereTeam}" aggiornato con successo!`, '👥 Team Aggiornato')
   } catch (err) {
+    // L'errore è già gestito dal composable
     console.error('Errore aggiornamento team:', err)
-    error(`Errore nell'aggiornamento del team: ${err.message}`, '❌ Errore Aggiornamento')
   }
 }
 
 const updateEmployeeAssignments = () => {
+  // Verifica che selectedCantiere sia ancora valido
+  if (!selectedCantiere.value || !selectedCantiere.value.id) {
+    console.warn('⚠️ updateEmployeeAssignments: selectedCantiere non valido')
+    return
+  }
+  
+  const nomeCantiereAssegnazione = selectedCantiere.value.nome || 'Cantiere senza nome'
+  
   // Aggiorna le assegnazioni dei dipendenti
   dipendentiDisponibili.value.forEach(dipendente => {
     const isAssigned = selectedCantiere.value.team?.some(membro => membro.id === dipendente.id)
     if (isAssigned) {
-      dipendente.cantiereAttuale = selectedCantiere.value.nome
-    } else if (dipendente.cantiereAttuale === selectedCantiere.value.nome) {
+      dipendente.cantiereAttuale = nomeCantiereAssegnazione
+    } else if (dipendente.cantiereAttuale === nomeCantiereAssegnazione) {
       dipendente.cantiereAttuale = null
     }
   })
@@ -2868,7 +2871,7 @@ const closeAttachmentsModal = () => {
 }
 
 const getAttachments = () => {
-  if (!selectedCantiere.value) return []
+  if (!selectedCantiere.value || !selectedCantiere.value.id) return []
   return cantieriAttachments.value[selectedCantiere.value.id] || []
 }
 
@@ -2926,6 +2929,11 @@ const downloadFile = (file) => {
 }
 
 const deleteFile = (file) => {
+  if (!selectedCantiere.value || !selectedCantiere.value.id) {
+    alert('❌ Errore: cantiere non valido!')
+    return
+  }
+  
   if (confirm(`🗑️ Sei sicuro di voler eliminare "${file.name}"?`)) {
     const cantiereId = selectedCantiere.value.id
     if (cantieriAttachments.value[cantiereId]) {
@@ -2939,6 +2947,11 @@ const deleteFile = (file) => {
 const handleFileUpload = async (event) => {
   const files = Array.from(event.target.files)
   if (!files.length) return
+  
+  if (!selectedCantiere.value || !selectedCantiere.value.id) {
+    alert('❌ Errore: cantiere non valido per upload!')
+    return
+  }
   
   const cantiereId = selectedCantiere.value.id
   
@@ -3696,15 +3709,9 @@ onMounted(async () => {
   // Carica allegati materiali dal localStorage solo al mount del componente
   loadMaterialAttachmentsFromStorage()
   
-  // Carica tutti i dati da Firestore
+  // Carica tutti i dati da Firestore usando il composable con gestione errori
   try {
-    await Promise.all([
-      firestoreStore.loadCantieri(),
-      firestoreStore.loadDipendenti(),
-      firestoreStore.loadMateriali(),
-      firestoreStore.loadFornitori(),
-      firestoreStore.loadClienti()
-    ])
+    await firestore.loadAllData()
   } catch (error) {
     console.error('Errore nel caricamento dati Cantieri:', error)
   }

@@ -70,6 +70,8 @@ export const firestoreConfig = {
     cantieri: 'cantieri',
     cantieriProgress: 'cantieriProgress',
     cantieriAttachments: 'cantieriAttachments',
+    cantieri_allegati: 'cantieri_allegati',
+    materiali_cantieri: 'materiali_cantieri',
     
     // 👤 Gestione clienti
     clienti: 'clienti',

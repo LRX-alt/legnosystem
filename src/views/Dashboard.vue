@@ -278,9 +278,12 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useFirestoreStore } from '@/stores/firestore'
+import { useFirestore } from '@/composables/useFirestore'
 
-// Firestore store
+// Firestore store per dati reattivi
 const firestoreStore = useFirestoreStore()
+// Firestore composable per operazioni
+const firestore = useFirestore()
 
 // KPI Data - Calcolati dinamicamente dai dati Firestore
 const kpis = computed(() => ({
@@ -364,15 +367,9 @@ onMounted(async () => {
     minute: '2-digit'
   })
   
-  // Carica tutti i dati da Firestore
+  // Carica tutti i dati da Firestore usando il composable con gestione errori
   try {
-    await Promise.all([
-      firestoreStore.loadCantieri(),
-      firestoreStore.loadClienti(),
-      firestoreStore.loadMateriali(),
-      firestoreStore.loadDipendenti(),
-      firestoreStore.loadMezzi()
-    ])
+    await firestore.loadAllData()
   } catch (error) {
     console.error('Errore nel caricamento dati dashboard:', error)
   }

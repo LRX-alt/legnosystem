@@ -374,6 +374,54 @@ export const useFirestoreStore = defineStore('firestore', () => {
     return result
   }
 
+  // 📦 Metodi per Materiali Cantieri (Nuovi per migrare da localStorage)
+  
+  const loadMaterialiCantiere = async (cantiereId) => {
+    const filters = [{ field: 'cantiereId', operator: '==', value: cantiereId }]
+    return await loadCollection('materiali_cantieri', filters)
+  }
+
+  const createMaterialeCantiere = async (cantiereId, materialeData) => {
+    const data = {
+      ...materialeData,
+      cantiereId,
+      stato: 'richiesto',
+      dataRichiesta: serverTimestamp()
+    }
+    return await createDocument('materiali_cantieri', data)
+  }
+
+  const updateMaterialeCantiere = async (materialeId, updateData) => {
+    return await updateDocument('materiali_cantieri', materialeId, {
+      ...updateData,
+      updatedAt: serverTimestamp()
+    })
+  }
+
+  const deleteMaterialeCantiere = async (materialeId) => {
+    return await deleteDocument('materiali_cantieri', materialeId)
+  }
+
+  // 📎 Metodi per Allegati (Nuovi per migrare da localStorage)
+  
+  const loadAllegatiCantiere = async (cantiereId) => {
+    const filters = [{ field: 'cantiereId', operator: '==', value: cantiereId }]
+    return await loadCollection('cantieri_allegati', filters)
+  }
+
+  const createAllegatoCantiere = async (cantiereId, allegatoData) => {
+    const data = {
+      ...allegatoData,
+      cantiereId,
+      uploadedAt: serverTimestamp()
+    }
+    return await createDocument('cantieri_allegati', data)
+  }
+
+  const deleteAllegatoCantiere = async (allegatoId) => {
+    return await deleteDocument('cantieri_allegati', allegatoId)
+  }
+
   // 🔔 Metodi per Notifiche
   
   const loadNotifications = async (userId) => {
@@ -611,6 +659,19 @@ export const useFirestoreStore = defineStore('firestore', () => {
     loadFornitori,
     createFornitore,
     loadMezzi,
+    
+    // Nuovi metodi per Materiali Cantieri
+    loadMaterialiCantiere,
+    createMaterialeCantiere,
+    updateMaterialeCantiere,
+    deleteMaterialeCantiere,
+    
+    // Nuovi metodi per Allegati
+    loadAllegatiCantiere,
+    createAllegatoCantiere,
+    deleteAllegatoCantiere,
+    
+    // Notifiche e Utils
     loadNotifications,
     createNotification,
     markNotificationAsRead,
