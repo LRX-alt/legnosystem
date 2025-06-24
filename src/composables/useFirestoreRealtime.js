@@ -5,7 +5,7 @@ import {
   onSnapshot, 
   query, 
   where, 
-  orderBy, 
+  orderBy as firestoreOrderBy, 
   limit,
   getDocs
 } from 'firebase/firestore'
@@ -54,8 +54,8 @@ export const useFirestoreRealtime = () => {
       })
       
       // Applica ordinamento
-      orderBys.forEach(orderBy => {
-        q = query(q, orderBy(orderBy.field, orderBy.direction || 'asc'))
+      orderBys.forEach(orderConfig => {
+        q = query(q, firestoreOrderBy(orderConfig.field, orderConfig.direction || 'asc'))
       })
       
       // Applica limite
