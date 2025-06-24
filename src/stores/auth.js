@@ -45,7 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Inizializza il listener di autenticazione
    */
-  const initAuth = () => {
+  const initializeAuth = () => {
     return new Promise((resolve) => {
       const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         loading.value = true
@@ -408,8 +408,8 @@ export const useAuthStore = defineStore('auth', () => {
     canManagePersonnel,
     canViewFinancials,
     
-    // Methods
-    initAuth,
+         // Methods
+     initializeAuth,
     login,
     register,
     logout,
