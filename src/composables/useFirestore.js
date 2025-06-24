@@ -109,26 +109,50 @@ export const useFirestore = () => {
     }
   }
 
-  // 📎 Operazioni Allegati con error handling
+  // 📎 Operazioni Allegati Cantieri con error handling
   const allegatiOperations = {
     async load(cantiereId) {
       return withErrorHandling(
         () => firestoreStore.loadAllegatiCantiere(cantiereId),
-        'Caricamento allegati'
+        'Caricamento allegati cantiere'
       )
     },
 
     async create(cantiereId, data) {
       return withErrorHandling(
         () => firestoreStore.createAllegatoCantiere(cantiereId, data),
-        'Salvataggio allegato'
+        'Salvataggio allegato cantiere'
       )
     },
 
     async delete(id) {
       return withErrorHandling(
         () => firestoreStore.deleteAllegatoCantiere(id),
-        'Eliminazione allegato'
+        'Eliminazione allegato cantiere'
+      )
+    }
+  }
+
+  // 📎 Operazioni Allegati Materiali con error handling
+  const allegatiMaterialiOperations = {
+    async load(materialeId) {
+      return withErrorHandling(
+        () => firestoreStore.loadAllegatiMateriale(materialeId),
+        'Caricamento allegati materiale'
+      )
+    },
+
+    async create(materialeId, data) {
+      return withErrorHandling(
+        () => firestoreStore.createAllegatoMateriale(materialeId, data),
+        'Salvataggio allegato materiale'
+      )
+    },
+
+    async delete(id) {
+      return withErrorHandling(
+        () => firestoreStore.deleteAllegatoMateriale(id),
+        'Eliminazione allegato materiale'
       )
     }
   }
@@ -231,6 +255,7 @@ export const useFirestore = () => {
     cantieri: cantieriOperations,
     materialiCantiere: materialiCantiereOperations,
     allegati: allegatiOperations,
+    allegatiMateriali: allegatiMaterialiOperations,
     clienti: clientiOperations,
     dipendenti: dipendentiOperations,
     

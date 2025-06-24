@@ -422,6 +422,26 @@ export const useFirestoreStore = defineStore('firestore', () => {
     return await deleteDocument('cantieri_allegati', allegatoId)
   }
 
+  // 📎 Metodi per Allegati Materiali (Nuovi per migrare da localStorage)
+  
+  const loadAllegatiMateriale = async (materialeId) => {
+    const filters = [{ field: 'materialeId', operator: '==', value: materialeId }]
+    return await loadCollection('materiali_allegati', filters)
+  }
+
+  const createAllegatoMateriale = async (materialeId, allegatoData) => {
+    const data = {
+      ...allegatoData,
+      materialeId,
+      uploadedAt: serverTimestamp()
+    }
+    return await createDocument('materiali_allegati', data)
+  }
+
+  const deleteAllegatoMateriale = async (allegatoId) => {
+    return await deleteDocument('materiali_allegati', allegatoId)
+  }
+
   // 🔔 Metodi per Notifiche
   
   const loadNotifications = async (userId) => {
@@ -670,6 +690,11 @@ export const useFirestoreStore = defineStore('firestore', () => {
     loadAllegatiCantiere,
     createAllegatoCantiere,
     deleteAllegatoCantiere,
+    
+    // Nuovi metodi per Allegati Materiali
+    loadAllegatiMateriale,
+    createAllegatoMateriale,
+    deleteAllegatoMateriale,
     
     // Notifiche e Utils
     loadNotifications,

@@ -272,6 +272,9 @@
         </ul>
       </div>
     </div>
+
+    <!-- ✅ Pannello Migrazione localStorage → Firestore -->
+    <MigrationPanel />
   </div>
 </template>
 
@@ -279,6 +282,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useFirestoreStore } from '@/stores/firestore'
 import { useFirestore } from '@/composables/useFirestore'
+import MigrationPanel from '@/components/MigrationPanel.vue'
+
+// Registra componenti
+const components = {
+  MigrationPanel
+}
 
 // Firestore store per dati reattivi
 const firestoreStore = useFirestoreStore()
