@@ -279,6 +279,9 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useFirestoreStore } from '@/stores/firestore'
+import { jsPDF } from 'jspdf'
 import { 
   PlusIcon,
   DocumentArrowDownIcon,
@@ -288,10 +291,9 @@ import {
   XMarkIcon
 } from '@heroicons/vue/24/outline'
 
-// Props
-const props = defineProps({
-  cantiereId: String
-})
+// Route e Store
+const route = useRoute()
+const firestoreStore = useFirestoreStore()
 
 // Stato reattivo
 const cantiere = ref(null)
@@ -409,35 +411,56 @@ const removeAttivita = (index) => {
   entryForm.value.attivita.splice(index, 1)
 }
 
-const saveEntry = () => {
-  const newEntryData = {
-    id: editingEntry.value?.id || Date.now(),
-    data: entryForm.value.data,
-    turno: entryForm.value.turno,
-    responsabile: entryForm.value.responsabile,
-    meteo: { ...entryForm.value.meteo },
-    attivita: entryForm.value.attivita.filter(a => a.trim()),
-    note: entryForm.value.note,
-    problemi: entryForm.value.problemiText.split('\n').filter(p => p.trim()),
-    oreTotali: entryForm.value.oreTotali,
-    team: entryForm.value.team,
-    allegati: editingEntry.value?.allegati || []
+const saveEntry = async () => {
+  if (!cantiere.value?.id) {
+    alert('❌ Errore: Cantiere non selezionato')
+    return
   }
 
-  if (editingEntry.value) {
-    const index = entries.value.findIndex(e => e.id === editingEntry.value.id)
-    entries.value[index] = newEntryData
-  } else {
-    entries.value.push(newEntryData)
-  }
+  try {
+    const entryData = {
+      data: entryForm.value.data,
+      turno: entryForm.value.turno,
+      responsabile: entryForm.value.responsabile,
+      meteo: { ...entryForm.value.meteo },
+      attivita: entryForm.value.attivita.filter(a => a.trim()),
+      note: entryForm.value.note,
+      problemi: entryForm.value.problemiText.split('\n').filter(p => p.trim()),
+      oreTotali: entryForm.value.oreTotali,
+      team: entryForm.value.team,
+      allegati: editingEntry.value?.allegati || []
+    }
 
-  closeEntryModal()
+    if (editingEntry.value) {
+      // Aggiorna registrazione esistente
+      await firestoreStore.updateRegistrazioneGiornale(editingEntry.value.id, entryData)
+    } else {
+      // Crea nuova registrazione
+      await firestoreStore.createRegistrazioneGiornale(cantiere.value.id, entryData)
+    }
+
+    // Ricarica le registrazioni
+    await loadGiornaleEntries()
+    
+    closeEntryModal()
+    
+    alert(`✅ Registrazione ${editingEntry.value ? 'aggiornata' : 'salvata'} con successo!`)
+  } catch (error) {
+    console.error('Errore nel salvataggio della registrazione:', error)
+    alert(`❌ Errore nel salvataggio: ${error.message}`)
+  }
 }
 
-const deleteEntry = (entryId) => {
+const deleteEntry = async (entryId) => {
   if (confirm('Sei sicuro di voler eliminare questa registrazione?')) {
-    const index = entries.value.findIndex(e => e.id === entryId)
-    entries.value.splice(index, 1)
+    try {
+      await firestoreStore.deleteRegistrazioneGiornale(entryId)
+      await loadGiornaleEntries()
+      alert('✅ Registrazione eliminata con successo!')
+    } catch (error) {
+      console.error('Errore nell\'eliminazione della registrazione:', error)
+      alert(`❌ Errore nell'eliminazione: ${error.message}`)
+    }
   }
 }
 
@@ -447,18 +470,275 @@ const resetFilters = () => {
 }
 
 const exportPDF = () => {
-  alert('📄 Export PDF in fase di sviluppo - includerà tutte le registrazioni filtrate')
+  if (!cantiere.value) {
+    alert('❌ Errore: Dati cantiere non disponibili per l\'esportazione')
+    return
+  }
+
+  try {
+    // Crea nuovo documento PDF
+    const doc = new jsPDF()
+    
+    // Configurazione colori
+    const primaryColor = [41, 128, 185] // Blue
+    const secondaryColor = [52, 73, 94] // Dark gray
+    const accentColor = [231, 76, 60]   // Red
+    
+    let yPosition = 20
+    
+    // Header del documento
+    doc.setFillColor(...primaryColor)
+    doc.rect(0, 0, 210, 35, 'F')
+    
+    // Logo/Titolo principale
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(20)
+    doc.setFont('helvetica', 'bold')
+    doc.text('📋 GIORNALE DI CANTIERE', 15, 20)
+    
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Legnosystem.bio - Sistema di Gestione Cantieri', 15, 28)
+    
+    // Data di generazione
+    doc.setFontSize(10)
+    const oggi = new Date().toLocaleDateString('it-IT', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+    doc.text(`Generato il: ${oggi}`, 150, 28)
+    
+    yPosition = 50
+    
+    // Informazioni cantiere
+    doc.setTextColor(...secondaryColor)
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.text('🏗️ INFORMAZIONI CANTIERE', 15, yPosition)
+    
+    yPosition += 10
+    
+    // Informazioni cantiere in formato testo
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...secondaryColor)
+    
+    const infoLines = [
+      `Nome Cantiere: ${cantiere.value.nome || 'N/A'}`,
+      `Cliente: ${cantiere.value.cliente || 'N/A'}`,
+      `Indirizzo: ${cantiere.value.indirizzo || 'N/A'}`,
+      `Tipo Lavoro: ${cantiere.value.tipoLavoro || 'N/A'}`,
+      `Stato: ${cantiere.value.stato || 'N/A'}`,
+      `Progresso: ${cantiere.value.progresso || 0}%`,
+      `Data Inizio: ${cantiere.value.dataInizio || 'N/A'}`,
+      `Scadenza: ${cantiere.value.scadenza || 'N/A'}`,
+      `Team: ${cantiere.value.team?.length ? cantiere.value.team.map(t => t.nome).join(', ') : 'Nessuno'}`
+    ]
+    
+    infoLines.forEach((line, index) => {
+      doc.text(line, 15, yPosition + (index * 8))
+    })
+    
+    yPosition += infoLines.length * 8 + 20
+    
+    // Sezione registrazioni
+    if (filteredEntries.value.length > 0) {
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.text('📝 REGISTRAZIONI GIORNALE', 15, yPosition)
+      
+      yPosition += 5
+      
+      // Info filtri applicati
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'italic')
+      doc.setTextColor(100, 100, 100)
+      let filtriText = `Registrazioni mostrate: ${filteredEntries.value.length}`
+      if (selectedDate.value) {
+        filtriText += ` | Filtro data: ${formatDate(selectedDate.value)}`
+      }
+      doc.text(filtriText, 15, yPosition)
+      
+      yPosition += 15
+      
+      // Per ogni registrazione
+      filteredEntries.value.forEach((entry, index) => {
+        // Controlla se serve una nuova pagina
+        if (yPosition > 250) {
+          doc.addPage()
+          yPosition = 20
+        }
+        
+        // Titolo registrazione
+        doc.setFontSize(12)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(...accentColor)
+        doc.text(`Registrazione ${index + 1} - ${formatDate(entry.data)}`, 15, yPosition)
+        
+        yPosition += 8
+        
+        // Dettagli registrazione in formato testo
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(...secondaryColor)
+        
+        const dettagli = [
+          `Data: ${formatDate(entry.data)}`,
+          `Turno: ${entry.turno}`,
+          `Responsabile: ${entry.responsabile}`,
+          `Ore Totali: ${entry.oreTotali}h`,
+          `Operatori: ${entry.team?.length || 0}`,
+          `Meteo: ${entry.meteo?.condizioni || 'N/A'} - ${entry.meteo?.temperatura || 'N/A'}°C`,
+          `Attività: ${entry.attivita?.join(', ') || 'Nessuna'}`,
+          `Note: ${entry.note || 'Nessuna'}`,
+          `Problemi: ${entry.problemi?.join(', ') || 'Nessuno'}`,
+          `Allegati: ${entry.allegati?.length || 0}`
+        ]
+        
+        dettagli.forEach((dettaglio, detIndex) => {
+          doc.text(dettaglio, 20, yPosition + (detIndex * 6))
+        })
+        
+        yPosition += dettagli.length * 6 + 12
+      })
+      
+    } else {
+      // Nessuna registrazione
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...accentColor)
+      doc.text('📝 REGISTRAZIONI GIORNALE', 15, yPosition)
+      
+      yPosition += 15
+      
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100, 100, 100)
+      doc.text('Nessuna registrazione presente per i filtri selezionati.', 15, yPosition)
+      
+      yPosition += 20
+    }
+    
+    // Statistiche finali
+    if (yPosition > 230) {
+      doc.addPage()
+      yPosition = 20
+    }
+    
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...secondaryColor)
+    doc.text('📊 STATISTICHE RIEPILOGATIVE', 15, yPosition)
+    
+    yPosition += 15
+    
+    const oreTotali = filteredEntries.value.reduce((total, entry) => total + (entry.oreTotali || 0), 0)
+    const operatoriCoinvolti = [...new Set(filteredEntries.value.flatMap(entry => entry.team || []))].length
+    const giorniLavorativi = filteredEntries.value.length
+    const problemiTotali = filteredEntries.value.reduce((total, entry) => total + (entry.problemi?.length || 0), 0)
+    
+    const statistiche = [
+      ['Giorni Lavorativi', giorniLavorativi],
+      ['Ore Totali Lavorate', `${oreTotali}h`],
+      ['Operatori Coinvolti', operatoriCoinvolti],
+      ['Problemi Segnalati', problemiTotali],
+      ['Media Ore/Giorno', giorniLavorativi > 0 ? `${(oreTotali / giorniLavorativi).toFixed(1)}h` : '0h'],
+      ['Allegati Totali', filteredEntries.value.reduce((total, entry) => total + (entry.allegati?.length || 0), 0)]
+    ]
+    
+    // Statistiche in formato testo
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...secondaryColor)
+    
+    statistiche.forEach((stat, index) => {
+      doc.text(`${stat[0]}: ${stat[1]}`, 15, yPosition + (index * 8))
+    })
+    
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
+      doc.setFontSize(8)
+      doc.setTextColor(100, 100, 100)
+      doc.text(
+        `Legnosystem.bio - Pagina ${i} di ${pageCount} - Generato il ${oggi}`,
+        15,
+        290
+      )
+    }
+    
+    // Salva il PDF
+    const fileName = `Giornale_Cantiere_${cantiere.value.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+    doc.save(fileName)
+    
+    // Messaggio di successo
+    alert(`📄 Export PDF completato!\n\n📋 Report include:\n• Informazioni cantiere complete\n• ${filteredEntries.value.length} registrazioni\n• ${oreTotali}h ore totali lavorate\n• Statistiche riepilogative\n\n💾 File salvato: ${fileName}`)
+    
+  } catch (error) {
+    console.error('Errore durante l\'export PDF:', error)
+    alert(`❌ Errore durante l'esportazione PDF: ${error.message}`)
+  }
 }
 
+// Watch per cambiamenti di route
+watch(() => route.params.id, async (newId) => {
+  if (newId) {
+    await loadCantiereData()
+  }
+}, { immediate: false })
+
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
   // Carica i dati del cantiere
-  loadCantiereData()
+  await loadCantiereData()
 })
 
-const loadCantiereData = () => {
-  // Carica i dati del cantiere da Firestore
-  cantiere.value = null
+const loadCantiereData = async () => {
+  try {
+    // Ottieni l'ID del cantiere dalla route
+    const cantiereId = route.params.id
+    
+    if (!cantiereId) {
+      console.error('ID cantiere non trovato nella route')
+      return
+    }
+    
+    // Carica i cantieri dal store se non sono già stati caricati
+    if (firestoreStore.cantieri.length === 0) {
+      await firestoreStore.loadCantieri()
+    }
+    
+    // Trova il cantiere specifico
+    cantiere.value = firestoreStore.cantieri.find(c => c.id === cantiereId)
+    
+    if (!cantiere.value) {
+      console.error(`Cantiere con ID ${cantiereId} non trovato`)
+    } else {
+      // Carica anche le registrazioni del giornale
+      await loadGiornaleEntries()
+    }
+  } catch (error) {
+    console.error('Errore nel caricamento del cantiere:', error)
+  }
+}
+
+const loadGiornaleEntries = async () => {
+  try {
+    const cantiereId = route.params.id
+    if (!cantiereId) return
+    
+    const result = await firestoreStore.loadGiornaleCantiere(cantiereId)
+    if (result.success) {
+      entries.value = result.data
+    } else {
+      console.error('Errore nel caricamento delle registrazioni:', result.error)
+    }
+  } catch (error) {
+    console.error('Errore nel caricamento delle registrazioni del giornale:', error)
+  }
 }
 </script>
 

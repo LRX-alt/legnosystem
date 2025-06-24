@@ -2111,6 +2111,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { 
   PlusIcon,
   BuildingOfficeIcon,
@@ -2134,6 +2135,7 @@ import { useFirestore } from '@/composables/useFirestore'
 
 // Firestore operations with validation and error handling
 const firestore = useFirestore()
+const router = useRouter()
 
 // Stato della pagina
 const showDetailModal = ref(false)
@@ -3776,7 +3778,10 @@ onMounted(async () => {
 })
 
 const openDailyLog = (cantiere) => {
-  // Naviga alla vista del giornale di cantiere
-  window.location.href = `/cantieri/${cantiere.id}/giornale`
+  // Naviga alla vista del giornale di cantiere usando Vue Router
+  router.push({ 
+    name: 'giornale-cantiere', 
+    params: { id: cantiere.id }
+  })
 }
 </script> 

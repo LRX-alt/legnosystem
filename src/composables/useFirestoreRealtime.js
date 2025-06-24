@@ -128,12 +128,7 @@ export const useFirestoreRealtime = () => {
               }
             })
 
-            // Toast per modifiche importanti (solo se non da cache)
-            if (!snapshot.metadata.fromCache && includeMetadata) {
-              if (changes.added.length > 0) {
-                toast.info(`${changes.added.length} nuovi elementi in ${collectionName}`, '🔄 Aggiornamento')
-              }
-            }
+            // Note: Toast notifications removed to avoid spam on dashboard
           } catch (error) {
             console.error('Errore processamento snapshot:', error)
             onError(error)
@@ -341,7 +336,11 @@ export const useFirestoreRealtime = () => {
   const listenToUserNotifications = (onUpdate) => {
     if (!authStore.user) return null
     
-    return listenToCollection('notifications', {
+    // TODO: Temporarily disabled until Firebase index is ready (takes a few minutes)
+    console.log('⏳ Notifications listener temporarily disabled - waiting for Firebase index')
+    return null
+    
+    /* return listenToCollection('notifications', {
       filters: [
         { field: 'recipients', operator: 'array-contains', value: authStore.user.uid },
         { field: 'read', operator: '==', value: false }
@@ -351,14 +350,9 @@ export const useFirestoreRealtime = () => {
       onData: (result) => {
         onUpdate(result.docs, result.changes)
         
-        // Toast per nuove notifiche
-        if (result.changes.added.length > 0) {
-          result.changes.added.forEach(notification => {
-            toast.info(notification.message, notification.title || 'Nuova Notifica')
-          })
-        }
+        // Note: Toast notifications removed to avoid spam
       }
-    })
+    }) */
   }
 
   /**

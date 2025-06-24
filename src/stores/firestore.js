@@ -111,8 +111,16 @@ export const useFirestoreStore = defineStore('firestore', () => {
     error.value = null
     
     try {
+      // Rimuovi campi undefined per evitare errori Firestore
+      const cleanedData = {}
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined) {
+          cleanedData[key] = data[key]
+        }
+      })
+      
       await updateDoc(doc(db, collectionName, docId), {
-        ...data,
+        ...cleanedData,
         updatedAt: serverTimestamp()
       })
       
@@ -442,6 +450,33 @@ export const useFirestoreStore = defineStore('firestore', () => {
     return await deleteDocument('materiali_allegati', allegatoId)
   }
 
+  // 📝 Metodi per Giornale Cantiere (Nuovi)
+  
+  const loadGiornaleCantiere = async (cantiereId) => {
+    const filters = [{ field: 'cantiereId', operator: '==', value: cantiereId }]
+    return await loadCollection('giornale_cantiere', filters, 'data', 'desc')
+  }
+
+  const createRegistrazioneGiornale = async (cantiereId, registrazioneData) => {
+    const data = {
+      ...registrazioneData,
+      cantiereId,
+      createdAt: serverTimestamp()
+    }
+    return await createDocument('giornale_cantiere', data)
+  }
+
+  const updateRegistrazioneGiornale = async (registrazioneId, updateData) => {
+    return await updateDocument('giornale_cantiere', registrazioneId, {
+      ...updateData,
+      updatedAt: serverTimestamp()
+    })
+  }
+
+  const deleteRegistrazioneGiornale = async (registrazioneId) => {
+    return await deleteDocument('giornale_cantiere', registrazioneId)
+  }
+
   // 🔔 Metodi per Notifiche
   
   const loadNotifications = async (userId) => {
@@ -695,6 +730,12 @@ export const useFirestoreStore = defineStore('firestore', () => {
     loadAllegatiMateriale,
     createAllegatoMateriale,
     deleteAllegatoMateriale,
+    
+    // Nuovi metodi per Giornale Cantiere
+    loadGiornaleCantiere,
+    createRegistrazioneGiornale,
+    updateRegistrazioneGiornale,
+    deleteRegistrazioneGiornale,
     
     // Notifiche e Utils
     loadNotifications,

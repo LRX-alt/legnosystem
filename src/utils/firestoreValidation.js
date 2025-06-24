@@ -69,16 +69,41 @@ export const firestoreValidation = {
         }
       }
       
+      // Sanifica i dati rimuovendo i campi undefined
+      const sanitizedData = {}
+      
+      // Copia solo i campi definiti
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined) {
+          switch (key) {
+            case 'nome':
+              sanitizedData[key] = data[key]?.trim()
+              break
+            case 'descrizione':
+              sanitizedData[key] = data[key]?.trim() || ''
+              break
+            case 'budget':
+            case 'valore':
+              sanitizedData[key] = data[key] ? parseFloat(data[key]) : 0
+              break
+            case 'progresso':
+              sanitizedData[key] = data[key] ? parseFloat(data[key]) : data[key]
+              break
+            case 'cliente':
+            case 'indirizzo':
+            case 'tipoLavoro':
+              sanitizedData[key] = data[key]?.trim()
+              break
+            default:
+              sanitizedData[key] = data[key]
+          }
+        }
+      })
+      
       return {
         isValid: errors.length === 0,
         errors,
-        sanitizedData: errors.length === 0 ? {
-          ...data,
-          nome: data.nome?.trim(),
-          descrizione: data.descrizione?.trim(),
-          budget: data.budget ? parseFloat(data.budget) : data.budget,
-          progresso: data.progresso ? parseFloat(data.progresso) : data.progresso
-        } : null
+        sanitizedData: errors.length === 0 ? sanitizedData : null
       }
     }
   },

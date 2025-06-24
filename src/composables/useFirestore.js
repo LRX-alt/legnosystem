@@ -2,6 +2,17 @@ import { useToast } from './useToast'
 import { useFirestoreStore } from '@/stores/firestore'
 import { validateAndSanitize } from '@/utils/firestoreValidation'
 
+// 🛡️ Helper per rimuovere campi undefined che causano errori Firestore
+const removeUndefinedFields = (obj) => {
+  const cleaned = {}
+  Object.keys(obj).forEach(key => {
+    if (obj[key] !== undefined) {
+      cleaned[key] = obj[key]
+    }
+  })
+  return cleaned
+}
+
 export const useFirestore = () => {
   const toast = useToast()
   const firestoreStore = useFirestoreStore()
@@ -50,8 +61,11 @@ export const useFirestore = () => {
     },
 
     async update(id, data) {
+      // Prima rimuovo i campi undefined per evitare errori Firestore
+      const cleanedData = removeUndefinedFields(data)
+      
       // Validazione dati prima dell'aggiornamento
-      const validation = validateAndSanitize('cantiere', 'update', data)
+      const validation = validateAndSanitize('cantiere', 'update', cleanedData)
       if (!validation.isValid) {
         toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
@@ -239,7 +253,7 @@ export const useFirestore = () => {
         }
 
         const successful = results.filter(r => r.status === 'fulfilled').length
-        toast.success(`✅ ${successful}/5 dataset caricati con successo`)
+        // Note: Removed success notification to avoid spam
 
         return { success: true, results }
       },

@@ -430,22 +430,19 @@ const startRealtimeSync = () => {
     dashboardListeners.value = realtime.startDashboardListeners({
       cantieri: (docs, changes) => {
         lastSync.value = new Date()
-        if (changes.added.length > 0 || changes.modified.length > 0) {
-          toast.info(`${changes.added.length + changes.modified.length} aggiornamenti cantieri`, '🔄 Sync')
-        }
+        // Removed toast notifications - only update silently
       },
       clienti: (docs, changes) => {
         lastSync.value = new Date()
-        if (changes.added.length > 0) {
-          toast.info(`${changes.added.length} nuovi clienti`, '👥 Clienti')
-        }
+        // Removed toast notifications - only update silently
       },
       dipendenti: (docs, changes) => {
         lastSync.value = new Date()
+        // Silent update
       },
       notifications: (docs, changes) => {
         lastSync.value = new Date()
-        // Le notifiche vengono gestite automaticamente dal composable realtime
+        // Silent update
       }
     })
 
