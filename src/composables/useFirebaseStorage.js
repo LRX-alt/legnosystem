@@ -1,174 +1,303 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { 
+  ref as storageRef, 
   uploadBytes, 
-  uploadBytesResumable, 
+  uploadBytesResumable,
   getDownloadURL, 
-  deleteObject, 
-  ref as storageRef,
-  listAll 
+  deleteObject,
+  listAll,
+  getMetadata,
+  updateMetadata
 } from 'firebase/storage'
-import { storage, storagePaths, firestoreConfig } from '@/config/firebase'
+import { storage, storagePaths } from '@/config/firebase'
+import { useToast } from '@/composables/useToast'
+import { useAuthStore } from '@/stores/auth'
 
-// Verifica se Storage è disponibile
-const isStorageAvailable = storage !== null
-
-export function useFirebaseStorage() {
-  const uploading = ref(false)
-  const downloadURL = ref(null)
+export const useFirebaseStorage = () => {
+  const toast = useToast()
+  const authStore = useAuthStore()
+  
+  // State
   const uploadProgress = ref(0)
-  const error = ref(null)
+  const isUploading = ref(false)
+  const uploadError = ref(null)
+  const currentUploadTask = ref(null)
+
+  // File validation
+  const allowedFileTypes = [
+    // Documents
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+    'text/csv',
+    
+    // Images
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    
+    // Archives
+    'application/zip',
+    'application/x-rar-compressed',
+    'application/x-7z-compressed'
+  ]
+
+  const maxFileSize = 10 * 1024 * 1024 // 10MB
+  const maxTotalSize = 100 * 1024 * 1024 // 100MB per utente
+
+  // Computed
+  const canUpload = computed(() => {
+    return authStore.isAuthenticated && !isUploading.value
+  })
 
   /**
-   * Valida il file prima dell'upload
+   * Valida un file prima dell'upload
    */
   const validateFile = (file) => {
     const errors = []
-    
-    // Controlla dimensione (max 10MB)
-    if (file.size > firestoreConfig.security.maxFileSize) {
-      errors.push(`File troppo grande. Massimo ${firestoreConfig.security.maxFileSize / 1024 / 1024}MB`)
+
+    // Controllo dimensione
+    if (file.size > maxFileSize) {
+      errors.push(`File troppo grande. Massimo ${formatFileSize(maxFileSize)}`)
     }
-    
-    // Controlla tipo file
-    const extension = file.name.split('.').pop().toLowerCase()
-    if (!firestoreConfig.security.allowedFileTypes.includes(extension)) {
-      errors.push(`Tipo file non supportato. Consentiti: ${firestoreConfig.security.allowedFileTypes.join(', ')}`)
+
+    // Controllo tipo file
+    if (!allowedFileTypes.includes(file.type)) {
+      errors.push(`Tipo file non supportato: ${file.type}`)
     }
-    
-    return errors
+
+    // Controllo nome file
+    if (file.name.length > 255) {
+      errors.push('Nome file troppo lungo (max 255 caratteri)')
+    }
+
+    // Controllo caratteri speciali nel nome
+    const invalidChars = /[<>:"/\\|?*]/
+    if (invalidChars.test(file.name)) {
+      errors.push('Nome file contiene caratteri non validi')
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    }
   }
 
   /**
-   * Carica un singolo file
+   * Upload file con progress tracking
    */
-  const uploadFile = async (file, path, metadata = {}) => {
-    // Verifica se Storage è disponibile
-    if (!isStorageAvailable) {
-      error.value = 'Firebase Storage non è configurato'
-      return { success: false, error: 'Storage non disponibile' }
+  const uploadFile = async (file, path, options = {}) => {
+    if (!authStore.isAuthenticated) {
+      throw new Error('Utente non autenticato')
     }
-    
-    // Reset stato
-    error.value = null
-    uploading.value = true
+
+    // Validazione file
+    const validation = validateFile(file)
+    if (!validation.isValid) {
+      throw new Error(validation.errors.join(', '))
+    }
+
+    // Reset state
     uploadProgress.value = 0
-    
+    isUploading.value = true
+    uploadError.value = null
+
     try {
-      // Valida file
-      const validationErrors = validateFile(file)
-      if (validationErrors.length > 0) {
-        throw new Error(validationErrors.join(', '))
-      }
-      
-      // Crea reference storage
+      // Crea riferimento storage
       const fileRef = storageRef(storage, path)
       
-      // Metadati personalizzati
-      const uploadMetadata = {
+      // Metadata
+      const metadata = {
         contentType: file.type,
         customMetadata: {
-          originalName: file.name,
+          uploadedBy: authStore.user.uid,
           uploadedAt: new Date().toISOString(),
-          ...metadata
+          originalName: file.name,
+          originalSize: file.size.toString(),
+          ...options.metadata
         }
       }
-      
+
       // Upload con progress tracking
-      const uploadTask = uploadBytesResumable(fileRef, file, uploadMetadata)
-      
+      const uploadTask = uploadBytesResumable(fileRef, file, metadata)
+      currentUploadTask.value = uploadTask
+
       return new Promise((resolve, reject) => {
         uploadTask.on('state_changed',
-          // Progress callback
+          // Progress
           (snapshot) => {
             uploadProgress.value = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
           },
-          // Error callback
-          (err) => {
-            error.value = err.message
-            uploading.value = false
-            reject(err)
+          // Error
+          (error) => {
+            console.error('Errore upload:', error)
+            uploadError.value = error.message
+            isUploading.value = false
+            currentUploadTask.value = null
+            
+            let errorMessage = 'Errore durante l\'upload'
+            switch (error.code) {
+              case 'storage/unauthorized':
+                errorMessage = 'Non autorizzato ad accedere allo storage'
+                break
+              case 'storage/canceled':
+                errorMessage = 'Upload annullato'
+                break
+              case 'storage/quota-exceeded':
+                errorMessage = 'Quota storage superata'
+                break
+              case 'storage/invalid-format':
+                errorMessage = 'Formato file non valido'
+                break
+              case 'storage/invalid-argument':
+                errorMessage = 'Argomenti upload non validi'
+                break
+              default:
+                errorMessage = error.message
+            }
+            
+            toast.error(errorMessage, '❌ Errore Upload')
+            reject(new Error(errorMessage))
           },
-          // Complete callback
+          // Complete
           async () => {
             try {
-              const url = await getDownloadURL(uploadTask.snapshot.ref)
-              downloadURL.value = url
-              uploading.value = false
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+              const metadata = await getMetadata(uploadTask.snapshot.ref)
               
-              resolve({
-                success: true,
-                url,
-                path,
+              const result = {
+                url: downloadURL,
+                path: path,
                 name: file.name,
                 size: file.size,
-                type: file.type.split('/')[1] || 'unknown'
-              })
-            } catch (err) {
-              error.value = err.message
-              uploading.value = false
-              reject(err)
+                type: file.type,
+                metadata: metadata,
+                uploadedAt: new Date().toISOString(),
+                uploadedBy: authStore.user.uid
+              }
+              
+              isUploading.value = false
+              currentUploadTask.value = null
+              uploadProgress.value = 100
+              
+              toast.success(`File "${file.name}" caricato con successo`, '✅ Upload Completato')
+              resolve(result)
+            } catch (error) {
+              reject(error)
             }
           }
         )
       })
-    } catch (err) {
-      error.value = err.message
-      uploading.value = false
-      return { success: false, error: err.message }
+    } catch (error) {
+      isUploading.value = false
+      currentUploadTask.value = null
+      console.error('Errore upload file:', error)
+      toast.error(`Errore upload: ${error.message}`)
+      throw error
     }
   }
 
   /**
-   * Carica multipli file
+   * Upload multipli file
    */
-  const uploadMultipleFiles = async (files, basePath, metadata = {}) => {
+  const uploadMultipleFiles = async (files, basePath, options = {}) => {
+    if (!Array.isArray(files)) {
+      throw new Error('Files deve essere un array')
+    }
+
     const results = []
-    const total = files.length
-    let completed = 0
-    
-    for (const file of files) {
+    const errors = []
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const filePath = `${basePath}/${Date.now()}_${file.name}`
+      
       try {
-        // Genera path unico per ogni file
-        const timestamp = Date.now()
-        const extension = file.name.split('.').pop()
-        const fileName = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-        const filePath = `${basePath}/${fileName}`
-        
-        const result = await uploadFile(file, filePath, {
-          ...metadata,
-          fileIndex: completed + 1,
-          totalFiles: total
-        })
-        
+        const result = await uploadFile(file, filePath, options)
         results.push(result)
-        completed++
-        
-        // Aggiorna progress globale
-        uploadProgress.value = (completed / total) * 100
-      } catch (err) {
-        results.push({ success: false, error: err.message, fileName: file.name })
+      } catch (error) {
+        errors.push({
+          file: file.name,
+          error: error.message
+        })
       }
     }
-    
+
+    if (errors.length > 0) {
+      console.warn('Errori upload multiplo:', errors)
+      toast.warning(`${errors.length} file non caricati`, '⚠️ Upload Parziale')
+    }
+
     return {
-      success: results.every(r => r.success),
-      results,
-      successCount: results.filter(r => r.success).length,
-      errorCount: results.filter(r => !r.success).length
+      success: results,
+      errors: errors,
+      total: files.length
     }
   }
 
   /**
-   * Elimina un file
+   * Cancella upload in corso
+   */
+  const cancelUpload = () => {
+    if (currentUploadTask.value) {
+      currentUploadTask.value.cancel()
+      currentUploadTask.value = null
+      isUploading.value = false
+      uploadProgress.value = 0
+      toast.info('Upload annullato', '🚫 Annullato')
+    }
+  }
+
+  /**
+   * Elimina file
    */
   const deleteFile = async (path) => {
+    if (!authStore.isAuthenticated) {
+      throw new Error('Utente non autenticato')
+    }
+
     try {
       const fileRef = storageRef(storage, path)
       await deleteObject(fileRef)
+      
+      toast.success('File eliminato con successo', '🗑️ File Eliminato')
       return { success: true }
-    } catch (err) {
-      console.error('Errore eliminazione file:', err)
-      return { success: false, error: err.message }
+    } catch (error) {
+      console.error('Errore eliminazione file:', error)
+      
+      let errorMessage = 'Errore durante l\'eliminazione'
+      switch (error.code) {
+        case 'storage/object-not-found':
+          errorMessage = 'File non trovato'
+          break
+        case 'storage/unauthorized':
+          errorMessage = 'Non autorizzato ad eliminare questo file'
+          break
+        default:
+          errorMessage = error.message
+      }
+      
+      toast.error(errorMessage, '❌ Errore Eliminazione')
+      throw new Error(errorMessage)
+    }
+  }
+
+  /**
+   * Ottieni URL download
+   */
+  const getFileUrl = async (path) => {
+    try {
+      const fileRef = storageRef(storage, path)
+      return await getDownloadURL(fileRef)
+    } catch (error) {
+      console.error('Errore ottenimento URL:', error)
+      throw error
     }
   }
 
@@ -177,147 +306,170 @@ export function useFirebaseStorage() {
    */
   const listFiles = async (path) => {
     try {
-      const folderRef = storageRef(storage, path)
-      const result = await listAll(folderRef)
+      const dirRef = storageRef(storage, path)
+      const result = await listAll(dirRef)
       
       const files = await Promise.all(
-        result.items.map(async (item) => {
-          const url = await getDownloadURL(item)
-          return {
-            name: item.name,
-            path: item.fullPath,
-            url
+        result.items.map(async (itemRef) => {
+          try {
+            const metadata = await getMetadata(itemRef)
+            const url = await getDownloadURL(itemRef)
+            
+            return {
+              name: itemRef.name,
+              path: itemRef.fullPath,
+              url: url,
+              size: metadata.size,
+              type: metadata.contentType,
+              metadata: metadata.customMetadata || {},
+              updatedAt: metadata.updated,
+              downloadTokens: metadata.downloadTokens
+            }
+          } catch (error) {
+            console.warn(`Errore caricamento metadata per ${itemRef.name}:`, error)
+            return {
+              name: itemRef.name,
+              path: itemRef.fullPath,
+              error: error.message
+            }
           }
         })
       )
       
-      return { success: true, files }
-    } catch (err) {
-      console.error('Errore lista file:', err)
-      return { success: false, error: err.message }
+      return files.filter(file => !file.error)
+    } catch (error) {
+      console.error('Errore lista file:', error)
+      throw error
     }
   }
 
   /**
-   * Carica allegati per cantiere
+   * Ottieni metadata file
    */
-  const uploadCantiereAttachment = async (file, cantiereId, category = 'documents') => {
-    const path = storagePaths.cantieriAttachments
-      .replace('{cantiereId}', cantiereId) + `/${category}`
-    
-    return await uploadFile(file, path, {
-      cantiereId,
-      category,
-      type: 'attachment'
-    })
-  }
-
-  /**
-   * Carica foto cantiere
-   */
-  const uploadCantierePhoto = async (file, cantiereId, fase = '') => {
-    const path = storagePaths.cantieriPhotos
-      .replace('{cantiereId}', cantiereId)
-    
-    return await uploadFile(file, path, {
-      cantiereId,
-      fase,
-      type: 'photo'
-    })
-  }
-
-  /**
-   * Carica documenti materiali
-   */
-  const uploadMaterialeDocument = async (file, materialeId, category = 'certificates') => {
-    let path
-    
-    switch (category) {
-      case 'certificates':
-        path = storagePaths.materialiCertificates.replace('{materialeId}', materialeId)
-        break
-      case 'fatture':
-        path = storagePaths.materialiFatture.replace('{materialeId}', materialeId)
-        break
-      default:
-        path = storagePaths.materialiAttachments.replace('{materialeId}', materialeId)
+  const getFileMetadata = async (path) => {
+    try {
+      const fileRef = storageRef(storage, path)
+      return await getMetadata(fileRef)
+    } catch (error) {
+      console.error('Errore metadata file:', error)
+      throw error
     }
-    
-    return await uploadFile(file, path, {
-      materialeId,
-      category,
-      type: 'document'
-    })
   }
 
   /**
-   * Carica avatar utente
+   * Aggiorna metadata file
    */
-  const uploadUserAvatar = async (file, userId) => {
-    const path = storagePaths.avatars.replace('{userId}', userId)
-    
-    // Ridimensiona immagine se necessario (opzionale)
-    return await uploadFile(file, path, {
-      userId,
-      type: 'avatar'
-    })
-  }
-
-  /**
-   * Genera URL per preview immagini
-   */
-  const getImagePreviewURL = (file) => {
-    if (file && file.type.startsWith('image/')) {
-      return URL.createObjectURL(file)
+  const updateFileMetadata = async (path, newMetadata) => {
+    try {
+      const fileRef = storageRef(storage, path)
+      return await updateMetadata(fileRef, newMetadata)
+    } catch (error) {
+      console.error('Errore aggiornamento metadata:', error)
+      throw error
     }
-    return null
   }
 
-  /**
-   * Converte file in Base64 per preview
-   */
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = reject
-      reader.readAsDataURL(file)
+  // Utilities per path storage
+  const getCantiereAttachmentsPath = (cantiereId) => 
+    storagePaths.cantieriAttachments.replace('{cantiereId}', cantiereId)
+  
+  const getCantierePhotosPath = (cantiereId) => 
+    storagePaths.cantieriPhotos.replace('{cantiereId}', cantiereId)
+  
+  const getMaterialeAttachmentsPath = (materialeId) => 
+    storagePaths.materialiAttachments.replace('{materialeId}', materialeId)
+  
+  const getPreventivoPath = (preventivoId) => 
+    storagePaths.preventivi.replace('{preventivoId}', preventivoId)
+
+  // Upload specifici per entità
+  const uploadCantiereAttachment = async (cantiereId, file, options = {}) => {
+    const path = `${getCantiereAttachmentsPath(cantiereId)}/${Date.now()}_${file.name}`
+    return await uploadFile(file, path, {
+      ...options,
+      metadata: {
+        cantiereId,
+        type: 'attachment',
+        ...options.metadata
+      }
     })
   }
 
-  /**
-   * Reset stato
-   */
-  const resetState = () => {
-    uploading.value = false
-    downloadURL.value = null
-    uploadProgress.value = 0
-    error.value = null
+  const uploadCantierePhoto = async (cantiereId, file, options = {}) => {
+    const path = `${getCantierePhotosPath(cantiereId)}/${Date.now()}_${file.name}`
+    return await uploadFile(file, path, {
+      ...options,
+      metadata: {
+        cantiereId,
+        type: 'photo',
+        ...options.metadata
+      }
+    })
+  }
+
+  const uploadMaterialeAttachment = async (materialeId, file, options = {}) => {
+    const path = `${getMaterialeAttachmentsPath(materialeId)}/${Date.now()}_${file.name}`
+    return await uploadFile(file, path, {
+      ...options,
+      metadata: {
+        materialeId,
+        type: 'attachment',
+        ...options.metadata
+      }
+    })
+  }
+
+  // Utility functions
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  const getFileIcon = (type) => {
+    if (type.startsWith('image/')) return '🖼️'
+    if (type.includes('pdf')) return '📄'
+    if (type.includes('word')) return '📝'
+    if (type.includes('excel') || type.includes('spreadsheet')) return '📊'
+    if (type.includes('zip') || type.includes('rar')) return '📦'
+    return '📁'
   }
 
   return {
     // State
-    uploading,
-    downloadURL,
     uploadProgress,
-    error,
-    
+    isUploading,
+    uploadError,
+    canUpload,
+
     // Methods
+    validateFile,
     uploadFile,
     uploadMultipleFiles,
+    cancelUpload,
     deleteFile,
+    getFileUrl,
     listFiles,
-    validateFile,
-    
-    // Specialized upload methods
+    getFileMetadata,
+    updateFileMetadata,
+
+    // Path utilities
+    getCantiereAttachmentsPath,
+    getCantierePhotosPath,
+    getMaterialeAttachmentsPath,
+    getPreventivoPath,
+
+    // Specific uploads
     uploadCantiereAttachment,
     uploadCantierePhoto,
-    uploadMaterialeDocument,
-    uploadUserAvatar,
-    
-    // Utility methods
-    getImagePreviewURL,
-    fileToBase64,
-    resetState
+    uploadMaterialeAttachment,
+
+    // Utilities
+    formatFileSize,
+    getFileIcon,
+    allowedFileTypes,
+    maxFileSize
   }
 } 

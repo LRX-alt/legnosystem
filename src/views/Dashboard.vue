@@ -279,9 +279,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useFirestoreStore } from '@/stores/firestore'
 import { useFirestore } from '@/composables/useFirestore'
+import { useFirebaseAnalytics } from '@/composables/useFirebaseAnalytics'
+import { useFirestoreRealtime } from '@/composables/useFirestoreRealtime'
+import { useAuthStore } from '@/stores/auth'
+import { useToast } from '@/composables/useToast'
 import MigrationPanel from '@/components/MigrationPanel.vue'
 
 // Registra componenti
@@ -289,10 +293,18 @@ const components = {
   MigrationPanel
 }
 
-// Firestore store per dati reattivi
+// Stores & Composables
+const authStore = useAuthStore()
 const firestoreStore = useFirestoreStore()
-// Firestore composable per operazioni
 const firestore = useFirestore()
+const analytics = useFirebaseAnalytics()
+const realtime = useFirestoreRealtime()
+const toast = useToast()
+
+// State per real-time
+const realtimeActive = ref(false)
+const dashboardListeners = ref(null)
+const lastSync = ref(null)
 
 // KPI Data - Calcolati dinamicamente dai dati Firestore
 const kpis = computed(() => ({
@@ -365,22 +377,164 @@ const attivitaRecenti = computed(() => {
 // Data e ora attuale
 const currentTime = ref('')
 
-onMounted(async () => {
-  // Aggiorna timestamp
-  const now = new Date()
-  currentTime.value = now.toLocaleString('it-IT', {
-    day: '2-digit',
-    month: '2-digit', 
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-  
-  // Carica tutti i dati da Firestore usando il composable con gestione errori
+// Real-time connection status
+const connectionStatus = computed(() => {
+  if (!realtimeActive.value) return { status: 'disconnected', color: 'text-gray-500', icon: '🔴' }
+  if (realtime.isConnected.value) return { status: 'connected', color: 'text-green-500', icon: '🟢' }
+  return { status: 'connecting', color: 'text-yellow-500', icon: '🟡' }
+})
+
+// Enhanced KPI calculation with trends
+const calculateTrend = (entity) => {
+  // Placeholder per calcolo trend - da implementare con dati storici
+  return Math.random() > 0.5 ? 'up' : 'down'
+}
+
+// Enhanced dashboard cards
+const enhancedKpis = computed(() => ({
+  cantieriAttivi: {
+    value: firestoreStore.cantieri.filter(c => ['in_corso', 'pianificato', 'in-corso'].includes(c.stato)).length,
+    total: firestoreStore.cantieri.length,
+    valoreAttivo: firestoreStore.cantieri
+      .filter(c => ['in_corso', 'pianificato', 'in-corso'].includes(c.stato))
+      .reduce((total, c) => total + (c.valore || 0), 0),
+    trend: calculateTrend('cantieri')
+  },
+  clienti: {
+    totale: firestoreStore.clienti.length,
+    attivi: firestoreStore.clienti.filter(c => c.attivo !== false).length,
+    nuoviQuesto_mese: firestoreStore.clienti.filter(c => {
+      const created = new Date(c.data_creazione || c.createdAt)
+      const now = new Date()
+      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear()
+    }).length,
+    trend: calculateTrend('clienti')
+  },
+  dipendenti: {
+    totale: firestoreStore.dipendenti.length,
+    attivi: firestoreStore.dipendenti.filter(d => d.attivo !== false).length,
+    trend: calculateTrend('dipendenti')
+  },
+  materiali: {
+    totale: firestoreStore.materiali.length,
+    valore: firestoreStore.materiali.reduce((total, m) => total + ((m.prezzo_unitario || 0) * (m.quantita || 0)), 0),
+    trend: calculateTrend('materiali')
+  }
+}))
+
+// Setup real-time listeners
+const startRealtimeSync = () => {
+  if (!authStore.isAuthenticated || realtimeActive.value) return
+
   try {
+    dashboardListeners.value = realtime.startDashboardListeners({
+      cantieri: (docs, changes) => {
+        lastSync.value = new Date()
+        if (changes.added.length > 0 || changes.modified.length > 0) {
+          toast.info(`${changes.added.length + changes.modified.length} aggiornamenti cantieri`, '🔄 Sync')
+        }
+      },
+      clienti: (docs, changes) => {
+        lastSync.value = new Date()
+        if (changes.added.length > 0) {
+          toast.info(`${changes.added.length} nuovi clienti`, '👥 Clienti')
+        }
+      },
+      dipendenti: (docs, changes) => {
+        lastSync.value = new Date()
+      },
+      notifications: (docs, changes) => {
+        lastSync.value = new Date()
+        // Le notifiche vengono gestite automaticamente dal composable realtime
+      }
+    })
+
+    realtimeActive.value = true
+    console.log('✅ Real-time sync attivato per dashboard')
+  } catch (error) {
+    console.error('Errore attivazione real-time sync:', error)
+    toast.error('Errore sincronizzazione real-time', '❌ Sync Error')
+  }
+}
+
+const stopRealtimeSync = () => {
+  if (dashboardListeners.value) {
+    dashboardListeners.value.stopAll()
+    dashboardListeners.value = null
+    realtimeActive.value = false
+    console.log('🔌 Real-time sync disattivato')
+  }
+}
+
+// Load dashboard data with analytics tracking
+const loadDashboardData = async () => {
+  const startTime = Date.now()
+  
+  try {
+    // Carica tutti i dati da Firestore
     await firestore.loadAllData()
+    
+    // Analytics: track dashboard view
+    const widgets = ['cantieri', 'clienti', 'materiali']
+    if (authStore.canManagePersonnel) widgets.push('dipendenti')
+    
+    await analytics.logDashboardViewed(widgets)
+    
+    // Performance tracking
+    const loadTime = Date.now() - startTime
+    await analytics.logPerformanceMetric('dashboard_load_time', loadTime, {
+      component: 'Dashboard'
+    })
+    
+    console.log(`✅ Dashboard caricato in ${loadTime}ms`)
   } catch (error) {
     console.error('Errore nel caricamento dati dashboard:', error)
+    
+    // Analytics: track error
+    await analytics.logErrorOccurred(error, { 
+      component: 'Dashboard',
+      action: 'loadData'
+    })
+    
+    toast.error(`Errore caricamento: ${error.message}`, '❌ Errore Dashboard')
   }
+}
+
+onMounted(async () => {
+  // Aggiorna timestamp
+  const updateTime = () => {
+    const now = new Date()
+    currentTime.value = now.toLocaleString('it-IT', {
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+  
+  updateTime()
+  // Aggiorna ogni minuto
+  const timeInterval = setInterval(updateTime, 60000)
+  
+  // Carica dati dashboard
+  await loadDashboardData()
+  
+  // Avvia real-time sync se l'utente è autenticato
+  if (authStore.isAuthenticated) {
+    startRealtimeSync()
+  }
+  
+  // Analytics: track page view
+  await analytics.trackPageView('/dashboard', {
+    user_role: authStore.userProfile?.role,
+    widgets_enabled: realtimeActive.value
+  })
+  
+  // Cleanup interval on unmount
+  onUnmounted(() => {
+    clearInterval(timeInterval)
+    stopRealtimeSync()
+  })
 })
 </script> 

@@ -7,16 +7,21 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   updatePassword,
-  onAuthStateChanged
+  onAuthStateChanged,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from 'firebase/auth'
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { auth, db, firestoreConfig } from '@/config/firebase'
+import { useToast } from '@/composables/useToast'
 
 export const useAuthStore = defineStore('auth', () => {
+  const toast = useToast()
+  
   // 🔐 State
   const user = ref(null)
   const userProfile = ref(null)
-  const loading = ref(false)
+  const loading = ref(true)
   const isAuthenticated = ref(false)
   const authInitialized = ref(false)
 
@@ -24,8 +29,16 @@ export const useAuthStore = defineStore('auth', () => {
   const userRole = computed(() => userProfile.value?.role || 'user')
   const userName = computed(() => userProfile.value?.displayName || user.value?.email || 'Utente')
   const isAdmin = computed(() => userRole.value === 'admin')
-  const canManageCantieri = computed(() => ['admin', 'project_manager'].includes(userRole.value))
-  const canManagePersonale = computed(() => ['admin', 'hr_manager'].includes(userRole.value))
+  const isManager = computed(() => ['admin', 'manager'].includes(userRole.value))
+  const canManageCantieri = computed(() => 
+    ['admin', 'manager', 'capo_cantiere'].includes(userRole.value)
+  )
+  const canManagePersonnel = computed(() =>
+    ['admin', 'manager'].includes(userRole.value)
+  )
+  const canViewFinancials = computed(() =>
+    ['admin', 'manager', 'amministrativo'].includes(userRole.value)
+  )
 
   // 🔧 Methods
   
@@ -34,7 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const initAuth = () => {
     return new Promise((resolve) => {
-      onAuthStateChanged(auth, async (firebaseUser) => {
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         loading.value = true
         
         if (firebaseUser) {
@@ -43,7 +56,9 @@ export const useAuthStore = defineStore('auth', () => {
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             photoURL: firebaseUser.photoURL,
-            emailVerified: firebaseUser.emailVerified
+            emailVerified: firebaseUser.emailVerified,
+            createdAt: firebaseUser.metadata.creationTime,
+            lastLoginAt: firebaseUser.metadata.lastSignInTime
           }
           
           // Carica il profilo utente da Firestore
@@ -57,7 +72,7 @@ export const useAuthStore = defineStore('auth', () => {
         
         loading.value = false
         authInitialized.value = true
-        resolve(firebaseUser)
+        resolve()
       })
     })
   }
@@ -67,7 +82,8 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const loadUserProfile = async (uid) => {
     try {
-      const userDoc = await getDoc(doc(db, firestoreConfig.collections.userProfiles, uid))
+      const userDocRef = doc(db, firestoreConfig.collections.userProfiles, uid)
+      const userDoc = await getDoc(userDocRef)
       
       if (userDoc.exists()) {
         userProfile.value = {
@@ -77,23 +93,20 @@ export const useAuthStore = defineStore('auth', () => {
       } else {
         // Crea profilo base se non esiste
         const defaultProfile = {
-          displayName: user.value?.displayName || user.value?.email?.split('@')[0] || 'Utente',
+          name: user.value?.displayName || user.value?.email?.split('@')[0] || 'Utente',
           role: 'user',
           department: '',
-          createdAt: new Date(),
-          lastLogin: new Date(),
-          settings: {
-            theme: 'light',
-            notifications: true,
-            language: 'it'
-          }
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          isActive: true
         }
         
-        await setDoc(doc(db, firestoreConfig.collections.userProfiles, uid), defaultProfile)
+        await setDoc(userDocRef, defaultProfile)
         userProfile.value = { id: uid, ...defaultProfile }
       }
     } catch (error) {
       console.error('Errore nel caricamento profilo utente:', error)
+      toast.error(`Errore caricamento profilo: ${error.message}`)
     }
   }
 
@@ -101,25 +114,46 @@ export const useAuthStore = defineStore('auth', () => {
    * Login con email e password
    */
   const login = async (email, password) => {
-    loading.value = true
-    
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password)
+      loading.value = true
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
       
       // Aggiorna ultimo login
-      if (result.user) {
-        await updateDoc(doc(db, firestoreConfig.collections.userProfiles, result.user.uid), {
-          lastLogin: new Date()
+      if (userProfile.value) {
+        await updateUserProfile({ 
+          lastLoginAt: serverTimestamp(),
+          loginCount: (userProfile.value.loginCount || 0) + 1
         })
       }
       
-      return { success: true, user: result.user }
+      toast.success(`Benvenuto ${userProfile.value?.name || user.value.email}!`, '✅ Accesso Effettuato')
+      return { success: true, user: userCredential.user }
     } catch (error) {
       console.error('Errore login:', error)
-      return { 
-        success: false, 
-        error: getFirebaseErrorMessage(error.code) 
+      let errorMessage = 'Errore durante l\'accesso'
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'Utente non trovato'
+          break
+        case 'auth/wrong-password':
+          errorMessage = 'Password non corretta'
+          break
+        case 'auth/invalid-email':
+          errorMessage = 'Email non valida'
+          break
+        case 'auth/user-disabled':
+          errorMessage = 'Account disabilitato'
+          break
+        case 'auth/too-many-requests':
+          errorMessage = 'Troppi tentativi di accesso. Riprova più tardi'
+          break
+        default:
+          errorMessage = error.message
       }
+      
+      toast.error(errorMessage, '❌ Errore Accesso')
+      return { success: false, error: errorMessage }
     } finally {
       loading.value = false
     }
@@ -128,41 +162,56 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Registrazione nuovo utente
    */
-  const register = async (email, password, displayName = '', role = 'user') => {
-    loading.value = true
-    
+  const register = async (email, password, userData = {}) => {
     try {
-      const result = await createUserWithEmailAndPassword(auth, email, password)
+      loading.value = true
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       
-      // Aggiorna profilo Firebase Auth
-      if (displayName) {
-        await updateProfile(result.user, { displayName })
+      // Aggiorna profilo Firebase
+      if (userData.name) {
+        await updateProfile(userCredential.user, {
+          displayName: userData.name
+        })
       }
       
       // Crea profilo Firestore
-      const userProfile = {
-        displayName: displayName || email.split('@')[0],
+      const profileData = {
+        name: userData.name || email.split('@')[0],
         email: email,
-        role: role,
-        department: '',
-        createdAt: new Date(),
-        lastLogin: new Date(),
-        settings: {
-          theme: 'light',
-          notifications: true,
-          language: 'it'
-        }
+        role: userData.role || 'user',
+        department: userData.department || 'generale',
+        phone: userData.phone || '',
+        position: userData.position || '',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isActive: true,
+        loginCount: 0
       }
       
-      await setDoc(doc(db, firestoreConfig.collections.userProfiles, result.user.uid), userProfile)
+      await setDoc(doc(db, firestoreConfig.collections.userProfiles, userCredential.user.uid), profileData)
       
-      return { success: true, user: result.user }
+      toast.success(`Account creato con successo! Benvenuto ${profileData.name}!`, '✅ Registrazione Completata')
+      return { success: true, user: userCredential.user }
     } catch (error) {
       console.error('Errore registrazione:', error)
-      return { 
-        success: false, 
-        error: getFirebaseErrorMessage(error.code) 
+      let errorMessage = 'Errore durante la registrazione'
+      
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'Email già registrata'
+          break
+        case 'auth/invalid-email':
+          errorMessage = 'Email non valida'
+          break
+        case 'auth/weak-password':
+          errorMessage = 'Password troppo debole (minimo 6 caratteri)'
+          break
+        default:
+          errorMessage = error.message
       }
+      
+      toast.error(errorMessage, '❌ Errore Registrazione')
+      return { success: false, error: errorMessage }
     } finally {
       loading.value = false
     }
@@ -172,23 +221,17 @@ export const useAuthStore = defineStore('auth', () => {
    * Logout utente
    */
   const logout = async () => {
-    loading.value = true
-    
     try {
       await signOut(auth)
       user.value = null
       userProfile.value = null
       isAuthenticated.value = false
-      
+      toast.success('Disconnessione effettuata', '👋 Arrivederci')
       return { success: true }
     } catch (error) {
       console.error('Errore logout:', error)
-      return { 
-        success: false, 
-        error: getFirebaseErrorMessage(error.code) 
-      }
-    } finally {
-      loading.value = false
+      toast.error(`Errore disconnessione: ${error.message}`)
+      return { success: false, error: error.message }
     }
   }
 
@@ -196,19 +239,27 @@ export const useAuthStore = defineStore('auth', () => {
    * Reset password
    */
   const resetPassword = async (email) => {
-    loading.value = true
-    
     try {
       await sendPasswordResetEmail(auth, email)
+      toast.success('Email di reset password inviata. Controlla la tua casella di posta.', '📧 Reset Password')
       return { success: true }
     } catch (error) {
       console.error('Errore reset password:', error)
-      return { 
-        success: false, 
-        error: getFirebaseErrorMessage(error.code) 
+      let errorMessage = 'Errore invio email di reset'
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'Utente non trovato'
+          break
+        case 'auth/invalid-email':
+          errorMessage = 'Email non valida'
+          break
+        default:
+          errorMessage = error.message
       }
-    } finally {
-      loading.value = false
+      
+      toast.error(errorMessage, '❌ Errore Reset')
+      return { success: false, error: errorMessage }
     }
   }
 
@@ -218,14 +269,14 @@ export const useAuthStore = defineStore('auth', () => {
   const updateUserProfile = async (updates) => {
     if (!user.value) return { success: false, error: 'Utente non autenticato' }
     
-    loading.value = true
-    
     try {
-      // Aggiorna Firestore
-      await updateDoc(doc(db, firestoreConfig.collections.userProfiles, user.value.uid), {
+      const userDocRef = doc(db, firestoreConfig.collections.userProfiles, user.value.uid)
+      const updateData = {
         ...updates,
-        updatedAt: new Date()
-      })
+        updatedAt: serverTimestamp()
+      }
+      
+      await updateDoc(userDocRef, updateData)
       
       // Aggiorna state locale
       userProfile.value = {
@@ -234,61 +285,78 @@ export const useAuthStore = defineStore('auth', () => {
       }
       
       // Aggiorna Firebase Auth se necessario
-      if (updates.displayName) {
-        await updateProfile(auth.currentUser, { displayName: updates.displayName })
+      if (updates.name) {
+        await updateProfile(auth.currentUser, { displayName: updates.name })
       }
       
+      toast.success('Profilo aggiornato con successo', '✅ Profilo Aggiornato')
       return { success: true }
     } catch (error) {
       console.error('Errore aggiornamento profilo:', error)
-      return { 
-        success: false, 
-        error: getFirebaseErrorMessage(error.code) 
-      }
-    } finally {
-      loading.value = false
+      toast.error(`Errore aggiornamento profilo: ${error.message}`)
+      return { success: false, error: error.message }
     }
   }
 
   /**
    * Cambia password
    */
-  const changePassword = async (newPassword) => {
-    if (!auth.currentUser) return { success: false, error: 'Utente non autenticato' }
-    
-    loading.value = true
+  const changePassword = async (currentPassword, newPassword) => {
+    if (!user.value) return { success: false, error: 'Utente non autenticato' }
     
     try {
+      // Re-autentica utente
+      const credential = EmailAuthProvider.credential(user.value.email, currentPassword)
+      await reauthenticateWithCredential(auth.currentUser, credential)
+      
+      // Aggiorna password
       await updatePassword(auth.currentUser, newPassword)
+      
+      toast.success('Password aggiornata con successo', '✅ Password Aggiornata')
       return { success: true }
     } catch (error) {
       console.error('Errore cambio password:', error)
-      return { 
-        success: false, 
-        error: getFirebaseErrorMessage(error.code) 
+      let errorMessage = 'Errore cambio password'
+      
+      switch (error.code) {
+        case 'auth/wrong-password':
+          errorMessage = 'Password attuale non corretta'
+          break
+        case 'auth/weak-password':
+          errorMessage = 'Nuova password troppo debole'
+          break
+        default:
+          errorMessage = error.message
       }
-    } finally {
-      loading.value = false
+      
+      toast.error(errorMessage, '❌ Errore Password')
+      return { success: false, error: errorMessage }
     }
   }
 
   /**
-   * Traduce i codici errore Firebase in messaggi italiani
+   * Verifica permessi
    */
-  const getFirebaseErrorMessage = (errorCode) => {
-    const errorMessages = {
-      'auth/user-not-found': 'Utente non trovato',
-      'auth/wrong-password': 'Password errata',
-      'auth/email-already-in-use': 'Email già registrata',
-      'auth/weak-password': 'Password troppo debole',
-      'auth/invalid-email': 'Email non valida',
-      'auth/user-disabled': 'Account disabilitato',
-      'auth/too-many-requests': 'Troppi tentativi, riprova più tardi',
-      'auth/network-request-failed': 'Errore di connessione',
-      'auth/requires-recent-login': 'Accesso recente richiesto'
+  const hasPermission = (permission) => {
+    if (!userProfile.value?.permissions) return false
+    return userProfile.value.permissions.includes(permission) || isAdmin.value
+  }
+
+  const canAccess = (resource) => {
+    const resourcePermissions = {
+      cantieri: ['view_cantieri', 'manage_cantieri'],
+      clienti: ['view_clienti', 'manage_clienti'],
+      fornitori: ['view_fornitori', 'manage_fornitori'],
+      materiali: ['view_materiali', 'manage_materiali'],
+      dipendenti: ['view_dipendenti', 'manage_dipendenti'],
+      preventivi: ['view_preventivi', 'manage_preventivi'],
+      fatture: ['view_fatture', 'manage_fatture'],
+      analytics: ['view_analytics'],
+      settings: ['manage_settings']
     }
     
-    return errorMessages[errorCode] || 'Errore sconosciuto'
+    const permissions = resourcePermissions[resource] || []
+    return permissions.some(permission => hasPermission(permission)) || isAdmin.value
   }
 
   /**
@@ -301,7 +369,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const adminProfile = {
       role: 'admin',
-      displayName: 'Admin Legnosystem',
+      name: 'Admin Legnosystem',
       department: 'Amministrazione',
       settings: {
         theme: 'light',
@@ -335,8 +403,10 @@ export const useAuthStore = defineStore('auth', () => {
     userRole,
     userName,
     isAdmin,
+    isManager,
     canManageCantieri,
-    canManagePersonale,
+    canManagePersonnel,
+    canViewFinancials,
     
     // Methods
     initAuth,
@@ -347,6 +417,8 @@ export const useAuthStore = defineStore('auth', () => {
     updateUserProfile,
     changePassword,
     loadUserProfile,
-    createAdminProfile
+    createAdminProfile,
+    hasPermission,
+    canAccess
   }
 }) 

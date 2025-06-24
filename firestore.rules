@@ -1,8 +1,286 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+    // 🔐 AUTENTICAZIONE BASE
+    // Funzioni helper per l'autenticazione
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserId() {
+      return request.auth.uid;
+    }
+    
+    function getUserEmail() {
+      return request.auth.token.email;
+    }
+    
+    // 👤 GESTIONE PROFILI UTENTI
+    function getUserProfile() {
+      return get(/databases/$(database)/documents/userProfiles/$(getUserId()));
+    }
+    
+    function getUserRole() {
+      return getUserProfile().data.role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    function isManager() {
+      return isAuthenticated() && getUserRole() in ['admin', 'manager'];
+    }
+    
+    function canManageCantieri() {
+      return isAuthenticated() && getUserRole() in ['admin', 'manager', 'capo_cantiere'];
+    }
+    
+    function canManagePersonnel() {
+      return isAuthenticated() && getUserRole() in ['admin', 'manager'];
+    }
+    
+    function canViewFinancials() {
+      return isAuthenticated() && getUserRole() in ['admin', 'manager', 'amministrativo'];
+    }
+    
+    function hasPermission(permission) {
+      return isAuthenticated() && (
+        isAdmin() || 
+        permission in getUserProfile().data.permissions
+      );
+    }
+
+    // 👥 PROFILI UTENTI
+    match /userProfiles/{userId} {
+      // Gli utenti possono leggere e modificare solo il proprio profilo
+      allow read, write: if isAuthenticated() && getUserId() == userId;
+      
+      // Gli admin possono gestire tutti i profili
+      allow read, write: if isAdmin();
+      
+      // I manager possono leggere tutti i profili ma modificare solo quelli del loro dipartimento
+      allow read: if isManager();
+      allow write: if isManager() && (
+        !('role' in resource.data) || 
+        resource.data.role in ['employee', 'capo_cantiere', 'amministrativo']
+      );
+    }
+
+    // 🏗️ CANTIERI
+    match /cantieri/{cantiereId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: admin, manager, capo_cantiere
+      allow create, update: if canManageCantieri();
+      
+      // Eliminazione: solo admin e manager
+      allow delete: if isManager();
+      
+      // Validazione dati cantiere
+      allow write: if validateCantiereData();
+    }
+    
+    function validateCantiereData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['nome', 'cliente', 'stato', 'valore']) &&
+             data.nome is string && data.nome.size() > 0 &&
+             data.cliente is string && data.cliente.size() > 0 &&
+             data.stato in ['pianificato', 'in-corso', 'completato', 'sospeso'] &&
+             data.valore is number && data.valore >= 0;
+    }
+
+    // 📎 ALLEGATI CANTIERI
+    match /cantieri_allegati/{allegatoId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: chi può gestire cantieri
+      allow create, update, delete: if canManageCantieri();
+      
+      // Validazione allegati
+      allow write: if validateAllegatoData();
+    }
+    
+    function validateAllegatoData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['nome', 'cantiereId']) &&
+             data.nome is string && data.nome.size() > 0 &&
+             data.cantiereId is string &&
+             (!('dimensione' in data) || (data.dimensione is number && data.dimensione <= 10485760)); // 10MB max
+    }
+
+    // 📦 MATERIALI CANTIERI
+    match /materiali_cantieri/{materialeId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: chi può gestire cantieri + chi può gestire materiali
+      allow create, update, delete: if canManageCantieri() || hasPermission('manage_materiali');
+      
+      // Validazione materiali cantiere
+      allow write: if validateMaterialeCantiereData();
+    }
+    
+    function validateMaterialeCantiereData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['nome', 'cantiereId', 'quantitaRichiesta']) &&
+             data.nome is string && data.nome.size() > 0 &&
+             data.cantiereId is string &&
+             data.quantitaRichiesta is number && data.quantitaRichiesta >= 0;
+    }
+
+    // 🧱 ALLEGATI MATERIALI
+    match /materiali_allegati/{allegatoId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: chi può gestire materiali
+      allow create, update, delete: if hasPermission('manage_materiali') || canManageCantieri();
+    }
+
+    // 👤 CLIENTI
+    match /clienti/{clienteId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: admin, manager, amministrativo
+      allow create, update: if isManager() || hasPermission('manage_clienti');
+      allow delete: if isAdmin();
+      
+      // Validazione clienti
+      allow write: if validateClienteData();
+    }
+    
+    function validateClienteData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['nome']) &&
+             data.nome is string && data.nome.size() > 0 &&
+             (!('email' in data) || (data.email is string && data.email.matches('.*@.*\\..*')));
+    }
+
+    // 📦 MATERIALI (MAGAZZINO)
+    match /materiali/{materialeId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: chi ha permessi materiali
+      allow create, update, delete: if hasPermission('manage_materiali') || isManager();
+      
+      // Validazione materiali
+      allow write: if validateMaterialeData();
+    }
+    
+    function validateMaterialeData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['nome', 'categoria']) &&
+             data.nome is string && data.nome.size() > 0 &&
+             data.categoria is string;
+    }
+
+    // 👥 DIPENDENTI
+    match /dipendenti/{dipendenteId} {
+      // Lettura: manager e admin
+      allow read: if canManagePersonnel() || hasPermission('view_dipendenti');
+      
+      // Scrittura: solo manager e admin
+      allow create, update, delete: if canManagePersonnel();
+      
+      // I dipendenti possono leggere solo i propri dati
+      allow read: if isAuthenticated() && 
+                     getUserEmail() == resource.data.email;
+    }
+
+    // 🚚 FORNITORI
+    match /fornitori/{fornitoreId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: amministrativo, manager, admin
+      allow create, update: if hasPermission('manage_fornitori') || isManager();
+      allow delete: if isAdmin();
+    }
+
+    // 🚛 MEZZI
+    match /mezzi/{mezzoId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: manager e admin
+      allow create, update, delete: if isManager();
+    }
+
+    // 💰 PREVENTIVI
+    match /preventivi/{preventivoId} {
+      // Lettura: chi può vedere i dati finanziari
+      allow read: if canViewFinancials();
+      
+      // Scrittura: chi può gestire preventivi
+      allow create, update: if hasPermission('manage_preventivi') || isManager();
+      allow delete: if isAdmin();
+    }
+
+    // 🧾 FATTURE
+    match /fatture/{fatturaId} {
+      // Lettura: chi può vedere i dati finanziari
+      allow read: if canViewFinancials();
+      
+      // Scrittura: chi può gestire fatture
+      allow create, update: if hasPermission('manage_fatture') || isManager();
+      allow delete: if isAdmin();
+    }
+
+    // 📊 ANALYTICS
+    match /analytics/{docId} {
+      // Solo lettura per chi ha permessi analytics
+      allow read: if hasPermission('view_analytics') || isManager();
+      
+      // Solo admin può scrivere
+      allow write: if isAdmin();
+    }
+
+    // 🔔 NOTIFICHE
+    match /notifications/{notificationId} {
+      // Gli utenti possono leggere solo le proprie notifiche
+      allow read: if isAuthenticated() && 
+                     getUserId() in resource.data.recipients;
+      
+      // Solo il sistema può creare notifiche (tramite Cloud Functions)
+      allow create: if false;
+      
+      // Gli utenti possono aggiornare solo il campo 'read'
+      allow update: if isAuthenticated() && 
+                       getUserId() in resource.data.recipients &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+      
+      // Solo admin può eliminare
+      allow delete: if isAdmin();
+    }
+
+    // ⚙️ IMPOSTAZIONI SISTEMA
+    match /settings/{settingId} {
+      // Lettura: tutti gli utenti autenticati
+      allow read: if isAuthenticated();
+      
+      // Scrittura: solo admin
+      allow write: if isAdmin();
+    }
+
+    // 📝 LOG SISTEMA
+    match /logs/{logId} {
+      // Solo lettura per admin
+      allow read: if isAdmin();
+      
+      // Solo il sistema può scrivere (tramite Cloud Functions)
+      allow create: if false;
+    }
+
+    // 🚫 REGOLA DI FALLBACK
+    // Nega tutto ciò che non è esplicitamente permesso
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 } 

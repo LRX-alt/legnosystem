@@ -17,7 +17,7 @@ app.use(router)
 
 // Initialize Firebase Auth
 const authStore = useAuthStore()
-authStore.initAuth().then(() => {
+authStore.initializeAuth().then(() => {
   console.log('🔥 Firebase Auth inizializzato')
   
   // 🧪 DEBUG: Esponi store globalmente per testing in console
