@@ -112,8 +112,12 @@ export const useFirestoreStore = defineStore('firestore', () => {
     Object.keys(data).forEach(key => {
       const value = data[key]
       
-      // Salta valori undefined
-      if (value === undefined) return
+      // Salta valori undefined, null, o campi problematici
+      if (value === undefined || value === null) return
+      
+      // Lista nera di campi che potrebbero causare problemi
+      const blacklistedFields = ['isNew', 'isFromStock', '_id', '__v', 'constructor']
+      if (blacklistedFields.includes(key)) return
       
       // Gestisce Date objects
       if (value instanceof Date) {
@@ -127,9 +131,21 @@ export const useFirestoreStore = defineStore('firestore', () => {
         return
       }
       
+      // Gestisce funzioni (le elimina)
+      if (typeof value === 'function') {
+        console.warn(`⚠️ Rimosso campo funzione "${key}"`)
+        return
+      }
+      
       // Gestisce array - verifica che siano effettivamente array
       if (Array.isArray(value)) {
-        sanitized[key] = value
+        // Sanitizza ricorsivamente gli elementi dell'array
+        sanitized[key] = value.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            return sanitizeFirestoreData(item)
+          }
+          return item
+        })
         return
       }
       
@@ -141,13 +157,26 @@ export const useFirestoreStore = defineStore('firestore', () => {
       
       // Gestisce oggetti semplici
       if (value !== null && typeof value === 'object') {
-        // Ricorsione per oggetti nested
-        sanitized[key] = sanitizeFirestoreData(value)
+        // Verifica che non sia un oggetto CircularJSON o con riferimenti circolari
+        try {
+          JSON.stringify(value)
+          // Ricorsione per oggetti nested
+          sanitized[key] = sanitizeFirestoreData(value)
+        } catch (e) {
+          console.warn(`⚠️ Rimosso campo con riferimenti circolari "${key}":`, e.message)
+          return
+        }
         return
       }
       
-      // Valori primitivi
-      sanitized[key] = value
+      // Valori primitivi (string, number, boolean)
+      if (['string', 'number', 'boolean'].includes(typeof value)) {
+        sanitized[key] = value
+        return
+      }
+      
+      // Se arriviamo qui, il tipo non è supportato
+      console.warn(`⚠️ Rimosso campo tipo non supportato "${key}":`, typeof value, value)
     })
     
     return sanitized
@@ -164,7 +193,17 @@ export const useFirestoreStore = defineStore('firestore', () => {
       // Sanitizza i dati prima dell'update
       const sanitizedData = sanitizeFirestoreData(data)
       
-      console.log(`🔧 Update ${collectionName}/${docId}:`, sanitizedData)
+      console.log(`🔧 Update ${collectionName}/${docId}:`)
+      console.log('📋 Dati originali:', JSON.stringify(data, null, 2))
+      console.log('🧹 Dati sanitizzati:', JSON.stringify(sanitizedData, null, 2))
+      
+      // Controlliamo ogni campo individualmente per identificare il problema
+      for (const [key, value] of Object.entries(sanitizedData)) {
+        console.log(`🔍 Campo "${key}":`, typeof value, value)
+        if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+          console.log(`⚠️ Oggetto complesso in "${key}":`, Object.keys(value))
+        }
+      }
       
       await updateDoc(doc(db, collectionName, docId), {
         ...sanitizedData,
@@ -174,8 +213,9 @@ export const useFirestoreStore = defineStore('firestore', () => {
       return { success: true }
     } catch (err) {
       error.value = err.message
-      console.error(`Errore aggiornamento documento ${docId} in ${collectionName}:`, err)
-      console.error('📋 Dati che causavano l\'errore:', data)
+      console.error(`❌ Errore aggiornamento documento ${docId} in ${collectionName}:`, err)
+      console.error('📋 Dati che causavano l\'errore:', JSON.stringify(data, null, 2))
+      console.error('🧹 Dati sanitizzati che causavano l\'errore:', JSON.stringify(sanitizedData, null, 2))
       return { success: false, error: err.message }
     } finally {
       loading.value = false
@@ -448,57 +488,42 @@ export const useFirestoreStore = defineStore('firestore', () => {
   }
 
   const updateMaterialeCantiere = async (materialeId, updateData) => {
-    // Validazione specifica per materiali cantiere
-    const validatedData = {
-      ...updateData
+    console.log('🔧 INIZIO updateMaterialeCantiere:', materialeId, updateData)
+    
+    // MODALITÀ DEBUG: Usa solo campi essenziali per identificare il problema
+    const essentialFields = {
+      nome: String(updateData.nome || ''),
+      quantitaRichiesta: Number(updateData.quantitaRichiesta || 0),
+      quantitaUtilizzata: Number(updateData.quantitaUtilizzata || 0),
+      stato: String(updateData.stato || 'ordinato')
     }
     
-    // Assicura che i campi numerici siano numeri
-    if (validatedData.quantitaRichiesta) {
-      validatedData.quantitaRichiesta = Number(validatedData.quantitaRichiesta) || 0
-    }
-    if (validatedData.quantitaUtilizzata) {
-      validatedData.quantitaUtilizzata = Number(validatedData.quantitaUtilizzata) || 0
-    }
-    if (validatedData.prezzoUnitario) {
-      validatedData.prezzoUnitario = Number(validatedData.prezzoUnitario) || 0
-    }
-    if (validatedData.prezzoTotale) {
-      validatedData.prezzoTotale = Number(validatedData.prezzoTotale) || 0
-    }
+    console.log('🧪 Primo test con campi essenziali:', essentialFields)
     
-    // Assicura che i campi stringa siano stringhe
-    if (validatedData.nome) {
-      validatedData.nome = String(validatedData.nome)
+    try {
+      // Test 1: Solo campi essenziali
+      const result = await updateDocument('materiali_cantieri', materialeId, essentialFields)
+      
+      if (result.success) {
+        console.log('✅ Test campi essenziali riuscito! Il problema è in altri campi.')
+        
+        // Test 2: Aggiungiamo gradualmente altri campi
+        const extendedFields = {
+          ...essentialFields,
+          descrizione: String(updateData.descrizione || ''),
+          unita: String(updateData.unita || ''),
+          prezzoUnitario: Number(updateData.prezzoUnitario || 0)
+        }
+        
+        console.log('🧪 Test esteso:', extendedFields)
+        return await updateDocument('materiali_cantieri', materialeId, extendedFields)
+      }
+      
+      return result
+    } catch (err) {
+      console.error('❌ Errore anche con campi essenziali:', err)
+      throw err
     }
-    if (validatedData.descrizione) {
-      validatedData.descrizione = String(validatedData.descrizione)
-    }
-    if (validatedData.unita) {
-      validatedData.unita = String(validatedData.unita)
-    }
-    if (validatedData.stato) {
-      validatedData.stato = String(validatedData.stato)
-    }
-    if (validatedData.note) {
-      validatedData.note = String(validatedData.note)
-    }
-    
-    // Assicura che gli ID siano stringhe
-    if (validatedData.fornitoreId) {
-      validatedData.fornitoreId = String(validatedData.fornitoreId)
-    }
-    if (validatedData.originalStockId) {
-      validatedData.originalStockId = String(validatedData.originalStockId)
-    }
-    
-    // Rimuove campi che potrebbero causare problemi
-    delete validatedData.isNew
-    delete validatedData.isFromStock
-    
-    console.log(`🔧 Aggiornamento materiale cantiere ${materialeId}:`, validatedData)
-    
-    return await updateDocument('materiali_cantieri', materialeId, validatedData)
   }
 
   const deleteMaterialeCantiere = async (materialeId) => {
