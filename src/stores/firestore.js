@@ -189,13 +189,17 @@ export const useFirestoreStore = defineStore('firestore', () => {
     loading.value = true
     error.value = null
     
+    // 🚨 IMPORTANTE: Converti sempre docId in stringa
+    const stringDocId = String(docId)
+    console.log(`🔧 Update ${collectionName}/${docId} → ${stringDocId}`)
+    
     let sanitizedData = null // Sposta la dichiarazione fuori dal try
     
     try {
       // Sanitizza i dati prima dell'update
       sanitizedData = sanitizeFirestoreData(data)
       
-      console.log(`🔧 Update ${collectionName}/${docId}:`)
+      console.log(`🔧 Update ${collectionName}/${stringDocId}:`)
       console.log('📋 Dati originali:', JSON.stringify(data, null, 2))
       console.log('🧹 Dati sanitizzati:', JSON.stringify(sanitizedData, null, 2))
       
@@ -207,7 +211,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
         }
       }
       
-      await updateDoc(doc(db, collectionName, docId), {
+      await updateDoc(doc(db, collectionName, stringDocId), {
         ...sanitizedData,
         updatedAt: serverTimestamp()
       })
@@ -215,7 +219,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
       return { success: true }
     } catch (err) {
       error.value = err.message
-      console.error(`❌ Errore aggiornamento documento ${docId} in ${collectionName}:`, err)
+      console.error(`❌ Errore aggiornamento documento ${stringDocId} in ${collectionName}:`, err)
       console.error('📋 Dati che causavano l\'errore:', JSON.stringify(data, null, 2))
       if (sanitizedData) {
         console.error('🧹 Dati sanitizzati che causavano l\'errore:', JSON.stringify(sanitizedData, null, 2))
@@ -494,6 +498,11 @@ export const useFirestoreStore = defineStore('firestore', () => {
   const updateMaterialeCantiere = async (materialeId, updateData) => {
     console.log('🔧 INIZIO updateMaterialeCantiere:', materialeId, updateData)
     
+    // 🚨 IMPORTANTE: Converti ID in stringa se è un numero
+    const docId = String(materialeId)
+    console.log('🔍 ID originale:', materialeId, 'tipo:', typeof materialeId)
+    console.log('🔍 ID convertito:', docId, 'tipo:', typeof docId)
+    
     // MODALITÀ DEBUG: Test diretto senza sanitizzazione prima
     const essentialFields = {
       nome: String(updateData.nome || ''),
@@ -506,22 +515,22 @@ export const useFirestoreStore = defineStore('firestore', () => {
     
     try {
       // Test diretto usando updateDoc senza sanitizzazione
-      console.log('🧪 Test DIRETTO updateDoc...')
+      console.log('🧪 Test DIRETTO updateDoc con ID stringa...')
       
-      await updateDoc(doc(db, 'materiali_cantieri', materialeId), {
+      await updateDoc(doc(db, 'materiali_cantieri', docId), {
         ...essentialFields,
         updatedAt: serverTimestamp()
       })
       
-      console.log('✅ Test DIRETTO riuscito! Il problema era nella sanitizzazione.')
+      console.log('✅ Test DIRETTO riuscito! Il problema era l\'ID numerico.')
       return { success: true }
       
     } catch (directErr) {
-      console.error('❌ Errore anche con test DIRETTO:', directErr)
+      console.error('❌ Errore anche con test DIRETTO (ID convertito):', directErr)
       
-      // Fallback: prova con la funzione normale
-      console.log('🔄 Fallback con updateDocument...')
-      return await updateDocument('materiali_cantieri', materialeId, essentialFields)
+      // Fallback: prova con la funzione normale usando ID stringa
+      console.log('🔄 Fallback con updateDocument e ID stringa...')
+      return await updateDocument('materiali_cantieri', docId, essentialFields)
     }
   }
 
