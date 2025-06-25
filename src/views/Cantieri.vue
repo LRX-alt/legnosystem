@@ -393,21 +393,36 @@
                 </div>
               </div>
 
-              <!-- Timeline Fasi -->
+              <!-- Storico Aggiornamenti Progresso -->
               <div>
-                <h4 class="font-semibold text-gray-900 mb-4">Timeline Progetto</h4>
-                <div class="space-y-4">
-                  <div v-for="fase in (selectedCantiere.fasi || [])" :key="fase.id" class="flex items-start space-x-3">
-                    <div class="w-6 h-6 rounded-full flex items-center justify-center mt-1" :class="fase.completata ? 'bg-green-500' : 'bg-gray-300'">
-                      <CheckIcon v-if="fase.completata" class="w-4 h-4 text-white" />
+                <h4 class="font-semibold text-gray-900 mb-4 flex items-center">
+                  📊 Storico Progresso
+                </h4>
+                
+                <div v-if="getProgressHistory(selectedCantiere?.id)?.length > 0" class="space-y-4 max-h-64 overflow-y-auto">
+                  <div v-for="(update, index) in getProgressHistory(selectedCantiere?.id)" :key="index" class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div class="flex items-start justify-between mb-2">
+                      <div class="flex items-center space-x-2">
+                        <ChartBarIcon class="w-4 h-4 text-accent-600" />
+                        <span class="font-medium text-gray-900">{{ update.fase }}</span>
+                      </div>
+                      <div class="text-right">
+                        <span class="text-sm font-bold text-accent-600">+{{ update.incremento }}%</span>
+                        <p class="text-xs text-gray-500">{{ formatDate(update.dataCompletamento) }}</p>
+                      </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium" :class="fase.completata ? 'text-green-700' : 'text-gray-900'">
-                        {{ fase.nome }}
-                      </p>
-                      <p class="text-xs text-gray-500 mt-1">{{ fase.durata }}</p>
+                    <p class="text-sm text-gray-600" v-if="update.nota">{{ update.nota }}</p>
+                    <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
+                      <span>Progresso: {{ update.progressoPrecedente }}% → {{ update.nuovoProgresso }}%</span>
                     </div>
                   </div>
+                </div>
+                
+                <!-- Stato Vuoto -->
+                <div v-else class="text-center py-8 text-gray-500">
+                  <ChartBarIcon class="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p class="text-sm font-medium text-gray-400">Nessun aggiornamento registrato</p>
+                  <p class="text-xs text-gray-400 mt-1">I progressi del cantiere appariranno qui</p>
                 </div>
               </div>
             </div>
@@ -428,29 +443,11 @@
                 </div>
               </div>
 
-              <!-- Timeline Fasi -->
-              <div class="space-y-4">
-                <h4 class="font-medium text-gray-900">Timeline Progetto</h4>
-                <div class="space-y-3">
-                  <div v-for="fase in (selectedCantiere.fasi || [])" :key="fase.id" class="flex items-center space-x-3">
-                    <div class="w-4 h-4 rounded-full" :class="fase.completata ? 'bg-green-500' : 'bg-gray-300'"></div>
-                    <div class="flex-1">
-                      <p class="text-sm font-medium" :class="fase.completata ? 'text-green-700' : 'text-gray-900'">
-                        {{ fase.nome }}
-                      </p>
-                      <p class="text-xs text-gray-500">{{ fase.durata }}</p>
-                    </div>
-                    <span v-if="fase.completata" class="text-green-600">
-                      <CheckIcon class="w-4 h-4" />
-                    </span>
-                  </div>
-                </div>
-              </div>
-
               <!-- Storico Aggiornamenti Progresso -->
-              <div class="space-y-4" v-if="getProgressHistory(selectedCantiere?.id)?.length > 0">
+              <div class="space-y-4">
                 <h4 class="font-medium text-gray-900">📊 Storico Progresso</h4>
-                <div class="space-y-3 max-h-48 overflow-y-auto">
+                
+                <div v-if="getProgressHistory(selectedCantiere?.id)?.length > 0" class="space-y-3 max-h-48 overflow-y-auto">
                   <div v-for="(update, index) in getProgressHistory(selectedCantiere?.id)" :key="index" class="p-3 bg-gray-50 rounded-lg">
                     <div class="flex items-start justify-between mb-2">
                       <div class="flex items-center space-x-2">
@@ -463,7 +460,17 @@
                       </div>
                     </div>
                     <p class="text-sm text-gray-600" v-if="update.nota">{{ update.nota }}</p>
+                    <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
+                      <span>Progresso: {{ update.progressoPrecedente }}% → {{ update.nuovoProgresso }}%</span>
+                    </div>
                   </div>
+                </div>
+                
+                <!-- Stato Vuoto -->
+                <div v-else class="text-center py-6 text-gray-500">
+                  <ChartBarIcon class="w-8 h-8 mx-auto mb-3 text-gray-300" />
+                  <p class="text-sm font-medium text-gray-400">Nessun aggiornamento registrato</p>
+                  <p class="text-xs text-gray-400 mt-1">I progressi del cantiere appariranno qui</p>
                 </div>
               </div>
             </div>
@@ -793,133 +800,6 @@
               Chiudi
             </button>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Aggiornamento Progresso -->
-    <div v-if="showProgressModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeProgressModal">
-      <div class="relative top-4 mx-auto border w-full max-w-2xl shadow-lg rounded-md bg-white" @click.stop>
-        <div class="p-6">
-          <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center space-x-3">
-              <div class="p-2 bg-accent-100 rounded-lg">
-                <ChartBarIcon class="w-6 h-6 text-accent-600" />
-              </div>
-              <div>
-                <h3 class="text-xl font-semibold text-gray-900">📊 Aggiorna Progresso</h3>
-                <p class="text-sm text-gray-600 mt-1" v-if="selectedCantiere">
-                  {{ selectedCantiere.nome }} - Progresso attuale: {{ selectedCantiere.progresso }}%
-                </p>
-              </div>
-            </div>
-            <button @click="closeProgressModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
-              <XMarkIcon class="w-6 h-6" />
-            </button>
-          </div>
-          
-          <!-- Barra Progresso Attuale -->
-          <div class="mb-6 p-4 bg-gray-50 rounded-lg">
-            <div class="flex items-center justify-between text-sm mb-2">
-              <span class="text-gray-600">Progresso Corrente</span>
-              <span class="font-bold text-accent-600">{{ selectedCantiere?.progresso }}%</span>
-            </div>
-            <div class="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                class="bg-accent-500 h-3 rounded-full transition-all duration-300" 
-                :style="`width: ${selectedCantiere?.progresso}%`"
-              ></div>
-            </div>
-          </div>
-
-          <form @submit.prevent="saveProgressUpdate" class="space-y-6">
-            <!-- Incremento Progresso -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Incremento Progresso (%)</label>
-              <div class="grid grid-cols-4 gap-2 mb-3">
-                <button 
-                  type="button"
-                  v-for="increment in [5, 10, 15, 20]" 
-                  :key="increment"
-                  @click="progressUpdate.incremento = increment"
-                  :class="[
-                    'px-3 py-2 rounded-lg border text-sm font-medium transition-colors',
-                    progressUpdate.incremento === increment 
-                      ? 'bg-accent-500 text-white border-accent-500' 
-                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                  ]"
-                >
-                  +{{ increment }}%
-                </button>
-              </div>
-              <input
-                v-model.number="progressUpdate.incremento"
-                type="number"
-                min="1"
-                :max="100 - (selectedCantiere?.progresso || 0)"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-accent-500 focus:border-accent-500 text-base"
-                placeholder="Inserisci incremento personalizzato..."
-              />
-              <p class="text-xs text-gray-500 mt-1">
-                Nuovo progresso: {{ Math.min((selectedCantiere?.progresso || 0) + progressUpdate.incremento, 100) }}%
-              </p>
-            </div>
-
-            <!-- Nome Fase Completata -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Fase Completata</label>
-              <input
-                v-model="progressUpdate.fase"
-                type="text"
-                required
-                placeholder="Es: Posa manto di copertura, Montaggio travi, Isolamento..."
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-accent-500 focus:border-accent-500 text-base"
-              />
-            </div>
-
-            <!-- Note Dettagliate -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Note Dettagliate</label>
-              <textarea
-                v-model="progressUpdate.nota"
-                rows="3"
-                placeholder="Descrivi i lavori completati, eventuali problemi risolti, materiali utilizzati..."
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-accent-500 focus:border-accent-500 text-base"
-              ></textarea>
-            </div>
-
-            <!-- Data Completamento -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Data Completamento</label>
-              <input
-                v-model="progressUpdate.dataCompletamento"
-                type="date"
-                :max="new Date().toISOString().split('T')[0]"
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-accent-500 focus:border-accent-500 text-base"
-              />
-            </div>
-
-            <!-- Preview Completamento -->
-            <div v-if="Math.min((selectedCantiere?.progresso || 0) + progressUpdate.incremento, 100) === 100" class="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div class="flex items-center space-x-2">
-                <CheckCircleIcon class="w-5 h-5 text-green-600" />
-                <span class="font-medium text-green-900">🎉 Cantiere al 100% - Verrà marcato come COMPLETATO!</span>
-              </div>
-              <p class="text-sm text-green-700 mt-1">Il cantiere passerà automaticamente allo stato "Completato"</p>
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
-              <button type="button" @click="closeProgressModal" class="w-full sm:w-auto btn-secondary py-3 text-base">
-                Annulla
-              </button>
-              <button type="submit" class="w-full sm:w-auto btn-primary py-3 text-base">
-                📊 Aggiorna Progresso
-              </button>
-            </div>
-          </form>
         </div>
       </div>
     </div>
@@ -3162,6 +3042,7 @@ const getAttachments = () => {
   return cantieriAttachments.value[selectedCantiere.value.id] || []
 }
 
+
 const getFileTypeClass = (type) => {
   const classes = {
     'pdf': 'bg-red-500',
@@ -4222,4 +4103,6 @@ const getManodoperaGiornaliera = (cantiere) => {
   if (giorniLavorativi === 0) return 0
   return Math.round(costoManodopera / giorniLavorativi)
 }
+
+
 </script> 
