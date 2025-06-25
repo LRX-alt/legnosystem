@@ -189,9 +189,11 @@ export const useFirestoreStore = defineStore('firestore', () => {
     loading.value = true
     error.value = null
     
+    let sanitizedData = null // Sposta la dichiarazione fuori dal try
+    
     try {
       // Sanitizza i dati prima dell'update
-      const sanitizedData = sanitizeFirestoreData(data)
+      sanitizedData = sanitizeFirestoreData(data)
       
       console.log(`🔧 Update ${collectionName}/${docId}:`)
       console.log('📋 Dati originali:', JSON.stringify(data, null, 2))
@@ -215,7 +217,9 @@ export const useFirestoreStore = defineStore('firestore', () => {
       error.value = err.message
       console.error(`❌ Errore aggiornamento documento ${docId} in ${collectionName}:`, err)
       console.error('📋 Dati che causavano l\'errore:', JSON.stringify(data, null, 2))
-      console.error('🧹 Dati sanitizzati che causavano l\'errore:', JSON.stringify(sanitizedData, null, 2))
+      if (sanitizedData) {
+        console.error('🧹 Dati sanitizzati che causavano l\'errore:', JSON.stringify(sanitizedData, null, 2))
+      }
       return { success: false, error: err.message }
     } finally {
       loading.value = false
@@ -490,7 +494,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
   const updateMaterialeCantiere = async (materialeId, updateData) => {
     console.log('🔧 INIZIO updateMaterialeCantiere:', materialeId, updateData)
     
-    // MODALITÀ DEBUG: Usa solo campi essenziali per identificare il problema
+    // MODALITÀ DEBUG: Test diretto senza sanitizzazione prima
     const essentialFields = {
       nome: String(updateData.nome || ''),
       quantitaRichiesta: Number(updateData.quantitaRichiesta || 0),
@@ -498,31 +502,26 @@ export const useFirestoreStore = defineStore('firestore', () => {
       stato: String(updateData.stato || 'ordinato')
     }
     
-    console.log('🧪 Primo test con campi essenziali:', essentialFields)
+    console.log('🧪 Test diretto senza sanitizzazione:', essentialFields)
     
     try {
-      // Test 1: Solo campi essenziali
-      const result = await updateDocument('materiali_cantieri', materialeId, essentialFields)
+      // Test diretto usando updateDoc senza sanitizzazione
+      console.log('🧪 Test DIRETTO updateDoc...')
       
-      if (result.success) {
-        console.log('✅ Test campi essenziali riuscito! Il problema è in altri campi.')
-        
-        // Test 2: Aggiungiamo gradualmente altri campi
-        const extendedFields = {
-          ...essentialFields,
-          descrizione: String(updateData.descrizione || ''),
-          unita: String(updateData.unita || ''),
-          prezzoUnitario: Number(updateData.prezzoUnitario || 0)
-        }
-        
-        console.log('🧪 Test esteso:', extendedFields)
-        return await updateDocument('materiali_cantieri', materialeId, extendedFields)
-      }
+      await updateDoc(doc(db, 'materiali_cantieri', materialeId), {
+        ...essentialFields,
+        updatedAt: serverTimestamp()
+      })
       
-      return result
-    } catch (err) {
-      console.error('❌ Errore anche con campi essenziali:', err)
-      throw err
+      console.log('✅ Test DIRETTO riuscito! Il problema era nella sanitizzazione.')
+      return { success: true }
+      
+    } catch (directErr) {
+      console.error('❌ Errore anche con test DIRETTO:', directErr)
+      
+      // Fallback: prova con la funzione normale
+      console.log('🔄 Fallback con updateDocument...')
+      return await updateDocument('materiali_cantieri', materialeId, essentialFields)
     }
   }
 
