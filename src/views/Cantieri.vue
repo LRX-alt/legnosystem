@@ -3109,7 +3109,7 @@ const saveMaterialToCantiere = async () => {
   const fornitoreSelected = fornitori.value.find(f => f.id == newMaterial.value.fornitoreId)
   
   const nuovoMateriale = {
-    id: Date.now() + Math.random(),
+    id: `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
     codice: newMaterial.value.codice,
     nome: newMaterial.value.nome,
     descrizione: newMaterial.value.descrizione || '',
@@ -3126,6 +3126,29 @@ const saveMaterialToCantiere = async () => {
     // Metadati aggiuntivi
     isFromStock: materialSelectionMode.value === 'existing',
     originalStockId: materialSelectionMode.value === 'existing' ? selectedMaterialFromStock.value : null
+  }
+
+  // 🏗️ Gestione scorte magazzino
+  if (materialSelectionMode.value === 'existing' && selectedMaterialFromStock.value) {
+    console.log(`📦 Aggiornamento scorte per materiale ID: ${selectedMaterialFromStock.value}`)
+    try {
+      // Decrementa la quantità dal magazzino usando la nuova funzione
+      const updateResult = await firestoreStore.updateMaterialeQuantita(
+        selectedMaterialFromStock.value, 
+        -newMaterial.value.quantitaRichiesta,
+        `Allocato al cantiere: ${selectedCantiere.value.nome}`
+      )
+      
+      if (updateResult.success) {
+        console.log(`✅ Scorte magazzino aggiornate: -${newMaterial.value.quantitaRichiesta}`)
+      } else {
+        console.warn('⚠️ Errore aggiornamento scorte:', updateResult.error)
+        error('Materiale aggiunto al cantiere ma errore aggiornamento scorte magazzino')
+      }
+    } catch (stockError) {
+      console.error('❌ Errore gestione scorte:', stockError)
+      error('Materiale aggiunto al cantiere ma errore aggiornamento scorte magazzino')
+    }
   }
 
   // ✅ Aggiungi a materialiCantiere e salva in Firestore
@@ -3163,35 +3186,52 @@ const saveMaterialChanges = async () => {
       editingMaterial.value.stato = 'in-uso'
     }
     
-    materialiCantiere.value[index] = { ...editingMaterial.value }
+    // 📊 Gestione aggiornamento scorte per modifiche quantità utilizzate
+    const originalMaterial = materialiCantiere.value[index]
+    const oldQuantitaUtilizzata = originalMaterial.quantitaUtilizzata || 0
+    const newQuantitaUtilizzata = editingMaterial.value.quantitaUtilizzata || 0
+    const diffQuantitaUtilizzata = newQuantitaUtilizzata - oldQuantitaUtilizzata
+    
+    if (originalMaterial.isFromStock && originalMaterial.originalStockId && diffQuantitaUtilizzata !== 0) {
+      console.log(`📊 Aggiornamento utilizzo materiale: ${diffQuantitaUtilizzata}`)
+      try {
+        // Se l'utilizzo è aumentato, non cambiamo il magazzino (materiale già allocato)
+        // Se l'utilizzo è diminuito, potremmo restituire la differenza al magazzino
+        // Per ora loggiamo solo l'operazione
+        console.log(`📈 Utilizzo materiale ${originalMaterial.nome}: ${oldQuantitaUtilizzata} → ${newQuantitaUtilizzata}`)
+      } catch (error) {
+        console.error('❌ Errore aggiornamento utilizzo:', error)
+      }
+    }
+
+    // Preserva flag isNew e altri metadati durante l'update
+    materialiCantiere.value[index] = { 
+      ...editingMaterial.value,
+      isNew: originalMaterial.isNew,
+      isFromStock: originalMaterial.isFromStock,
+      originalStockId: originalMaterial.originalStockId
+    }
     await saveMaterialiCantiereToStorage()
   }
   
   const { success } = useToast()
-  closeEditMaterialModal()
   
-  const quantitaUtilizzata = editingMaterial.value.quantitaUtilizzata || 0
-  const quantitaRichiesta = editingMaterial.value.quantitaRichiesta || 0
+  // 💾 Salva i valori PRIMA di chiudere il modal (che imposta editingMaterial.value = null)
+  const quantitaUtilizzata = editingMaterial.value?.quantitaUtilizzata || 0
+  const quantitaRichiesta = editingMaterial.value?.quantitaRichiesta || 0
+  const nomeMateriale = editingMaterial.value?.nome || 'Materiale'
+  
+  closeEditMaterialModal()
   
   if (quantitaUtilizzata > 0) {
     const percentualeUtilizzo = ((quantitaUtilizzata / quantitaRichiesta) * 100).toFixed(1)
     success(`Materiale aggiornato! Utilizzo: ${quantitaUtilizzata}/${quantitaRichiesta} (${percentualeUtilizzo}%)`, '✅ Materiale Aggiornato')
   } else {
-    success(`Materiale "${editingMaterial.value.nome}" aggiornato!`, '✅ Materiale Aggiornato')
+    success(`Materiale "${nomeMateriale}" aggiornato!`, '✅ Materiale Aggiornato')
   }
 }
 
-const removeMaterialFromCantiere = async (materialId) => {
-  if (confirm('🗑️ Sei sicuro di voler rimuovere questo materiale dal cantiere?')) {
-    const index = materialiCantiere.value.findIndex(m => m.id === materialId)
-    if (index !== -1) {
-      const materialeRimosso = materialiCantiere.value[index]
-      materialiCantiere.value.splice(index, 1)
-      await saveMaterialiCantiereToStorage()
-      alert(`✅ Materiale "${materialeRimosso.nome}" rimosso dal cantiere!`)
-    }
-  }
-}
+
 
 // ✅ Salva materiali cantiere in Firestore invece di localStorage
 const saveMaterialiCantiereToStorage = async () => {
@@ -3203,17 +3243,27 @@ const saveMaterialiCantiereToStorage = async () => {
   try {
     // Sincronizza tutti i materiali locali con Firestore
     for (const materiale of materialiCantiere.value) {
-      if (materiale.id && !materiale.isNew) {
+      console.log(`🔧 Processando materiale: ID=${materiale.id}, isNew=${materiale.isNew}`)
+      
+      // 🛡️ Migliorata logica: considera isNew undefined come false (esistente)
+      if (materiale.id && (materiale.isNew === false || materiale.isNew === undefined)) {
         // Materiale esistente - aggiorna
+        console.log(`📝 Aggiornamento materiale esistente: ${materiale.id} (isNew: ${materiale.isNew})`)
         await firestore.materialiCantiere.update(materiale.id, materiale)
-      } else {
+        // Assicura che isNew sia settato correttamente
+        materiale.isNew = false
+      } else if (materiale.isNew === true || !materiale.id) {
         // Nuovo materiale - crea
+        console.log(`➕ Creazione nuovo materiale: ${materiale.nome} (isNew: ${materiale.isNew})`)
         const result = await firestore.materialiCantiere.create(selectedCantiere.value.id, materiale)
         if (result.success && result.data) {
           // Aggiorna ID locale con quello di Firestore
+          console.log(`✅ Materiale creato con ID: ${result.data.id}`)
           materiale.id = result.data.id
           materiale.isNew = false
         }
+      } else {
+        console.warn(`⚠️ Materiale in stato ambiguo: ID=${materiale.id}, isNew=${materiale.isNew}`)
       }
     }
     console.log('✅ Materiali cantiere sincronizzati con Firestore')
@@ -3370,7 +3420,7 @@ const addAttachmentToMaterial = (materialId) => {
   if (!material) return
 
   const newAttachment = {
-    id: Date.now() + Math.random(),
+    id: `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
     name: `Attachment-${Date.now()}.pdf`,
     size: 1024, // Simula una dimensione fissa
     type: 'pdf',
@@ -3538,7 +3588,7 @@ const handleMaterialFileUpload = async (event) => {
     
     // Crea oggetto allegato
     const attachment = {
-      id: Date.now() + Math.random(),
+      id: `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       name: file.name,
       size: file.size,
       type: extension,
@@ -3812,5 +3862,56 @@ const openDailyLog = (cantiere) => {
     name: 'giornale-cantiere', 
     params: { id: cantiere.id }
   })
+}
+
+
+
+const removeMaterialFromCantiere = async (materialId) => {
+  if (confirm('🗑️ Sei sicuro di voler rimuovere questo materiale dal cantiere?')) {
+    const index = materialiCantiere.value.findIndex(m => m.id === materialId)
+    if (index !== -1) {
+      const materialeRimosso = materialiCantiere.value[index]
+      
+      // 🔄 Gestione restituzione scorte al magazzino
+      if (materialeRimosso.isFromStock && materialeRimosso.originalStockId) {
+        console.log(`🔄 Restituzione scorte per materiale ID: ${materialeRimosso.originalStockId}`)
+        try {
+          const quantitaDaRestituire = materialeRimosso.quantitaRichiesta - (materialeRimosso.quantitaUtilizzata || 0)
+          
+          if (quantitaDaRestituire > 0) {
+            const updateResult = await firestoreStore.updateMaterialeQuantita(
+              materialeRimosso.originalStockId,
+              quantitaDaRestituire,
+              `Restituito da cantiere: ${selectedCantiere.value.nome}`
+            )
+            
+            if (updateResult.success) {
+              console.log(`✅ Scorte magazzino restituite: +${quantitaDaRestituire}`)
+            }
+          }
+        } catch (stockError) {
+          console.error('❌ Errore restituzione scorte:', stockError)
+        }
+      }
+      
+      // 🗑️ Elimina da Firestore se esistente
+      if (materialeRimosso.id && materialeRimosso.isNew === false) {
+        console.log(`🗑️ Eliminazione materiale da Firestore: ${materialeRimosso.id}`)
+        try {
+          await firestore.materialiCantiere.delete(materialeRimosso.id)
+          console.log(`✅ Materiale eliminato da Firestore`)
+        } catch (deleteError) {
+          console.error('❌ Errore eliminazione da Firestore:', deleteError)
+        }
+      }
+      
+      // Rimuovi dall'array locale
+      materialiCantiere.value.splice(index, 1)
+      
+      // ❌ NON chiamare saveMaterialiCantiereToStorage() - causerebbe ricreazione materiali rimanenti!
+      
+      alert(`✅ Materiale "${materialeRimosso.nome}" rimosso dal cantiere!`)
+    }
+  }
 }
 </script> 
