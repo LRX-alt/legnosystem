@@ -60,6 +60,39 @@
       </div>
     </div>
 
+    <!-- 💰 Riepilogo Costi Accumulati -->
+    <div class="card bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-gray-900">💰 Costi Accumulati</h3>
+        <button @click="refreshCosts" class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+          Aggiorna
+        </button>
+      </div>
+      <div class="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <p class="text-xs text-gray-600">Manodopera</p>
+          <p class="text-lg font-bold text-orange-600">€{{ costiCantiere.manodopera.toLocaleString() }}</p>
+          <p class="text-xs text-gray-500">{{ costiCantiere.giorniLavorativi }} giorni</p>
+        </div>
+        <div>
+          <p class="text-xs text-gray-600">Materiali</p>
+          <p class="text-lg font-bold text-blue-600">€{{ costiCantiere.materiali.toLocaleString() }}</p>
+          <p class="text-xs text-gray-500">utilizzati</p>
+        </div>
+        <div>
+          <p class="text-xs text-gray-600">Totale</p>
+          <p class="text-lg font-bold text-red-600">€{{ costiCantiere.totale.toLocaleString() }}</p>
+          <p class="text-xs text-gray-500">sostenuto</p>
+        </div>
+      </div>
+      <div v-if="costiCantiere.oreTotali > 0" class="pt-2 mt-2 border-t border-green-200 text-center">
+        <p class="text-xs text-gray-600">
+          {{ costiCantiere.oreTotali }}h lavorate • 
+          €{{ costiCantiere.costoMedioGiorno?.toFixed(0) || 0 }}/giorno medio
+        </p>
+      </div>
+    </div>
+
     <!-- Filtri Data -->
     <div class="card">
       <div class="flex flex-col md:flex-row gap-4">
@@ -112,7 +145,12 @@
           <div>
             <h4 class="text-sm font-medium text-gray-700 mb-2">⏰ Ore Lavorate</h4>
             <p class="text-sm font-semibold">{{ entry.oreTotali }}h totali</p>
-            <p class="text-xs text-gray-500">{{ entry.team.length }} operatori</p>
+            <p class="text-xs text-gray-500">
+              {{ (entry.teamPresente || entry.team || []).length }} operatori
+              <span v-if="entry.costoGiornata" class="text-green-600 font-medium ml-2">
+                • €{{ entry.costoGiornata.toFixed(0) }}
+              </span>
+            </p>
           </div>
 
           <!-- Attività -->
@@ -249,6 +287,77 @@
               </div>
             </div>
 
+            <!-- 👥 Team Presente e Ore Lavorate -->
+            <div>
+              <h4 class="text-lg font-medium text-gray-900 mb-4">👥 Team Presente e Ore</h4>
+              
+              <!-- Ore Totali -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">⏰ Ore Totali Lavorate</label>
+                  <input v-model.number="entryForm.oreTotali" type="number" min="0.5" max="12" step="0.5" required class="form-input">
+                  <p class="text-xs text-gray-500 mt-1">Es: 4 ore, 8 ore, etc.</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">👤 Numero Operatori</label>
+                  <input :value="entryForm.teamPresente.length" type="number" readonly class="form-input bg-gray-100">
+                  <p class="text-xs text-gray-500 mt-1">Calcolato automaticamente</p>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">💰 Costo Stimato Giornata</label>
+                  <input :value="calculateDayCost().toFixed(2)" type="text" readonly class="form-input bg-gray-100 font-bold text-green-600">
+                  <p class="text-xs text-gray-500 mt-1">€ per questa giornata</p>
+                </div>
+              </div>
+
+              <!-- Selezione Team Presente -->
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <label class="text-sm font-medium text-gray-700">Dipendenti Presenti</label>
+                  <div class="text-xs text-gray-500">
+                    Seleziona chi ha effettivamente lavorato oggi
+                  </div>
+                </div>
+                
+                <!-- Lista dipendenti disponibili -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                  <div v-for="membro in cantiere?.team" :key="membro.id" class="flex items-center space-x-3">
+                    <input 
+                      :id="'team-' + membro.id" 
+                      type="checkbox" 
+                      :checked="isTeamMemberPresent(membro)"
+                      @change="toggleTeamMember(membro)"
+                      class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                    >
+                    <label :for="'team-' + membro.id" class="text-sm text-gray-700 flex-1 cursor-pointer">
+                      <span class="font-medium">{{ membro.nome }}</span>
+                      <span class="text-gray-500 ml-2">({{ membro.ruolo }})</span>
+                      <span class="text-green-600 ml-2 font-medium">€{{ getDipendentePagaOraria(membro.id) }}/h</span>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Team presente riepilogo -->
+                <div v-if="entryForm.teamPresente.length > 0" class="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p class="text-sm font-medium text-blue-900 mb-2">Team presente ({{ entryForm.teamPresente.length }} dipendenti):</p>
+                  <div class="flex flex-wrap gap-2">
+                    <span v-for="membro in entryForm.teamPresente" :key="membro.id" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                      {{ membro.nome }} - €{{ membro.pagaOraria }}/h
+                    </span>
+                  </div>
+                  <p class="text-xs text-blue-700 mt-2">
+                    Costo orario team: €{{ calcolayCostoOrarioTeam() }}/h • 
+                    {{ entryForm.oreTotali }}h × €{{ calcolayCostoOrarioTeam() }}/h = €{{ calculateDayCost() }}
+                  </p>
+                </div>
+
+                <!-- Warning se nessun team -->
+                <div v-if="entryForm.teamPresente.length === 0" class="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                  <p class="text-sm text-yellow-800">⚠️ Seleziona almeno un dipendente che ha lavorato in questa giornata</p>
+                </div>
+              </div>
+            </div>
+
             <!-- Note e Problemi -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -317,11 +426,22 @@ const entryForm = ref({
   note: '',
   problemiText: '',
   oreTotali: 8,
-  team: []
+  team: [], // Team legacy per compatibilità
+  teamPresente: [] // Nuovo array per il team specifico della giornata
 })
 
 // Registrazioni giornale - vuoto, da caricare da Firestore
 const entries = ref([])
+
+// 💰 Costi cantiere
+const costiCantiere = ref({
+  manodopera: 0,
+  materiali: 0,
+  totale: 0,
+  giorniLavorativi: 0,
+  oreTotali: 0,
+  costoMedioGiorno: 0
+})
 
 // Computed
 const filteredEntries = computed(() => {
@@ -377,7 +497,8 @@ const newEntry = () => {
     note: '',
     problemiText: '',
     oreTotali: 8,
-    team: []
+    team: [], // Legacy
+    teamPresente: [] // Nuovo team specifico
   }
   showEntryModal.value = true
 }
@@ -393,7 +514,8 @@ const editEntry = (entry) => {
     note: entry.note,
     problemiText: entry.problemi.join('\n'),
     oreTotali: entry.oreTotali,
-    team: [...entry.team]
+    team: [...(entry.team || [])], // Legacy
+    teamPresente: [...(entry.teamPresente || entry.team || [])] // Nuovo team, fallback su legacy
   }
   showEntryModal.value = true
 }
@@ -411,6 +533,74 @@ const removeAttivita = (index) => {
   entryForm.value.attivita.splice(index, 1)
 }
 
+// 👥 ===== FUNZIONI GESTIONE TEAM PRESENTE =====
+
+// Verifica se un membro del team è presente nella registrazione
+const isTeamMemberPresent = (membro) => {
+  return entryForm.value.teamPresente.some(m => m.id === membro.id)
+}
+
+// Aggiunge/rimuove un membro dal team presente
+const toggleTeamMember = (membro) => {
+  const index = entryForm.value.teamPresente.findIndex(m => m.id === membro.id)
+  
+  if (index >= 0) {
+    // Rimuovi il membro se già presente
+    entryForm.value.teamPresente.splice(index, 1)
+  } else {
+    // Aggiungi il membro se non presente
+    const pagaOraria = getDipendentePagaOraria(membro.id)
+    entryForm.value.teamPresente.push({
+      id: membro.id,
+      nome: membro.nome,
+      ruolo: membro.ruolo,
+      iniziali: membro.iniziali,
+      pagaOraria: pagaOraria
+    })
+  }
+}
+
+// Ottiene la paga oraria di un dipendente dai dati reali
+const getDipendentePagaOraria = (dipendenteId) => {
+  try {
+    // Cerca il dipendente nello store dei dipendenti
+    const dipendente = firestoreStore.dipendenti.find(d => d.id === dipendenteId)
+    
+    if (dipendente && dipendente.pagaOraria) {
+      return parseFloat(dipendente.pagaOraria)
+    }
+    
+    // Se non trovato, cerca nel team del cantiere
+    const membroTeam = cantiere.value?.team?.find(m => m.id === dipendenteId)
+    if (membroTeam && membroTeam.pagaOraria) {
+      return parseFloat(membroTeam.pagaOraria)
+    }
+    
+    // Default fallback
+    console.warn(`Paga oraria non trovata per dipendente ${dipendenteId}, usando default €25/h`)
+    return 25
+  } catch (error) {
+    console.error('Errore nel recupero paga oraria:', error)
+    return 25
+  }
+}
+
+// Calcola il costo orario del team presente
+const calcolayCostoOrarioTeam = () => {
+  return entryForm.value.teamPresente.reduce((total, membro) => {
+    return total + membro.pagaOraria
+  }, 0)
+}
+
+// Calcola il costo totale della giornata
+const calculateDayCost = () => {
+  const costoOrario = calcolayCostoOrarioTeam()
+  const ore = entryForm.value.oreTotali || 0
+  return costoOrario * ore
+}
+
+// ===== FINE FUNZIONI GESTIONE TEAM PRESENTE =====
+
 const saveEntry = async () => {
   if (!cantiere.value?.id) {
     alert('❌ Errore: Cantiere non selezionato')
@@ -427,7 +617,9 @@ const saveEntry = async () => {
       note: entryForm.value.note,
       problemi: entryForm.value.problemiText.split('\n').filter(p => p.trim()),
       oreTotali: entryForm.value.oreTotali,
-      team: entryForm.value.team,
+      team: entryForm.value.team, // Legacy per compatibilità
+      teamPresente: entryForm.value.teamPresente, // Nuovo campo per team specifico
+      costoGiornata: calculateDayCost(), // Calcola e salva il costo della giornata
       allegati: editingEntry.value?.allegati || []
     }
 
@@ -441,6 +633,9 @@ const saveEntry = async () => {
 
     // Ricarica le registrazioni
     await loadGiornaleEntries()
+    
+    // 💰 Aggiorna automaticamente i costi dopo salvataggio registrazione
+    await updateCostiCantiere()
     
     closeEntryModal()
     
@@ -456,6 +651,10 @@ const deleteEntry = async (entryId) => {
     try {
       await firestoreStore.deleteRegistrazioneGiornale(entryId)
       await loadGiornaleEntries()
+      
+      // 💰 Aggiorna automaticamente i costi dopo eliminazione
+      await updateCostiCantiere()
+      
       alert('✅ Registrazione eliminata con successo!')
     } catch (error) {
       console.error('Errore nell\'eliminazione della registrazione:', error)
@@ -719,6 +918,11 @@ const loadCantiereData = async () => {
     } else {
       // Carica anche le registrazioni del giornale
       await loadGiornaleEntries()
+      
+      // 👥 Carica i dipendenti per avere le paghe orarie
+      if (firestoreStore.dipendenti.length === 0) {
+        await firestoreStore.loadDipendenti()
+      }
     }
   } catch (error) {
     console.error('Errore nel caricamento del cantiere:', error)
@@ -733,6 +937,9 @@ const loadGiornaleEntries = async () => {
     const result = await firestoreStore.loadGiornaleCantiere(cantiereId)
     if (result.success) {
       entries.value = result.data
+      
+      // 💰 Carica automaticamente i costi quando si caricano le registrazioni
+      await updateCostiCantiere()
     } else {
       console.error('Errore nel caricamento delle registrazioni:', result.error)
     }
@@ -740,6 +947,104 @@ const loadGiornaleEntries = async () => {
     console.error('Errore nel caricamento delle registrazioni del giornale:', error)
   }
 }
+
+// 💰 ===== FUNZIONI GESTIONE COSTI =====
+
+// Calcola e aggiorna i costi del cantiere
+const updateCostiCantiere = async () => {
+  if (!cantiere.value?.id) return
+  
+  try {
+    // Calcola costi manodopera dalle registrazioni del giornale
+    const costiManodopera = await calculateLaborCosts()
+    
+    // Calcola costi materiali utilizzati
+    const costiMateriali = await calculateMaterialsCosts()
+    
+    // Statistiche generali
+    const giorniLavorativi = entries.value.length
+    const oreTotali = entries.value.reduce((sum, entry) => sum + (entry.oreTotali || 8), 0)
+    const costiTotali = costiManodopera + costiMateriali
+    const costoMedioGiorno = giorniLavorativi > 0 ? costiTotali / giorniLavorativi : 0
+    
+    // Aggiorna i costi locali
+    costiCantiere.value = {
+      manodopera: costiManodopera,
+      materiali: costiMateriali,
+      totale: costiTotali,
+      giorniLavorativi,
+      oreTotali,
+      costoMedioGiorno
+    }
+    
+    console.log('💰 Costi cantiere aggiornati:', costiCantiere.value)
+    
+  } catch (error) {
+    console.error('Errore calcolo costi cantiere:', error)
+  }
+}
+
+// Calcola i costi della manodopera dalle registrazioni del giornale
+const calculateLaborCosts = async () => {
+  if (!entries.value.length) return 0
+  
+  let costoTotale = 0
+  
+  for (const entry of entries.value) {
+    // 🆕 Usa il team specifico della registrazione se disponibile, altrimenti fallback
+    const teamGiorno = entry.teamPresente || entry.team || cantiere.value?.team || []
+    const oreLavorate = entry.oreTotali || 8
+    
+    // Se il costo è già salvato nella registrazione, usalo direttamente
+    if (entry.costoGiornata && entry.costoGiornata > 0) {
+      costoTotale += entry.costoGiornata
+    } else {
+      // Calcola il costo per questa giornata basato sul team presente
+      const costoGiornata = teamGiorno.reduce((sum, membro) => {
+        // Paga oraria di default €25/h se non specificata
+        const pagaOraria = membro.pagaOraria || 25
+        return sum + (pagaOraria * oreLavorate)
+      }, 0)
+      
+      costoTotale += costoGiornata
+    }
+  }
+  
+  return costoTotale
+}
+
+// Calcola i costi dei materiali utilizzati
+const calculateMaterialsCosts = async () => {
+  if (!cantiere.value?.id) return 0
+  
+  try {
+    // Carica i materiali del cantiere dal Firestore
+    const result = await firestoreStore.loadMaterialiCantiere(cantiere.value.id)
+    
+    if (!result.success || !result.data) return 0
+    
+    // Calcola il costo totale dei materiali utilizzati (non solo richiesti)
+    const costoMateriali = result.data.reduce((total, materiale) => {
+      const quantitaUtilizzata = materiale.quantitaUtilizzata || 0
+      const prezzoUnitario = materiale.prezzoUnitario || 0
+      return total + (quantitaUtilizzata * prezzoUnitario)
+    }, 0)
+    
+    return costoMateriali
+    
+  } catch (error) {
+    console.error('Errore calcolo costi materiali:', error)
+    return 0
+  }
+}
+
+// Funzione per aggiornare manualmente i costi (pulsante "Aggiorna")
+const refreshCosts = async () => {
+  await updateCostiCantiere()
+  alert('💰 Costi aggiornati!')
+}
+
+// ===== FINE FUNZIONI GESTIONE COSTI =====
 </script>
 
 <style scoped>

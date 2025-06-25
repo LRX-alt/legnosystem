@@ -126,6 +126,11 @@
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getPriorityColor(cantiere.priorita)">
               {{ cantiere.priorita }}
             </span>
+            <!-- Badge Alert Costi -->
+            <span v-if="(cantiere.costiAccumulati?.totale || 0) / cantiere.valore > 0.8" 
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              ⚠️ Costi
+            </span>
           </div>
         </div>
 
@@ -137,6 +142,76 @@
           </div>
           <div class="w-full bg-gray-200 rounded-full h-2">
             <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${cantiere.progresso}%`"></div>
+          </div>
+        </div>
+
+        <!-- 💰 Riepilogo Costi -->
+        <div class="mb-4 p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg border border-green-200">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-medium text-gray-700 flex items-center">
+              💰 Costi Sostenuti
+            </h4>
+            <button @click="refreshCantiereCosts(cantiere)" class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+              Aggiorna
+            </button>
+          </div>
+          
+          <!-- Costi Dettagliati -->
+          <div class="grid grid-cols-2 gap-3 text-sm mb-3">
+            <div>
+              <span class="text-gray-600">Materiali:</span>
+              <span class="font-medium text-blue-600 block">
+                €{{ cantiere.costiAccumulati?.materiali?.toLocaleString() || '0' }}
+              </span>
+            </div>
+            <div>
+              <span class="text-gray-600">Manodopera:</span>
+              <span class="font-medium text-orange-600 block">
+                €{{ cantiere.costiAccumulati?.manodopera?.toLocaleString() || '0' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Totale e Progresso -->
+          <div class="pt-2 mt-2 border-t border-green-200">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-gray-600 text-sm">Totale Sostenuto:</span>
+              <span class="font-bold text-red-600">
+                €{{ cantiere.costiAccumulati?.totale?.toLocaleString() || '0' }} / €{{ cantiere.valore?.toLocaleString() || '0' }}
+              </span>
+            </div>
+            
+            <!-- Margine di Profitto -->
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-gray-600 text-sm">Margine Rimanente:</span>
+              <span class="font-bold text-sm" :class="getMargineColor(cantiere)">
+                €{{ (cantiere.valore - (cantiere.costiAccumulati?.totale || 0)).toLocaleString() }}
+                <span class="text-xs ml-1" :class="getMarginePercentColor(cantiere)">
+                  ({{ getMarginePercent(cantiere) }})
+                </span>
+              </span>
+            </div>
+
+            <!-- Barra di Progresso Costi -->
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div class="h-2 rounded-full transition-all duration-300" 
+                   :class="getPerformanceBarColor(cantiere)"
+                   :style="`width: ${Math.min(100, (cantiere.costiAccumulati?.totale || 0) / cantiere.valore * 100)}%`">
+              </div>
+            </div>
+
+            <!-- Stats Footer -->
+            <div class="flex justify-between items-center text-xs text-gray-500">
+              <div v-if="cantiere.statisticheCosti?.giorniLavorativi">
+                {{ cantiere.statisticheCosti.giorniLavorativi }} giorni • 
+                {{ cantiere.statisticheCosti.oreTotaliLavorate || 0 }}h totali
+              </div>
+              <div class="text-gray-600 font-medium">
+                <span v-if="(cantiere.costiAccumulati?.totale || 0) > 0">
+                  €{{ Math.round((cantiere.costiAccumulati?.totale || 0) / Math.max(1, cantiere.statisticheCosti?.giorniLavorativi || 1)).toLocaleString() }}/giorno
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -152,7 +227,15 @@
           </div>
           <div class="flex items-center justify-between text-sm min-w-0">
             <span class="text-gray-600 flex-shrink-0">Manodopera/giorno:</span>
-            <span class="font-medium truncate ml-2 text-orange-600">€{{ calculateDailyCost(cantiere).toLocaleString() }}</span>
+            <span class="font-medium truncate ml-2 text-orange-600">
+              €{{ getManodoperaGiornaliera(cantiere).toLocaleString() }}
+              <span v-if="getManodoperaGiornaliera(cantiere) > 0" class="text-xs text-gray-500 ml-1">
+                (effettiva)
+              </span>
+              <span v-else class="text-xs text-gray-500 ml-1">
+                €{{ calculateDailyCost(cantiere).toLocaleString() }} (teorica)
+              </span>
+            </span>
           </div>
           <div class="flex items-center justify-between text-sm min-w-0">
             <span class="text-gray-600 flex-shrink-0">Scadenza:</span>
@@ -2791,6 +2874,183 @@ const calculateMonthlyCost = (cantiere) => {
   return calculateDailyCost(cantiere) * 22
 }
 
+// 💰 ===== NUOVE FUNZIONI SISTEMA COSTI CANTIERE =====
+
+// Calcola il costo totale dei materiali utilizzati (non solo richiesti)
+const getTotalMaterialsCost = async (cantiere) => {
+  if (!cantiere?.id) return 0
+  
+  try {
+    const materiali = await getMaterialsByCantiere(cantiere.id)
+    return materiali.reduce((total, materiale) => {
+      const quantitaUsata = materiale.quantitaUtilizzata || 0
+      return total + (quantitaUsata * materiale.prezzoUnitario)
+    }, 0)
+  } catch (error) {
+    console.error('Errore calcolo costi materiali:', error)
+    return 0
+  }
+}
+
+// Calcola il costo totale della manodopera dalle registrazioni del giornale
+const getTotalLaborCost = async (cantiere) => {
+  if (!cantiere?.id) return 0
+  
+  try {
+    const result = await firestoreStore.loadGiornaleCantiere(cantiere.id)
+    if (!result.success || !result.data) return 0
+    
+    const registrazioni = result.data
+    let costoTotale = 0
+    
+    for (const reg of registrazioni) {
+      // Calcola il costo per questa registrazione specifica
+      const costoGiornaliero = calculateDailyCostForDate(cantiere, reg.data, reg.team || [])
+      costoTotale += costoGiornaliero
+    }
+    
+    return costoTotale
+  } catch (error) {
+    console.error('Errore calcolo costi manodopera:', error)
+    return 0
+  }
+}
+
+// Calcola il costo giornaliero per una data specifica con team specifico
+const calculateDailyCostForDate = (cantiere, data, teamGiorno) => {
+  // Se non c'è team specifico per il giorno, usa il team del cantiere
+  const teamDaUsare = teamGiorno?.length > 0 ? teamGiorno : (cantiere.team || [])
+  
+  if (!teamDaUsare.length) return 0
+  
+  return teamDaUsare.reduce((total, membro) => {
+    // Trova il dipendente per ottenere la paga oraria
+    const dipendente = dipendentiDisponibili.value.find(d => 
+      d.id === membro.id || d.id === membro.dipendenteId
+    )
+    const pagaOraria = dipendente?.pagaOraria || 25
+    return total + (pagaOraria * 8) // 8 ore standard
+  }, 0)
+}
+
+// Calcola i costi totali del cantiere (materiali + manodopera)
+const getTotalCosts = async (cantiere) => {
+  if (!cantiere?.id) return 0
+  
+  const [costiMateriali, costiManodopera] = await Promise.all([
+    getTotalMaterialsCost(cantiere),
+    getTotalLaborCost(cantiere)
+  ])
+  
+  return costiMateriali + costiManodopera
+}
+
+// Calcola le statistiche sui costi del cantiere
+const getCostStatistics = async (cantiere) => {
+  if (!cantiere?.id) return {
+    costiMateriali: 0,
+    costiManodopera: 0,
+    costiTotali: 0,
+    giorniLavorativi: 0,
+    oreTotali: 0,
+    costoMedioGiorno: 0
+  }
+  
+  try {
+    const [costiMateriali, costiManodopera] = await Promise.all([
+      getTotalMaterialsCost(cantiere),
+      getTotalLaborCost(cantiere)
+    ])
+    
+    const result = await firestoreStore.loadGiornaleCantiere(cantiere.id)
+    const registrazioni = result.success ? result.data : []
+    
+    const giorniLavorativi = registrazioni.length
+    const oreTotali = registrazioni.reduce((sum, reg) => sum + (reg.oreTotali || 8), 0)
+    const costiTotali = costiMateriali + costiManodopera
+    const costoMedioGiorno = giorniLavorativi > 0 ? costiTotali / giorniLavorativi : 0
+    
+    return {
+      costiMateriali,
+      costiManodopera,
+      costiTotali,
+      giorniLavorativi,
+      oreTotali,
+      costoMedioGiorno
+    }
+  } catch (error) {
+    console.error('Errore calcolo statistiche costi:', error)
+    return {
+      costiMateriali: 0,
+      costiManodopera: 0,
+      costiTotali: 0,
+      giorniLavorativi: 0,
+      oreTotali: 0,
+      costoMedioGiorno: 0
+    }
+  }
+}
+
+// Aggiorna i costi accumulati nel documento cantiere
+const updateCantiereAccumulatedCosts = async (cantiereId) => {
+  try {
+    const cantiere = cantieri.value.find(c => c.id === cantiereId)
+    if (!cantiere) return
+    
+    const stats = await getCostStatistics(cantiere)
+    
+    const updateData = {
+      costiAccumulati: {
+        manodopera: stats.costiManodopera,
+        materiali: stats.costiMateriali,
+        totale: stats.costiTotali
+      },
+      statisticheCosti: {
+        giorniLavorativi: stats.giorniLavorativi,
+        oreTotaliLavorate: stats.oreTotali,
+        costoMedioGiorno: stats.costoMedioGiorno,
+        ultimoAggiornamento: new Date().toISOString()
+      }
+    }
+    
+    await firestore.cantieri.update(cantiereId, updateData)
+    
+    // Aggiorna anche la cache locale
+    const cantiereIndex = cantieri.value.findIndex(c => c.id === cantiereId)
+    if (cantiereIndex !== -1) {
+      cantieri.value[cantiereIndex] = { ...cantieri.value[cantiereIndex], ...updateData }
+    }
+    
+    console.log(`✅ Costi cantiere ${cantiere.nome} aggiornati:`, stats)
+  } catch (error) {
+    console.error('Errore aggiornamento costi accumulati:', error)
+  }
+}
+
+// Aggiorna manualmente i costi di un cantiere (funzione per il pulsante "Aggiorna")
+const refreshCantiereCosts = async (cantiere) => {
+  const { success, error } = useToast()
+  
+  if (!cantiere?.id) {
+    error('Errore: cantiere non valido!', '❌ Errore')
+    return
+  }
+  
+  try {
+    await updateCantiereAccumulatedCosts(cantiere.id)
+    
+    // Ricarica i cantieri per aggiornare la vista
+    await firestore.cantieri.load()
+    
+    success(`Costi del cantiere "${cantiere.nome}" aggiornati!`, '💰 Costi Aggiornati')
+  } catch (error) {
+    console.error('Errore aggiornamento costi cantiere:', error)
+    error('Errore durante l\'aggiornamento dei costi', '❌ Errore')
+  }
+}
+
+// ===== FINE FUNZIONI SISTEMA COSTI CANTIERE =====
+
 const addMemberToTeam = (dipendente) => {
   if (!selectedCantiere.value.team) {
     selectedCantiere.value.team = []
@@ -3155,6 +3415,11 @@ const saveMaterialToCantiere = async () => {
   materialiCantiere.value.push({ ...nuovoMateriale, isNew: true })
   await saveMaterialiCantiereToStorage()
   
+  // 💰 Aggiorna automaticamente i costi del cantiere
+  if (selectedCantiere.value?.id) {
+    await updateCantiereAccumulatedCosts(selectedCantiere.value.id)
+  }
+  
   closeAddMaterialModal()
   
   const modeText = materialSelectionMode.value === 'existing' ? 'aggiunto dal magazzino' : 'creato e aggiunto'
@@ -3212,6 +3477,11 @@ const saveMaterialChanges = async () => {
       originalStockId: originalMaterial.originalStockId
     }
     await saveMaterialiCantiereToStorage()
+    
+    // 💰 Aggiorna automaticamente i costi del cantiere dopo modifica materiale
+    if (selectedCantiere.value?.id) {
+      await updateCantiereAccumulatedCosts(selectedCantiere.value.id)
+    }
   }
   
   const { success } = useToast()
@@ -3913,5 +4183,43 @@ const removeMaterialFromCantiere = async (materialId) => {
       alert(`✅ Materiale "${materialeRimosso.nome}" rimosso dal cantiere!`)
     }
   }
+}
+
+const getMargineColor = (cantiere) => {
+  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
+  if (margine > 0) return 'text-green-600'
+  if (margine < 0) return 'text-red-600'
+  return 'text-gray-600'
+}
+
+const getMarginePercent = (cantiere) => {
+  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
+  const percentuale = (margine / cantiere.valore) * 100
+  return percentuale.toFixed(1) + '%'
+}
+
+const getMarginePercentColor = (cantiere) => {
+  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
+  const percentuale = (margine / cantiere.valore) * 100
+  if (percentuale > 0) return 'text-green-600'
+  if (percentuale < 0) return 'text-red-600'
+  return 'text-gray-600'
+}
+
+const getPerformanceBarColor = (cantiere) => {
+  const percentuale = (cantiere.costiAccumulati?.totale || 0) / cantiere.valore * 100
+  if (percentuale > 100) return 'bg-red-600'
+  if (percentuale > 80) return 'bg-orange-500'
+  if (percentuale > 60) return 'bg-yellow-500'
+  return 'bg-green-500'
+}
+
+// Calcola manodopera giornaliera effettiva dai dati reali
+const getManodoperaGiornaliera = (cantiere) => {
+  const giorniLavorativi = cantiere.statisticheCosti?.giorniLavorativi || 0
+  const costoManodopera = cantiere.costiAccumulati?.manodopera || 0
+  
+  if (giorniLavorativi === 0) return 0
+  return Math.round(costoManodopera / giorniLavorativi)
 }
 </script> 
