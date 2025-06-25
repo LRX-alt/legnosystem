@@ -415,7 +415,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { 
   PlusIcon, 
   CubeIcon, 
@@ -423,6 +423,16 @@ import {
   ExclamationTriangleIcon,
   XMarkIcon
 } from '@heroicons/vue/24/outline'
+import { useFirestoreStore } from '@/stores/firestore'
+import { useFirestore } from '@/composables/useFirestore'
+import { useToast } from '@/composables/useToast'
+import { useAuthStore } from '@/stores/auth'
+
+// Stores e composables
+const firestoreStore = useFirestoreStore()
+const firestore = useFirestore()
+const authStore = useAuthStore()
+const { success, error } = useToast()
 
 // Stato della pagina
 const showAddModal = ref(false)
@@ -430,12 +440,15 @@ const showEditModal = ref(false)
 const searchTerm = ref('')
 const selectedCategory = ref('')
 
-// Stats
-const stats = ref({
-  totaleArticoli: 0,
-  valoreTotale: 0,
-  sottoScorta: 0
-})
+// Computed per materiali da Firestore store
+const materiali = computed(() => firestoreStore.materiali)
+
+// Stats calcolate dai dati Firestore
+const stats = computed(() => ({
+  totaleArticoli: materiali.value.length,
+  valoreTotale: materiali.value.reduce((total, m) => total + (m.quantita * m.prezzoUnitario), 0),
+  sottoScorta: materiali.value.filter(m => m.quantita <= (m.scorteMinime || 0)).length
+}))
 
 // Nuovo materiale
 const newMateriale = ref({
@@ -461,9 +474,6 @@ const editingMateriale = ref({
   prezzoUnitario: 0,
   scorteMinime: 0
 })
-
-// Dati materiali - inizialmente vuoto, caricato da Firestore
-const materiali = ref([])
 
 // Computed
 const filteredMateriali = computed(() => {
@@ -510,21 +520,20 @@ const editMateriale = (materiale) => {
   showEditModal.value = true
 }
 
-const deleteMateriale = (id) => {
+const deleteMateriale = async (id) => {
   if (confirm('⚠️ Sei sicuro di voler eliminare questo materiale?')) {
-    const index = materiali.value.findIndex(m => m.id === id)
-    if (index !== -1) {
-      const materialeEliminato = materiali.value[index]
-      materiali.value.splice(index, 1)
-      
-      // Aggiorna statistiche
-      stats.value.totaleArticoli--
-      stats.value.valoreTotale -= (materialeEliminato.quantita * materialeEliminato.prezzoUnitario)
-      if (materialeEliminato.quantita <= materialeEliminato.scorteMinime) {
-        stats.value.sottoScorta--
+    try {
+      const result = await firestoreStore.deleteDocument('materiali', id)
+      if (result.success) {
+        // Ricarica i materiali per aggiornare la lista
+        await firestoreStore.loadMateriali()
+        success('Materiale eliminato con successo!', '✅ Eliminazione Completata')
+      } else {
+        error('Errore durante l\'eliminazione del materiale', '❌ Errore')
       }
-      
-      alert(`✅ Materiale "${materialeEliminato.nome}" eliminato con successo!`)
+    } catch (err) {
+      console.error('Errore eliminazione materiale:', err)
+      error('Errore durante l\'eliminazione del materiale', '❌ Errore')
     }
   }
 }
@@ -558,61 +567,80 @@ const closeEditModal = () => {
   }
 }
 
-const saveMateriale = () => {
+const saveMateriale = async () => {
   if (!newMateriale.value.codice || !newMateriale.value.nome || !newMateriale.value.categoria) {
-    alert('❌ Compila tutti i campi obbligatori!')
+    error('Compila tutti i campi obbligatori!', '❌ Validazione')
     return
   }
 
   // Verifica se il codice esiste già
   if (materiali.value.some(m => m.codice === newMateriale.value.codice)) {
-    alert('❌ Codice materiale già esistente!')
+    error('Codice materiale già esistente!', '❌ Codice Duplicato')
     return
   }
 
-  const nuovoMateriale = {
-    id: Date.now(),
-    codice: newMateriale.value.codice,
-    nome: newMateriale.value.nome,
-    descrizione: newMateriale.value.descrizione,
-    categoria: newMateriale.value.categoria,
-    unita: newMateriale.value.unita,
-    quantita: newMateriale.value.quantita,
-    prezzoUnitario: newMateriale.value.prezzoUnitario,
-    scorteMinime: newMateriale.value.scorteMinime
+  // 🔐 Verifica autenticazione
+  console.log('🔐 Stato autenticazione:', {
+    isAuthenticated: authStore.isAuthenticated,
+    user: authStore.user?.email,
+    userId: authStore.user?.uid
+  })
+
+  if (!authStore.isAuthenticated) {
+    error('Devi essere autenticato per salvare materiali!', '❌ Non Autenticato')
+    return
   }
 
-  materiali.value.push(nuovoMateriale)
-  
-  // Aggiorna statistiche
-  stats.value.totaleArticoli++
-  stats.value.valoreTotale += (nuovoMateriale.quantita * nuovoMateriale.prezzoUnitario)
-  if (nuovoMateriale.quantita <= nuovoMateriale.scorteMinime) {
-    stats.value.sottoScorta++
-  }
+  try {
+    console.log('🚀 Iniziando salvataggio materiale...', newMateriale.value)
+    
+    const nuovoMateriale = {
+      codice: newMateriale.value.codice,
+      nome: newMateriale.value.nome,
+      descrizione: newMateriale.value.descrizione,
+      categoria: newMateriale.value.categoria,
+      unita: newMateriale.value.unita,
+      quantita: newMateriale.value.quantita,
+      prezzoUnitario: newMateriale.value.prezzoUnitario,
+      scorteMinime: newMateriale.value.scorteMinime
+    }
 
-  closeAddModal()
-  alert(`✅ Materiale "${nuovoMateriale.nome}" aggiunto con successo!`)
+    console.log('📦 Dati da salvare:', nuovoMateriale)
+    
+    const result = await firestoreStore.createMateriale(nuovoMateriale)
+    console.log('📝 Risultato salvataggio:', result)
+    
+    if (result.success) {
+      console.log('✅ Materiale salvato su Firestore, ricarico lista...')
+      // Ricarica i materiali per aggiornare la lista
+      await firestoreStore.loadMateriali()
+      console.log('📋 Lista materiali ricaricata:', firestoreStore.materiali.length, 'elementi')
+      closeAddModal()
+      success(`Materiale "${nuovoMateriale.nome}" aggiunto con successo!`, '✅ Materiale Aggiunto')
+    } else {
+      console.error('❌ Errore nel salvataggio:', result.error)
+      error('Errore durante il salvataggio del materiale', '❌ Errore')
+    }
+  } catch (err) {
+    console.error('❌ Eccezione durante salvataggio materiale:', err)
+    error('Errore durante il salvataggio del materiale', '❌ Errore')
+  }
 }
 
-const saveEditMateriale = () => {
+const saveEditMateriale = async () => {
   if (!editingMateriale.value.codice || !editingMateriale.value.nome || !editingMateriale.value.categoria) {
-    alert('❌ Compila tutti i campi obbligatori!')
+    error('Compila tutti i campi obbligatori!', '❌ Validazione')
     return
   }
 
   // Verifica se il codice esiste già (escludendo se stesso)
   if (materiali.value.some(m => m.codice === editingMateriale.value.codice && m.id !== editingMateriale.value.id)) {
-    alert('❌ Codice materiale già esistente!')
+    error('Codice materiale già esistente!', '❌ Codice Duplicato')
     return
   }
 
-  const index = materiali.value.findIndex(m => m.id === editingMateriale.value.id)
-  if (index !== -1) {
-    const materialeOriginale = { ...materiali.value[index] }
-    
-    materiali.value[index] = {
-      id: editingMateriale.value.id,
+  try {
+    const materialeAggiornato = {
       codice: editingMateriale.value.codice,
       nome: editingMateriale.value.nome,
       descrizione: editingMateriale.value.descrizione,
@@ -623,23 +651,93 @@ const saveEditMateriale = () => {
       scorteMinime: editingMateriale.value.scorteMinime
     }
 
-    // Aggiorna statistiche
-    const vecchioValore = materialeOriginale.quantita * materialeOriginale.prezzoUnitario
-    const nuovoValore = editingMateriale.value.quantita * editingMateriale.value.prezzoUnitario
-    stats.value.valoreTotale = stats.value.valoreTotale - vecchioValore + nuovoValore
-    
-    // Aggiorna conteggio sotto scorta
-    const eraInScorta = materialeOriginale.quantita <= materialeOriginale.scorteMinime
-    const eInScorta = editingMateriale.value.quantita <= editingMateriale.value.scorteMinime
-    
-    if (eraInScorta && !eInScorta) {
-      stats.value.sottoScorta--
-    } else if (!eraInScorta && eInScorta) {
-      stats.value.sottoScorta++
+    const result = await firestoreStore.updateDocument('materiali', editingMateriale.value.id, materialeAggiornato)
+    if (result.success) {
+      // Ricarica i materiali per aggiornare la lista
+      await firestoreStore.loadMateriali()
+      closeEditModal()
+      success(`Materiale "${materialeAggiornato.nome}" modificato con successo!`, '✅ Materiale Aggiornato')
+    } else {
+      error('Errore durante l\'aggiornamento del materiale', '❌ Errore')
     }
+  } catch (err) {
+    console.error('Errore aggiornamento materiale:', err)
+    error('Errore durante l\'aggiornamento del materiale', '❌ Errore')
+  }
+}
+
+// Funzione per configurare i permessi utente automaticamente
+const setupUserPermissions = async () => {
+  if (!authStore.isAuthenticated || !authStore.user?.uid) {
+    console.warn('⚠️ Utente non autenticato, impossibile configurare permessi')
+    return false
   }
 
-  closeEditModal()
-  alert(`✅ Materiale "${editingMateriale.value.nome}" modificato con successo!`)
+  try {
+    const userId = authStore.user.uid
+    const email = authStore.user.email
+    
+    console.log('🔧 Configurando permessi utente per:', email)
+    
+    // Crea/aggiorna il profilo utente con i permessi necessari
+    const userProfile = {
+      email: email,
+      role: 'manager', // Ruolo che permette gestione materiali
+      permissions: [
+        'manage_materiali',
+        'manage_cantieri', 
+        'view_dipendenti',
+        'manage_clienti'
+      ],
+      displayName: authStore.user.displayName || email.split('@')[0],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+    
+    // Salva il profilo in Firestore
+    const result = await firestoreStore.updateDocument('userProfiles', userId, userProfile)
+    
+    if (result.success) {
+      console.log('✅ Permessi utente configurati correttamente')
+      success('Permessi utente configurati! Ora puoi gestire i materiali.', '✅ Setup Completato')
+      return true
+    } else {
+      console.error('❌ Errore configurazione permessi:', result.error)
+      return false
+    }
+  } catch (err) {
+    console.error('❌ Errore setup permessi:', err)
+    return false
+  }
 }
+
+// Carica i materiali all'avvio del componente
+onMounted(async () => {
+  console.log('🏗️ Magazzino: Inizializzazione componente...')
+  
+  // 🔧 Setup permessi utente (una tantum)
+  if (authStore.isAuthenticated) {
+    await setupUserPermissions()
+  }
+  
+  // 🧪 Test connessione Firestore
+  try {
+    console.log('🧪 Testando connessione Firestore...')
+    const testResult = await firestoreStore.testFirestoreConnection()
+    console.log('🧪 Risultato test Firestore:', testResult)
+  } catch (testErr) {
+    console.error('❌ Test Firestore fallito:', testErr)
+  }
+  
+  try {
+    console.log('📡 Caricando materiali da Firestore...')
+    const result = await firestoreStore.loadMateriali()
+    console.log('📋 Risultato caricamento materiali:', result)
+    console.log('📦 Materiali caricati nello store:', firestoreStore.materiali.length)
+    console.log('📝 Lista materiali:', firestoreStore.materiali)
+  } catch (err) {
+    console.error('❌ Errore caricamento materiali:', err)
+    error('Errore durante il caricamento dei materiali', '❌ Errore Caricamento')
+  }
+})
 </script> 

@@ -73,8 +73,14 @@
               </div>
             </div>
 
+            <!-- Loading State -->
+            <div v-if="isLoading" class="flex items-center justify-center py-8">
+              <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              <span class="ml-3 text-gray-600">Caricamento allegati...</span>
+            </div>
+
             <!-- Lista Allegati -->
-            <div v-if="attachments.length > 0" class="space-y-3">
+            <div v-else-if="attachments.length > 0" class="space-y-3">
               <div
                 v-for="attachment in attachments"
                 :key="attachment.id"
@@ -242,6 +248,7 @@ import {
   TrashIcon 
 } from '@heroicons/vue/24/outline'
 import { useToast } from '@/composables/useToast'
+import { useFirestoreStore } from '@/stores/firestore'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -251,10 +258,13 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const { success, error } = useToast()
+const firestoreStore = useFirestoreStore()
 
 // Stato locale
 const showUploadArea = ref(false)
 const attachments = ref([])
+const isDragOver = ref(false)
+const isLoading = ref(false)
 
 // Computed
 const totalSize = computed(() => {
@@ -285,9 +295,40 @@ watch(() => props.material, (newMaterial) => {
 }, { immediate: true })
 
 // Methods
-const loadAttachments = () => {
-  if (!props.material) return
+const loadAttachments = async () => {
+  if (!props.material?.id) return
   
+  isLoading.value = true
+  try {
+    // Carica allegati da Firestore
+    const result = await firestoreStore.loadAllegatiMateriale(props.material.id)
+    if (result.success && result.data) {
+      attachments.value = result.data.map(att => ({
+        id: att.id,
+        materialId: att.materialeId,
+        cantiereId: props.material.cantiere?.id,
+        nome: att.nome,
+        categoria: att.categoria || 'Generale',
+        dimensione: att.dimensione,
+        tipo: att.tipo,
+        dataCaricamento: att.uploadedAt?.toDate?.() || att.uploadedAt,
+        fornitore: props.material.fornitoreNome,
+        url: att.url
+      }))
+    } else {
+      attachments.value = []
+    }
+  } catch (e) {
+    console.error('Errore caricamento allegati da Firestore:', e)
+    // Fallback a localStorage per compatibilità
+    loadAttachmentsFromLocalStorage()
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Fallback per compatibilità con localStorage
+const loadAttachmentsFromLocalStorage = () => {
   const stored = localStorage.getItem('legnosystem_material_attachments')
   if (!stored) {
     attachments.value = []
@@ -314,7 +355,7 @@ const loadAttachments = () => {
       url: att.url
     }))
   } catch (e) {
-    console.error('Errore caricamento allegati:', e)
+    console.error('Errore caricamento allegati da localStorage:', e)
     attachments.value = []
   }
 }
@@ -343,68 +384,48 @@ const processFiles = (files) => {
 }
 
 const addAttachment = async (file) => {
+  if (!props.material?.id) return
+  
   const categoria = categorizeFile(file.name, file.type)
   
-  // Converte il file in Base64 per persistenza
-  const base64 = await new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onload = (e) => resolve(e.target.result)
-    reader.readAsDataURL(file)
-  })
-  
-  const newAttachment = {
-    id: Date.now() + Math.random(),
-    materialId: String(props.material.id),
-    cantiereId: String(props.material.cantiere?.id),
-    nome: file.name,
-    categoria,
-    dimensione: file.size,
-    tipo: file.type.split('/').pop(),
-    dataCaricamento: new Date().toISOString().split('T')[0],
-    fornitore: props.material.fornitoreNome,
-    url: base64
-  }
-  
-  attachments.value.push(newAttachment)
-  saveAttachments()
-  success(`Allegato "${file.name}" aggiunto con successo!`)
-}
-
-const saveAttachments = () => {
-  const stored = localStorage.getItem('legnosystem_material_attachments')
-  let allAttachments = []
-  
-  if (stored) {
-    try {
-      allAttachments = JSON.parse(stored)
-    } catch (e) {
-      console.error('Errore parsing allegati:', e)
+  try {
+    isLoading.value = true
+    
+    // Converte il file in Base64 per persistenza
+    const base64 = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = (e) => resolve(e.target.result)
+      reader.readAsDataURL(file)
+    })
+    
+    // Prepara i dati per Firestore
+    const allegatoData = {
+      nome: file.name,
+      categoria,
+      dimensione: file.size,
+      tipo: file.type.split('/').pop(),
+      fornitore: props.material.fornitoreNome,
+      url: base64,
+      materialeId: props.material.id,
+      cantiereId: props.material.cantiere?.id
     }
+    
+    // Salva su Firestore
+    const result = await firestoreStore.createAllegatoMateriale(props.material.id, allegatoData)
+    
+    if (result.success) {
+      // Ricarica allegati da Firestore
+      await loadAttachments()
+      success(`Allegato "${file.name}" aggiunto con successo!`)
+    } else {
+      throw new Error(result.error || 'Errore nel salvataggio')
+    }
+  } catch (e) {
+    console.error('Errore aggiunta allegato:', e)
+    error(`Errore nell'aggiunta dell'allegato: ${e.message}`)
+  } finally {
+    isLoading.value = false
   }
-  
-  // Rimuovi i vecchi allegati di questo materiale usando confronto stringa
-  allAttachments = allAttachments.filter(att => 
-    !(String(att.materialId) === String(props.material.id) && 
-      String(att.cantiereId) === String(props.material.cantiere?.id))
-  )
-  
-  // Converti e aggiungi i nuovi allegati nel formato compatibile
-  const newAttachments = attachments.value.map(att => ({
-    id: att.id,
-    materialId: String(att.materialId),
-    cantiereId: String(att.cantiereId),
-    name: att.nome,
-    category: att.categoria,
-    size: att.dimensione,
-    type: att.tipo,
-    uploadDate: att.dataCaricamento,
-    fornitore: att.fornitore,
-    url: att.url
-  }))
-  
-  allAttachments.push(...newAttachments)
-  
-  localStorage.setItem('legnosystem_material_attachments', JSON.stringify(allAttachments))
 }
 
 const categorizeFile = (fileName, fileType) => {
@@ -469,11 +490,27 @@ const downloadFile = (attachment) => {
   success(`Download avviato: ${attachment.nome}`)
 }
 
-const deleteFile = (attachment) => {
+const deleteFile = async (attachment) => {
   if (confirm(`Eliminare "${attachment.nome}"?`)) {
-    attachments.value = attachments.value.filter(att => att.id !== attachment.id)
-    saveAttachments()
-    success(`Allegato "${attachment.nome}" eliminato`)
+    try {
+      isLoading.value = true
+      
+      // Elimina da Firestore
+      const result = await firestoreStore.deleteAllegatoMateriale(attachment.id)
+      
+      if (result.success) {
+        // Ricarica allegati da Firestore
+        await loadAttachments()
+        success(`Allegato "${attachment.nome}" eliminato`)
+      } else {
+        throw new Error(result.error || 'Errore nell\'eliminazione')
+      }
+    } catch (e) {
+      console.error('Errore eliminazione allegato:', e)
+      error(`Errore nell'eliminazione dell'allegato: ${e.message}`)
+    } finally {
+      isLoading.value = false
+    }
   }
 }
 

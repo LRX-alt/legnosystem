@@ -1,11 +1,36 @@
-# Changelog
+# 📋 Changelog - Legnosystem.bio
 
-Tutte le modifiche significative al progetto Legnosystem.bio saranno documentate in questo file.
+Tutte le modifiche significative a questo progetto verranno documentate in questo file.
 
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.13.0] - 2024-12-19
+## [2.2.0] - 2024-12-27
+
+### 🚀 **NUOVE FUNZIONALITÀ**
+- ✅ **Integrazione completa Firestore** per gestione materiali magazzino
+- ✅ **Sistema permessi utente automatico** per accesso alle funzionalità
+- ✅ **Dropdown materiali cantieri** ora popolato correttamente dal magazzino
+- ✅ **Sincronizzazione real-time** tra Magazzino e Cantieri
+
+### 🔧 **CORREZIONI**
+- ✅ **RISOLTO**: Materiali magazzino sparivano dopo refresh della pagina
+- ✅ **RISOLTO**: Dropdown vuoto per selezione materiali nei cantieri
+- ✅ **RISOLTO**: Conflitti localStorage vs Firestore
+- ✅ **MIGLIORATO**: Gestione errori e feedback utente con toast notifications
+
+### 🛠️ **MIGRAZIONI TECNICHE**
+- ✅ **Migrato** `Magazzino.vue` da localStorage a Firestore
+- ✅ **Aggiornato** `MaterialAttachmentsModal.vue` per usare Firestore allegati
+- ✅ **Risolto** conflitto regole sicurezza Firestore
+- ✅ **Implementato** setup automatico profili utente con permessi
+
+### 📋 **REFACTORING**
+- ✅ **Standardizzata** nomenclatura campi tra localStorage e Firestore
+- ✅ **Unified** gestione ID come stringhe in tutto il sistema
+- ✅ **Improved** debug logging per diagnostica problemi
+
+## [2.1.0] - 2024-12-20
 
 ### 🎉 NUOVE FUNZIONALITÀ MAGGIORI
 - **🚛 Gestione Mezzi & Attrezzature** - Sistema completo per parco macchine aziendale

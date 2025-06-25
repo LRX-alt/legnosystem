@@ -3052,7 +3052,14 @@ const closeManageMaterialsModal = () => {
   showManageMaterialsModal.value = false
 }
 
-const addMaterialToCantiere = () => {
+const addMaterialToCantiere = async () => {
+  // Ricarica i materiali del magazzino per avere i dati più aggiornati
+  try {
+    await firestoreStore.loadMateriali()
+  } catch (error) {
+    console.warn('Errore aggiornamento materiali magazzino:', error)
+  }
+  
   // Reset form con valori default
   newMaterial.value = {
     nome: '',
@@ -3721,8 +3728,20 @@ const getSelectedMaterialFromStock = () => {
 }
 
 const fillMaterialFromStock = () => {
-  newMaterial.value = { ...getSelectedMaterialFromStock() }
-  closeAddMaterialModal()
+  const selectedMaterial = getSelectedMaterialFromStock()
+  if (selectedMaterial) {
+    newMaterial.value = {
+      nome: selectedMaterial.nome,
+      descrizione: selectedMaterial.descrizione,
+      codice: selectedMaterial.codice,
+      unita: selectedMaterial.unita,
+      prezzoUnitario: selectedMaterial.prezzoUnitario,
+      categoria: selectedMaterial.categoria,
+      quantitaRichiesta: 1, // Default quantity
+      stato: 'pianificato',
+      note: ''
+    }
+  }
 }
 
 const clientSelectionMode = ref('existing')
@@ -3769,11 +3788,21 @@ onMounted(async () => {
   // Carica allegati materiali dal localStorage solo al mount del componente
   loadMaterialAttachmentsFromStorage()
   
-  // Carica tutti i dati da Firestore usando il composable con gestione errori
+  // Carica tutti i dati da Firestore 
   try {
-    await firestore.loadAllData()
+    // Carica tutti i dati necessari usando Promise.all per efficienza
+    await Promise.all([
+      firestoreStore.loadCantieri(),
+      firestoreStore.loadDipendenti(),
+      firestoreStore.loadMateriali(), // Assicura che i materiali siano disponibili per il dropdown
+      firestoreStore.loadFornitori(),
+      firestoreStore.loadClienti()
+    ])
+    console.log('✅ Dati cantieri caricati con successo')
   } catch (error) {
-    console.error('Errore nel caricamento dati Cantieri:', error)
+    console.error('❌ Errore nel caricamento dati Cantieri:', error)
+    const { error: showError } = useToast()
+    showError('Errore durante il caricamento dei dati', '❌ Errore Caricamento')
   }
 })
 

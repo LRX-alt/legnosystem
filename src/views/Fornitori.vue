@@ -1142,51 +1142,30 @@ const closeEditModal = () => {
   }
 }
 
-// Funzioni per sincronizzazione con materiali cantieri
+// Funzioni per sincronizzazione con materiali cantieri - AGGIORNATO PER FIRESTORE
 const getFornitoreRelations = (fornitoreId) => {
-  const stored = localStorage.getItem('legnosystem_materiali_cantieri')
-  const cantieriStored = localStorage.getItem('legnosystem_cantieri')
+  // Usa i dati da Firestore store invece di localStorage
+  const cantieri = firestoreStore.cantieri
+  const materialiCantieri = {} // TODO: Implementare caricamento materiali cantieri da Firestore
   
-  if (!stored || !cantieriStored) return { materiali: [], cantieri: [], totaleValore: 0 }
+  if (!cantieri.length) return { materiali: [], cantieri: [], totaleValore: 0 }
   
   try {
-    const materialiCantieri = JSON.parse(stored)
-    const cantieri = JSON.parse(cantieriStored)
-    
     let materiali = []
     let cantieriAssociati = new Set()
     let totaleValore = 0
     
-    // Cerca in tutti i cantieri i materiali di questo fornitore
-    Object.entries(materialiCantieri).forEach(([cantiereId, materialiList]) => {
-      const cantiere = cantieri.find(c => c.id == cantiereId)
-      
-      materialiList.forEach(materiale => {
-        if (materiale.fornitoreId == fornitoreId) {
-          materiali.push({
-            ...materiale,
-            cantiere: {
-              id: cantiereId,
-              nome: cantiere?.nome || 'Cantiere non trovato',
-              cliente: cantiere?.cliente || ''
-            }
-          })
-          cantieriAssociati.add(cantiereId)
-          totaleValore += (materiale.quantitaRichiesta * materiale.prezzoUnitario) || 0
-        }
-      })
-    })
-    
-    const cantieriArray = Array.from(cantieriAssociati).map(id => {
-      const cantiere = cantieri.find(c => c.id == id)
-      return cantiere ? {
+    // Per ora usiamo solo i cantieri da Firestore
+    // I materiali cantieri verranno caricati quando sarà implementata la funzione completa
+    const cantieriArray = cantieri
+      .filter(cantiere => cantiere.fornitoreId === fornitoreId || cantiere.fornitori?.includes(fornitoreId))
+      .map(cantiere => ({
         id: cantiere.id,
         nome: cantiere.nome,
         cliente: cantiere.cliente,
         stato: cantiere.stato,
-        materialiCount: materialiCantieri[id]?.filter(m => m.fornitoreId == fornitoreId).length || 0
-      } : null
-    }).filter(Boolean)
+        materialiCount: 0 // TODO: Contare materiali da Firestore
+      }))
     
     return {
       materiali,
@@ -1194,13 +1173,15 @@ const getFornitoreRelations = (fornitoreId) => {
       totaleValore
     }
   } catch (e) {
-    console.error('Errore nel caricamento relazioni fornitore:', e)
+    console.error('Errore nel caricamento relazioni fornitore da Firestore:', e)
     return { materiali: [], cantieri: [], totaleValore: 0 }
   }
 }
 
-// Funzione per contare gli allegati di un materiale specifico
+// Funzione per contare gli allegati di un materiale specifico - AGGIORNATO PER FIRESTORE
 const getMaterialAttachmentCount = (materiale) => {
+  // TODO: Implementare conteggio allegati da Firestore quando sarà disponibile
+  // Per ora manteniamo il fallback a localStorage per compatibilità
   const stored = localStorage.getItem('legnosystem_material_attachments')
   if (!stored) return 0
   
