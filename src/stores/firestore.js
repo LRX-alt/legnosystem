@@ -104,6 +104,56 @@ export const useFirestoreStore = defineStore('firestore', () => {
   }
 
   /**
+   * Sanitizza i dati per evitare errori Firestore
+   */
+  const sanitizeFirestoreData = (data) => {
+    const sanitized = {}
+    
+    Object.keys(data).forEach(key => {
+      const value = data[key]
+      
+      // Salta valori undefined
+      if (value === undefined) return
+      
+      // Gestisce Date objects
+      if (value instanceof Date) {
+        sanitized[key] = value
+        return
+      }
+      
+      // Gestisce Timestamp/serverTimestamp
+      if (value && typeof value === 'object' && value.constructor?.name === 'Timestamp') {
+        sanitized[key] = value
+        return
+      }
+      
+      // Gestisce array - verifica che siano effettivamente array
+      if (Array.isArray(value)) {
+        sanitized[key] = value
+        return
+      }
+      
+      // Se dovrebbe essere un array ma non lo è, convertilo
+      if (['team', 'fasi', 'allegati'].includes(key) && !Array.isArray(value)) {
+        sanitized[key] = value ? [value] : []
+        return
+      }
+      
+      // Gestisce oggetti semplici
+      if (value !== null && typeof value === 'object') {
+        // Ricorsione per oggetti nested
+        sanitized[key] = sanitizeFirestoreData(value)
+        return
+      }
+      
+      // Valori primitivi
+      sanitized[key] = value
+    })
+    
+    return sanitized
+  }
+
+  /**
    * Aggiorna un documento esistente
    */
   const updateDocument = async (collectionName, docId, data) => {
@@ -111,16 +161,13 @@ export const useFirestoreStore = defineStore('firestore', () => {
     error.value = null
     
     try {
-      // Rimuovi campi undefined per evitare errori Firestore
-      const cleanedData = {}
-      Object.keys(data).forEach(key => {
-        if (data[key] !== undefined) {
-          cleanedData[key] = data[key]
-        }
-      })
+      // Sanitizza i dati prima dell'update
+      const sanitizedData = sanitizeFirestoreData(data)
+      
+      console.log(`🔧 Update ${collectionName}/${docId}:`, sanitizedData)
       
       await updateDoc(doc(db, collectionName, docId), {
-        ...cleanedData,
+        ...sanitizedData,
         updatedAt: serverTimestamp()
       })
       
@@ -128,6 +175,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
     } catch (err) {
       error.value = err.message
       console.error(`Errore aggiornamento documento ${docId} in ${collectionName}:`, err)
+      console.error('📋 Dati che causavano l\'errore:', data)
       return { success: false, error: err.message }
     } finally {
       loading.value = false
@@ -400,10 +448,57 @@ export const useFirestoreStore = defineStore('firestore', () => {
   }
 
   const updateMaterialeCantiere = async (materialeId, updateData) => {
-    return await updateDocument('materiali_cantieri', materialeId, {
-      ...updateData,
-      updatedAt: serverTimestamp()
-    })
+    // Validazione specifica per materiali cantiere
+    const validatedData = {
+      ...updateData
+    }
+    
+    // Assicura che i campi numerici siano numeri
+    if (validatedData.quantitaRichiesta) {
+      validatedData.quantitaRichiesta = Number(validatedData.quantitaRichiesta) || 0
+    }
+    if (validatedData.quantitaUtilizzata) {
+      validatedData.quantitaUtilizzata = Number(validatedData.quantitaUtilizzata) || 0
+    }
+    if (validatedData.prezzoUnitario) {
+      validatedData.prezzoUnitario = Number(validatedData.prezzoUnitario) || 0
+    }
+    if (validatedData.prezzoTotale) {
+      validatedData.prezzoTotale = Number(validatedData.prezzoTotale) || 0
+    }
+    
+    // Assicura che i campi stringa siano stringhe
+    if (validatedData.nome) {
+      validatedData.nome = String(validatedData.nome)
+    }
+    if (validatedData.descrizione) {
+      validatedData.descrizione = String(validatedData.descrizione)
+    }
+    if (validatedData.unita) {
+      validatedData.unita = String(validatedData.unita)
+    }
+    if (validatedData.stato) {
+      validatedData.stato = String(validatedData.stato)
+    }
+    if (validatedData.note) {
+      validatedData.note = String(validatedData.note)
+    }
+    
+    // Assicura che gli ID siano stringhe
+    if (validatedData.fornitoreId) {
+      validatedData.fornitoreId = String(validatedData.fornitoreId)
+    }
+    if (validatedData.originalStockId) {
+      validatedData.originalStockId = String(validatedData.originalStockId)
+    }
+    
+    // Rimuove campi che potrebbero causare problemi
+    delete validatedData.isNew
+    delete validatedData.isFromStock
+    
+    console.log(`🔧 Aggiornamento materiale cantiere ${materialeId}:`, validatedData)
+    
+    return await updateDocument('materiali_cantieri', materialeId, validatedData)
   }
 
   const deleteMaterialeCantiere = async (materialeId) => {
