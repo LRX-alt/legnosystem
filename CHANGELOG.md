@@ -5,6 +5,27 @@ Tutte le modifiche significative a questo progetto verranno documentate in quest
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2024-12-30
+
+### 🎨 **MIGLIORAMENTI UX SCHEDA CANTIERE**
+- ✅ **Calcolo manodopera effettiva**: Ora mostra costo giornaliero reale basato sui dati del giornale cantiere invece di valore teorico
+- ✅ **Margine rimanente**: Visualizzazione margine profitto con calcolo `Valore Cantiere - Costi Sostenuti` e percentuale colorata
+- ✅ **Barra progresso costi**: Indicatore visuale consumo budget con soglie colorate (Verde <60%, Giallo 60-80%, Arancione 80-100%, Rosso >100%)
+- ✅ **Badge alert costi**: Indicatore "⚠️ Costi" per cantieri che superano 80% del valore totale
+- ✅ **Rapporto costi migliorato**: Visualizzazione `€760 / €5.200` per immediata comprensione proporzioni
+- ✅ **Statistiche dettagliate**: Costo medio giornaliero calcolato automaticamente nella sezione stats
+- ✅ **Distinzione valori**: Chiara separazione tra valori effettivi (dai dati reali) e teorici (da calcoli pianificati)
+
+### 🔧 **CORREZIONI & OTTIMIZZAZIONI**
+- ✅ **Performance barra costi**: Animazioni smooth con transition CSS per feedback immediato
+- ✅ **Colori dinamici**: Sistema colori intelligente per margini (verde positivo, rosso negativo)
+- ✅ **Precisione calcoli**: Margine percentuale con 1 decimale per maggiore leggibilità
+
+### 📊 **BUSINESS INTELLIGENCE**
+- ✅ **Controllo finanziario immediato**: Vista instant dello stato economico di ogni cantiere
+- ✅ **Alert preventivi**: Sistema avvisi automatici per cantieri con derive sui costi
+- ✅ **KPI visuali**: Indicatori colorati per identificazione rapida problematiche
+
 ## [2.2.0] - 2024-12-27
 
 ### 🚀 **NUOVE FUNZIONALITÀ**
