@@ -309,7 +309,7 @@ const lastSync = ref(null)
 // KPI Data - Calcolati dinamicamente dai dati Firestore
 const kpis = computed(() => ({
   cantieriAttivi: firestoreStore.cantieri.filter(c => c.stato === 'in_corso' || c.stato === 'pianificato' || c.stato === 'in-corso').length,
-  valoreMagazzino: firestoreStore.materiali.reduce((total, m) => total + (m.prezzo_unitario * m.quantita), 0),
+  valoreMagazzino: firestoreStore.materiali.reduce((total, m) => total + ((m.prezzoUnitario || 0) * (m.quantita || 0)), 0),
   oreLavorate: firestoreStore.dipendenti.reduce((total, d) => total + (d.ore_settimana || 0), 0),
   mezziDisponibili: firestoreStore.mezzi.filter(m => m.stato === 'disponibile').length
 }))
@@ -331,14 +331,14 @@ const cantieri = computed(() =>
 // Materiali più utilizzati - Top 5 per quantità
 const materialiTop = computed(() => 
   firestoreStore.materiali
-    .filter(m => m.quantita > 0)
-    .sort((a, b) => b.quantita - a.quantita)
+    .filter(m => (m.quantita || 0) > 0)
+    .sort((a, b) => (b.quantita || 0) - (a.quantita || 0))
     .slice(0, 5)
     .map((m, index) => ({
       id: m.id,
       nome: m.nome,
       quantita: m.quantita,
-      unita: m.unita_misura,
+      unita: m.unita || m.unitaMisura || m.unita_misura || 'pz',
       color: ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500'][index]
     }))
 )
@@ -417,7 +417,7 @@ const enhancedKpis = computed(() => ({
   },
   materiali: {
     totale: firestoreStore.materiali.length,
-    valore: firestoreStore.materiali.reduce((total, m) => total + ((m.prezzo_unitario || 0) * (m.quantita || 0)), 0),
+    valore: firestoreStore.materiali.reduce((total, m) => total + ((m.prezzoUnitario || 0) * (m.quantita || 0)), 0),
     trend: calculateTrend('materiali')
   }
 }))
