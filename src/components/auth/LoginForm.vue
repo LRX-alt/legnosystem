@@ -105,12 +105,12 @@
 
           <!-- Remember me & Forgot -->
           <div class="flex items-center justify-between">
-            <label class="flex items-center">
+            <label class="flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 v-model="form.remember"
                 :disabled="loading"
-                class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded disabled:opacity-50"
+                class="form-checkbox h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded disabled:opacity-50"
               />
               <span class="ml-2 text-sm text-gray-600">Ricordami</span>
             </label>
