@@ -19,8 +19,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import LoginForm from '@/components/auth/LoginForm.vue'
 import RegisterForm from '@/components/auth/RegisterForm.vue'
 import { usePopup } from '@/composables/usePopup'
@@ -28,14 +29,26 @@ import { usePopup } from '@/composables/usePopup'
 // Composables
 const router = useRouter()
 const { success } = usePopup()
+const authStore = useAuthStore()
 
 // State
 const showRegister = ref(false)
 
 // Methods
 const handleLoginSuccess = () => {
-  success('Accesso Effettuato', 'Benvenuto in Legnosystem!')
-  router.push('/')
+  // Aspetta che lo stato di autenticazione sia confermato prima di reindirizzare
+  // per risolvere la race condition con la guardia del router.
+  const unwatch = watch(
+    () => authStore.isAuthenticated,
+    (isAuth) => {
+      if (isAuth) {
+        success('Accesso Effettuato', 'Benvenuto in Legnosystem!')
+        router.push('/')
+        // Rimuovi il watcher una volta eseguito il reindirizzamento
+        unwatch()
+      }
+    }
+  )
 }
 
 const handleRegisterSuccess = () => {
