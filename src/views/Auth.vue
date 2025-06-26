@@ -35,7 +35,7 @@ const showRegister = ref(false)
 // Methods
 const handleLoginSuccess = () => {
   success('Accesso Effettuato', 'Benvenuto in Legnosystem!')
-  router.push('/dashboard')
+  router.push('/')
 }
 
 const handleRegisterSuccess = () => {
