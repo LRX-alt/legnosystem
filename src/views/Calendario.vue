@@ -393,6 +393,190 @@
       </div>
     </div>
 
+    <!-- Modal Dettaglio Evento -->
+    <div v-if="showEventDetailModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeEventDetailModal">
+      <div class="relative top-4 mx-auto border w-full max-w-2xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <!-- Header -->
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 rounded-lg" :class="getEventHeaderColor(selectedEvent?.type)">
+                <CalendarDaysIcon v-if="selectedEvent?.type === 'cantiere'" class="w-6 h-6" />
+                <ClockIcon v-else-if="selectedEvent?.type === 'scadenza'" class="w-6 h-6" />
+                <UserGroupIcon v-else class="w-6 h-6" />
+              </div>
+              <div>
+                <h3 class="text-xl font-bold text-gray-900">{{ selectedEvent?.title }}</h3>
+                <p class="text-sm text-gray-600">{{ selectedEvent?.type === 'cantiere' ? 'Cantiere' : selectedEvent?.type === 'scadenza' ? 'Scadenza' : 'Appuntamento' }}</p>
+              </div>
+            </div>
+            <button @click="closeEventDetailModal" class="text-gray-400 hover:text-gray-600">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+
+          <!-- Info Base Evento -->
+          <div class="bg-gray-50 rounded-lg p-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="flex items-center space-x-3">
+                <CalendarDaysIcon class="w-5 h-5 text-gray-400" />
+                <div>
+                  <p class="text-sm text-gray-600">Data</p>
+                  <p class="font-medium">{{ formatDate(selectedEvent?.date) }}</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-3">
+                <ClockIcon class="w-5 h-5 text-gray-400" />
+                <div>
+                  <p class="text-sm text-gray-600">Orario</p>
+                  <p class="font-medium">{{ selectedEvent?.startTime }} - {{ selectedEvent?.endTime }}</p>
+                </div>
+              </div>
+            </div>
+            <div v-if="selectedEvent?.description" class="mt-4">
+              <p class="text-sm text-gray-600">Descrizione</p>
+              <p class="font-medium">{{ selectedEvent.description }}</p>
+            </div>
+          </div>
+
+          <!-- Dettagli Cantiere (se presente) -->
+          <div v-if="selectedEvent?.cantiere" class="space-y-6">
+            <!-- Info Cliente e Progetto -->
+            <div class="border border-blue-200 bg-blue-50 rounded-lg p-4">
+              <h4 class="text-lg font-semibold text-blue-900 mb-4 flex items-center">
+                <BuildingOfficeIcon class="w-5 h-5 mr-2" />
+                Informazioni Progetto
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p class="text-sm text-blue-700">Cliente</p>
+                  <p class="font-medium text-blue-900">{{ selectedEvent.cantiere.cliente }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-blue-700">Tipo Lavoro</p>
+                  <p class="font-medium text-blue-900">{{ selectedEvent.cantiere.tipoLavoro || 'Non specificato' }}</p>
+                </div>
+                <div class="md:col-span-2">
+                  <p class="text-sm text-blue-700">Indirizzo</p>
+                  <p class="font-medium text-blue-900">{{ selectedEvent.cantiere.indirizzo }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stato e Progresso -->
+            <div class="border border-green-200 bg-green-50 rounded-lg p-4">
+              <h4 class="text-lg font-semibold text-green-900 mb-4 flex items-center">
+                <ChartBarIcon class="w-5 h-5 mr-2" />
+                Stato Avanzamento
+              </h4>
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-green-700">Stato Progetto</span>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" :class="getStatusColor(selectedEvent.cantiere.stato)">
+                    {{ getStatusLabel(selectedEvent.cantiere.stato) }}
+                  </span>
+                </div>
+                <div>
+                  <div class="flex items-center justify-between text-sm mb-2">
+                    <span class="text-green-700">Progresso Completamento</span>
+                    <span class="font-medium text-green-900">{{ selectedEvent.cantiere.progresso || 0 }}%</span>
+                  </div>
+                  <div class="w-full bg-green-200 rounded-full h-3">
+                    <div class="bg-green-600 h-3 rounded-full transition-all duration-300" 
+                         :style="`width: ${selectedEvent.cantiere.progresso || 0}%`">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Informazioni Economiche -->
+            <div class="border border-orange-200 bg-orange-50 rounded-lg p-4">
+              <h4 class="text-lg font-semibold text-orange-900 mb-4 flex items-center">
+                <CurrencyEuroIcon class="w-5 h-5 mr-2" />
+                Riepilogo Economico
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p class="text-sm text-orange-700">Valore Contratto</p>
+                  <p class="font-bold text-xl text-orange-900">€{{ selectedEvent.cantiere.valore?.toLocaleString() || '0' }}</p>
+                </div>
+                <div v-if="selectedEvent.cantiere.costiAccumulati?.totale">
+                  <p class="text-sm text-orange-700">Costi Sostenuti</p>
+                  <p class="font-bold text-xl text-red-600">€{{ selectedEvent.cantiere.costiAccumulati.totale.toLocaleString() }}</p>
+                </div>
+              </div>
+              
+              <!-- Dettaglio Costi -->
+              <div v-if="selectedEvent.cantiere.costiAccumulati" class="mt-4 pt-4 border-t border-orange-200">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p class="text-orange-700">Materiali</p>
+                    <p class="font-medium text-blue-600">€{{ selectedEvent.cantiere.costiAccumulati.materiali?.toLocaleString() || '0' }}</p>
+                  </div>
+                  <div>
+                    <p class="text-orange-700">Manodopera</p>
+                    <p class="font-medium text-green-600">€{{ selectedEvent.cantiere.costiAccumulati.manodopera?.toLocaleString() || '0' }}</p>
+                  </div>
+                </div>
+                
+                <!-- Margine -->
+                <div class="mt-3 pt-3 border-t border-orange-200">
+                  <div class="flex justify-between items-center">
+                    <span class="text-orange-700">Margine Rimanente</span>
+                    <span class="font-bold" :class="getMargineColorText(selectedEvent.cantiere)">
+                      €{{ (selectedEvent.cantiere.valore - (selectedEvent.cantiere.costiAccumulati?.totale || 0)).toLocaleString() }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Timeline Date -->
+            <div class="border border-purple-200 bg-purple-50 rounded-lg p-4">
+              <h4 class="text-lg font-semibold text-purple-900 mb-4 flex items-center">
+                <CalendarDaysIcon class="w-5 h-5 mr-2" />
+                Timeline Progetto
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p class="text-sm text-purple-700">Data Inizio</p>
+                  <p class="font-medium text-purple-900">{{ formatDate(selectedEvent.cantiere.dataInizio) }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-purple-700">Scadenza Prevista</p>
+                  <p class="font-medium text-purple-900">{{ formatDate(selectedEvent.cantiere.scadenza) }}</p>
+                </div>
+              </div>
+              
+              <!-- Giorni rimanenti -->
+              <div class="mt-4 pt-4 border-t border-purple-200">
+                <div class="flex justify-between items-center">
+                  <span class="text-purple-700">Giorni rimanenti</span>
+                  <span class="font-bold" :class="getDaysRemainingColor(selectedEvent.cantiere)">
+                    {{ getDaysRemaining(selectedEvent.cantiere.scadenza) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+            <button v-if="selectedEvent?.cantiere" @click="goToCantiere(selectedEvent.cantiere)" 
+                    class="w-full sm:w-auto btn-primary py-3 text-base">
+              <BuildingOfficeIcon class="w-5 h-5 mr-2" />
+              Vai al Cantiere
+            </button>
+            <button @click="closeEventDetailModal" 
+                    class="w-full sm:w-auto btn-secondary py-3 text-base">
+              Chiudi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Nuovo Evento -->
     <div v-if="showNewEventModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeNewEventModal">
       <div class="relative top-4 mx-auto border w-full max-w-2xl shadow-lg rounded-md bg-white" @click.stop>
@@ -490,7 +674,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { 
   PlusIcon,
   UserGroupIcon,
@@ -502,8 +686,14 @@ import {
   ChevronRightIcon,
   TruckIcon,
   WrenchScrewdriverIcon,
-  XMarkIcon
+  XMarkIcon,
+  ClockIcon,
+  ChartBarIcon,
+  CurrencyEuroIcon
 } from '@heroicons/vue/24/outline'
+import { useFirestoreStore } from '@/stores/firestore'
+import { usePopup } from '@/composables/usePopup'
+import { useRouter } from 'vue-router'
 
 // Stato della pagina
 const showNewEventModal = ref(false)
@@ -512,14 +702,146 @@ const activeTab = ref('calendario')
 const currentView = ref('month')
 const currentDate = ref(new Date())
 const filterType = ref('')
+const showEventDetailModal = ref(false)
+const selectedEvent = ref(null)
 
-// Stats - resettate a 0
-const stats = ref({
-  eventiOggi: 0,
-  cantieriAttivi: 0,
-  personeImpegnate: 0,
-  totalePers: 0,
-  scadenzeUrgenti: 0
+// Import diretto dal Firestore store per dati reattivi
+const firestoreStore = useFirestoreStore()
+const router = useRouter()
+const { success, error } = usePopup()
+
+// Dati cantieri - computed per reattività
+const cantieri = computed(() => firestoreStore.cantieri)
+
+// Eventi - ora include i cantieri automaticamente
+const eventi = computed(() => {
+  // Eventi statici di esempio (da rimuovere se non necessari)
+  const eventiStatici = [
+    {
+      id: 'ex1',
+      type: 'cantiere',
+      title: 'Cantiere Villa Rossi',
+      date: '2024-01-15',
+      startTime: '08:00',
+      endTime: '17:00',
+      description: 'Avvio lavori di ristrutturazione',
+      status: 'confirmed'
+    },
+    {
+      id: 'ex2',
+      type: 'appuntamento',
+      title: 'Sopralluogo Magazzino',
+      date: '2024-01-20',
+      startTime: '14:00',
+      endTime: '16:00',
+      description: 'Verifica materiali in arrivo',
+      status: 'confirmed'
+    },
+    {
+      id: 'ex3',
+      type: 'scadenza',
+      title: 'Scadenza Cantiere Centro',
+      date: '2024-01-25',
+      startTime: '09:00',
+      endTime: '18:00',
+      description: 'Termine previsto per completamento',
+      status: 'pending'
+    }
+  ]
+
+  // Convertire cantieri in eventi del calendario
+  const eventiCantieri = cantieri.value.map(cantiere => {
+    const eventi = []
+
+    // Evento di inizio cantiere
+    if (cantiere.dataInizio) {
+      eventi.push({
+        id: `cantiere-start-${cantiere.id}`,
+        type: 'cantiere',
+        title: `🚀 Inizio: ${cantiere.nome}`,
+        date: cantiere.dataInizio,
+        startTime: '08:00',
+        endTime: '17:00',
+        description: `Inizio lavori cantiere: ${cantiere.cliente} - ${cantiere.tipoLavoro}`,
+        status: 'confirmed',
+        cantiere: cantiere,
+        cantiereId: cantiere.id,
+        eventType: 'start'
+      })
+    }
+
+    // Evento di scadenza cantiere
+    if (cantiere.scadenza) {
+      eventi.push({
+        id: `cantiere-end-${cantiere.id}`,
+        type: 'scadenza',
+        title: `⏰ Scadenza: ${cantiere.nome}`,
+        date: cantiere.scadenza,
+        startTime: '08:00',
+        endTime: '17:00',
+        description: `Scadenza prevista cantiere: ${cantiere.cliente} - €${cantiere.valore?.toLocaleString() || '0'}`,
+        status: cantiere.stato === 'completato' ? 'completed' : 'pending',
+        cantiere: cantiere,
+        cantiereId: cantiere.id,
+        eventType: 'deadline'
+      })
+    }
+
+    // Se il cantiere è in corso, aggiungi eventi per il periodo
+    if (cantiere.stato === 'in-corso' && cantiere.dataInizio && cantiere.scadenza) {
+      const inizioDate = new Date(cantiere.dataInizio)
+      const scadenzaDate = new Date(cantiere.scadenza)
+      const oggi = new Date()
+      
+      // Genera eventi settimanali per cantieri in corso (max 4 settimane visualizzate)
+      const settimaneMax = 4
+      let settimana = 0
+      const dataCorrente = new Date(Math.max(inizioDate.getTime(), oggi.getTime() - 7 * 24 * 60 * 60 * 1000))
+      
+      while (dataCorrente <= scadenzaDate && settimana < settimaneMax) {
+        // Trova il lunedì della settimana corrente
+        const lunedi = new Date(dataCorrente)
+        lunedi.setDate(lunedi.getDate() + (1 + 7 - lunedi.getDay()) % 7)
+        
+        // Genera eventi per i giorni lavorativi (Lun-Sab) della settimana
+        for (let giornoSettimanale = 0; giornoSettimanale < 6; giornoSettimanale++) {
+          const giornoLavorativo = new Date(lunedi)
+          giornoLavorativo.setDate(lunedi.getDate() + giornoSettimanale)
+          
+          if (giornoLavorativo >= inizioDate && giornoLavorativo <= scadenzaDate) {
+            const dayNames = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab']
+            eventi.push({
+              id: `cantiere-day-${cantiere.id}-${settimana}-${giornoSettimanale}`,
+              type: 'cantiere',
+              title: `🔨 ${cantiere.nome}`,
+              date: giornoLavorativo.toISOString().split('T')[0],
+              startTime: '08:00',
+              endTime: '17:00',
+              description: `Lavori ${dayNames[giornoSettimanale]} - Progresso: ${cantiere.progresso || 0}%`,
+              status: 'confirmed',
+              cantiere: cantiere,
+              cantiereId: cantiere.id,
+              eventType: 'ongoing'
+            })
+          }
+        }
+        
+        dataCorrente.setDate(dataCorrente.getDate() + 7)
+        settimana++
+      }
+    }
+
+    return eventi
+  }).flat()
+
+  // Filtra eventi in base al filtro selezionato
+  let tuttiEventi = [...eventiStatici, ...eventiCantieri]
+  
+  if (filterType.value) {
+    tuttiEventi = tuttiEventi.filter(evento => evento.type === filterType.value)
+  }
+
+  return tuttiEventi
 })
 
 // Tabs - reset count a 0
@@ -537,7 +859,7 @@ const viste = ref([
 ])
 
 // Alert Conflitti - vuoto, da caricare da Firestore
-const alertConflitti = ref([])
+// Alert conflitti rimosso - ora è computed
 
 // Nuovo Evento
 const newEvent = ref({
@@ -551,11 +873,83 @@ const newEvent = ref({
   assignedResources: []
 })
 
-// Eventi - vuoto, da caricare da Firestore
-const eventi = ref([])
+// Planning cantieri - ora usa dati reali da Firestore
+const planningCantieri = computed(() => {
+  return cantieri.value.map(cantiere => {
+    const dataInizio = cantiere.dataInizio ? new Date(cantiere.dataInizio) : new Date()
+    const dataScadenza = cantiere.scadenza ? new Date(cantiere.scadenza) : new Date()
+    
+    return {
+      id: cantiere.id,
+      nome: cantiere.nome || 'Cantiere senza nome',
+      cliente: cantiere.cliente || 'Cliente non specificato',
+      stato: cantiere.stato || 'pianificato',
+      startDay: Math.max(1, dataInizio.getDate()),
+      endDay: Math.min(31, dataScadenza.getDate()),
+      progresso: cantiere.progresso || 0,
+      valore: cantiere.valore || 0
+    }
+  })
+})
 
-// Planning Cantieri - vuoto, da caricare da Firestore
-const planningCantieri = ref([])
+// Stats aggiornate con dati reali
+const stats = computed(() => {
+  const oggi = new Date()
+  const inizioOggi = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate())
+  const fineOggi = new Date(inizioOggi.getTime() + 24 * 60 * 60 * 1000)
+
+  return {
+    eventiOggi: eventi.value.filter(evento => {
+      const dataEvento = new Date(evento.date)
+      return dataEvento >= inizioOggi && dataEvento < fineOggi
+    }).length,
+    cantieriAttivi: cantieri.value.filter(c => c.stato === 'in-corso').length,
+    personeImpegnate: cantieri.value.reduce((total, c) => {
+      return total + (c.team?.length || 0)
+    }, 0),
+    totalePers: personale.value.length,
+    scadenzeUrgenti: cantieri.value.filter(c => {
+      if (!c.scadenza) return false
+      const scadenza = new Date(c.scadenza)
+      const diffGiorni = Math.ceil((scadenza - oggi) / (1000 * 60 * 60 * 24))
+      return diffGiorni <= 7 && diffGiorni >= 0 && c.stato !== 'completato'
+    }).length
+  }
+})
+
+// Alert conflitti - aggiornati con dati reali
+const alertConflitti = computed(() => {
+  const conflitti = []
+  const oggi = new Date()
+  
+  // Controlla cantieri con scadenze ravvicinate
+  cantieri.value.forEach(cantiere => {
+    if (cantiere.scadenza && cantiere.stato === 'in-corso') {
+      const scadenza = new Date(cantiere.scadenza)
+      const diffGiorni = Math.ceil((scadenza - oggi) / (1000 * 60 * 60 * 24))
+      
+      if (diffGiorni <= 3 && diffGiorni >= 0) {
+        conflitti.push({
+          id: `scadenza-${cantiere.id}`,
+          risorsa: cantiere.nome,
+          conflitto: `Scadenza in ${diffGiorni} giorni`,
+          data: new Date(cantiere.scadenza).toLocaleDateString('it-IT')
+        })
+      }
+      
+      if (diffGiorni < 0) {
+        conflitti.push({
+          id: `ritardo-${cantiere.id}`,
+          risorsa: cantiere.nome,
+          conflitto: `In ritardo di ${Math.abs(diffGiorni)} giorni`,
+          data: new Date(cantiere.scadenza).toLocaleDateString('it-IT')
+        })
+      }
+    }
+  })
+  
+  return conflitti
+})
 
 // Personale - vuoto, da caricare da Firestore
 const personale = ref([])
@@ -722,12 +1116,72 @@ const todayView = () => {
 }
 
 const viewEvent = (evento) => {
-  alert(`📅 ${evento.title}\n\n📅 Data: ${formatDate(evento.date)}\n⏰ Orario: ${evento.startTime} - ${evento.endTime}\n📝 Descrizione: ${evento.description}\n🏷️ Tipo: ${evento.type}`)
+  selectedEvent.value = evento
+  showEventDetailModal.value = true
+}
+
+const closeEventDetailModal = () => {
+  showEventDetailModal.value = false
+  selectedEvent.value = null
+}
+
+const getEventHeaderColor = (type) => {
+  const colors = {
+    'cantiere': 'bg-blue-100 text-blue-600',
+    'scadenza': 'bg-red-100 text-red-600',
+    'appuntamento': 'bg-green-100 text-green-600'
+  }
+  return colors[type] || 'bg-gray-100 text-gray-600'
+}
+
+const getMargineColorText = (cantiere) => {
+  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
+  const percentuale = (margine / cantiere.valore) * 100
+  
+  if (percentuale > 20) return 'text-green-600'
+  if (percentuale > 10) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
+const getDaysRemaining = (scadenza) => {
+  if (!scadenza) return 'Non definita'
+  
+  const oggi = new Date()
+  const dataScadenza = new Date(scadenza)
+  const diffTime = dataScadenza - oggi
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  
+  if (diffDays < 0) return `${Math.abs(diffDays)} giorni di ritardo`
+  if (diffDays === 0) return 'Scade oggi'
+  if (diffDays === 1) return '1 giorno rimanente'
+  return `${diffDays} giorni rimanenti`
+}
+
+const getDaysRemainingColor = (cantiere) => {
+  if (!cantiere.scadenza) return 'text-gray-600'
+  
+  const oggi = new Date()
+  const dataScadenza = new Date(cantiere.scadenza)
+  const diffTime = dataScadenza - oggi
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  
+  if (diffDays < 0) return 'text-red-600'
+  if (diffDays <= 3) return 'text-orange-600'
+  if (diffDays <= 7) return 'text-yellow-600'
+  return 'text-green-600'
+}
+
+const goToCantiere = (cantiere) => {
+  closeEventDetailModal()
+  // Naviga alla pagina cantieri
+  router.push('/cantieri')
+  // Potresti aggiungere un parametro per aprire direttamente il cantiere
+  // router.push({ path: '/cantieri', query: { open: cantiere.id } })
 }
 
 const createEvent = () => {
   if (!newEvent.value.type || !newEvent.value.title) {
-    alert('❌ Compila tutti i campi obbligatori!')
+          error('Campi Mancanti', 'Compila tutti i campi obbligatori!')
     return
   }
 
@@ -741,7 +1195,7 @@ const createEvent = () => {
   stats.value.eventiOggi++
 
   closeNewEventModal()
-  alert(`✅ Evento "${nuovoEvento.title}" creato con successo!`)
+      success('Evento Creato', `"${nuovoEvento.title}" aggiunto al calendario`)
 }
 
 const closeNewEventModal = () => {
@@ -757,4 +1211,18 @@ const closeNewEventModal = () => {
     assignedResources: []
   }
 }
+
+// Hook lifecycle per inizializzazione
+onMounted(async () => {
+  try {
+    // Carica tutti i dati necessari da Firestore
+    await Promise.all([
+      firestoreStore.loadCantieri(),
+      firestoreStore.loadDipendenti()
+    ])
+    console.log('✅ Dati calendario caricati con successo')
+  } catch (error) {
+    console.error('❌ Errore nel caricamento dati Calendario:', error)
+  }
+})
 </script> 

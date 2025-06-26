@@ -425,14 +425,14 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '@/stores/firestore'
 import { useFirestore } from '@/composables/useFirestore'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 import { useAuthStore } from '@/stores/auth'
 
 // Stores e composables
 const firestoreStore = useFirestoreStore()
 const firestore = useFirestore()
 const authStore = useAuthStore()
-const { success, error } = useToast()
+const { success, error, confirm } = usePopup()
 
 // Stato della pagina
 const showAddModal = ref(false)
@@ -521,7 +521,8 @@ const editMateriale = (materiale) => {
 }
 
 const deleteMateriale = async (id) => {
-  if (confirm('⚠️ Sei sicuro di voler eliminare questo materiale?')) {
+  const confirmed = await confirm('Eliminare Materiale', 'Sei sicuro di voler eliminare questo materiale? Questa azione non può essere annullata.')
+  if (confirmed) {
     try {
       const result = await firestoreStore.deleteDocument('materiali', id)
       if (result.success) {

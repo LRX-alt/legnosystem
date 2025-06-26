@@ -181,7 +181,7 @@
             <span class="font-medium">{{ dipendente.oreTotaliSettimana }}h</span>
           </div>
           <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${(dipendente.oreTotaliSettimana / 40) * 100}%`"></div>
+            <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${(dipendente.oreTotaliSettimana / 48) * 100}%`"></div>
           </div>
         </div>
 
@@ -703,26 +703,97 @@
               </div>
             </div>
 
-            <!-- Calendario ore -->
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                    <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Cantiere</th>
-                    <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Ore</th>
-                    <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Note</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="entry in getTimesheetForDipendente(selectedDipendente?.id)" :key="entry.id" class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-base text-gray-900">{{ formatDate(entry.data) }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-base text-gray-900">{{ entry.cantiere }}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-900">{{ entry.ore }}h</td>
-                    <td class="px-6 py-4 text-base text-gray-900">{{ entry.note || '-' }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <!-- Riepilogo ore e costi -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <p class="text-sm text-blue-600 font-medium">Ore Settimana</p>
+                <p class="text-2xl font-bold text-blue-900">{{ selectedDipendente?.oreTotaliSettimana || 0 }}h</p>
+                <div class="w-full bg-blue-200 rounded-full h-2 mt-2">
+                  <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                       :style="`width: ${Math.min(((selectedDipendente?.oreTotaliSettimana || 0) / 48) * 100, 100)}%`"></div>
+                </div>
+              </div>
+              <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                <p class="text-sm text-green-600 font-medium">Costo Settimana</p>
+                <p class="text-2xl font-bold text-green-900">€{{ Math.round((selectedDipendente?.oreTotaliSettimana || 0) * (selectedDipendente?.pagaOraria || 25)) }}</p>
+                <p class="text-xs text-green-600 mt-1">{{ selectedDipendente?.pagaOraria || 25 }}€/h</p>
+              </div>
+              <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <p class="text-sm text-yellow-600 font-medium">Voci Timesheet</p>
+                <p class="text-2xl font-bold text-yellow-900">{{ getTimesheetForDipendente(selectedDipendente?.id).length }}</p>
+                <p class="text-xs text-yellow-600 mt-1">registrazioni</p>
+              </div>
+              <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <p class="text-sm text-purple-600 font-medium">Da Giornale</p>
+                <p class="text-2xl font-bold text-purple-900">{{ getTimesheetForDipendente(selectedDipendente?.id).filter(t => t.fonte === 'giornale_cantiere').length }}</p>
+                <p class="text-xs text-purple-600 mt-1">auto-generate</p>
+              </div>
+            </div>
+
+            <!-- Timesheet dettagliato -->
+            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <h4 class="font-semibold text-gray-900">📋 Registro Ore Dettagliato</h4>
+                <p class="text-sm text-gray-600 mt-1">Cronologia completa delle ore lavorate</p>
+              </div>
+              
+              <div v-if="getTimesheetForDipendente(selectedDipendente?.id).length === 0" class="p-8 text-center">
+                <div class="text-gray-400 text-6xl mb-4">🕐</div>
+                <p class="text-lg text-gray-600 font-medium">Nessuna registrazione trovata</p>
+                <p class="text-sm text-gray-500">Le ore verranno popolate automaticamente dal Giornale Cantiere</p>
+              </div>
+              
+              <div v-else class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Cantiere</th>
+                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Ore</th>
+                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Fonte</th>
+                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Note</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-for="entry in getTimesheetForDipendente(selectedDipendente?.id)" 
+                        :key="entry.id" 
+                        class="hover:bg-gray-50 transition-colors duration-200"
+                        :class="entry.fonte === 'giornale_cantiere' ? 'bg-blue-25' : ''">
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div class="flex items-center">
+                          <span class="font-medium">{{ formatDate(entry.data) }}</span>
+                          <span v-if="entry.turno" class="ml-2 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">{{ entry.turno }}</span>
+                        </div>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div class="font-medium">{{ entry.cantiere }}</div>
+                        <div v-if="entry.cantiereId" class="text-xs text-gray-500">ID: {{ entry.cantiereId }}</div>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <span class="text-lg">{{ entry.ore }}h</span>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div class="font-medium text-green-600">€{{ (entry.costoTotale || (entry.ore * (entry.costoOrario || selectedDipendente?.pagaOraria || 25))).toLocaleString() }}</div>
+                        <div class="text-xs text-gray-500">{{ entry.costoOrario || selectedDipendente?.pagaOraria || 25 }}€/h</div>
+                      </td>
+                      <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span v-if="entry.fonte === 'giornale_cantiere'" 
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          📋 Giornale
+                        </span>
+                        <span v-else 
+                              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          ✋ Manuale
+                        </span>
+                      </td>
+                      <td class="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                        <div class="truncate" :title="entry.note">{{ entry.note || '-' }}</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -920,8 +991,8 @@
             <!-- Calendario Semplificato -->
             <div class="card">
               <h5 class="font-semibold text-gray-900 mb-4">📅 Calendario Settimanale</h5>
-              <div class="grid grid-cols-5 gap-4 text-center">
-                <div v-for="(giorno, index) in ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì']" :key="index" 
+              <div class="grid grid-cols-6 gap-4 text-center">
+                <div v-for="(giorno, index) in ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato']" :key="index" 
                      class="p-4 border border-gray-200 rounded-lg">
                   <p class="font-medium text-gray-900 mb-2">{{ giorno }}</p>
                   <div class="space-y-2">
@@ -955,10 +1026,11 @@ import {
   XMarkIcon
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '../stores/firestore.js'
-import { useToast } from '../composables/useToast.js'
+import { usePopup } from '../composables/usePopup.js'
 
 // Firestore store
 const firestoreStore = useFirestoreStore()
+const { success, error, confirm } = usePopup()
 
 // Stato della pagina
 const activeTab = ref('dipendenti')
@@ -1065,6 +1137,56 @@ const loadDipendenti = async () => {
   }
 }
 
+// Funzioni per la gestione dei timesheet - carica da Firestore
+const loadTimesheet = async (dipendenteId = null) => {
+  try {
+    // Se non specificato il dipendente, carica tutti i timesheet
+    const result = await firestoreStore.loadCollection('timesheet')
+    
+    if (result.success) {
+      const allTimesheet = result.data || []
+      
+      if (dipendenteId) {
+        // Filtra per dipendente specifico
+        timesheetDettagli.value = allTimesheet.filter(t => t.dipendenteId === dipendenteId)
+      } else {
+        // Carica tutti
+        timesheetDettagli.value = allTimesheet
+      }
+      
+      console.log(`✅ Timesheet caricati da Firestore: ${timesheetDettagli.value.length} voci`)
+      
+      // Aggiorna le ore settimanali per ogni dipendente
+      updateDipendentiOreFromTimesheet()
+    }
+  } catch (e) {
+    console.warn('Errore nel caricamento timesheet da Firestore:', e)
+  }
+}
+
+// Aggiorna le ore settimanali dei dipendenti basandosi sui timesheet
+const updateDipendentiOreFromTimesheet = () => {
+  const now = new Date()
+  const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1)) // Lunedì
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 6) // Sabato (6 giorni lavorativi)
+  
+  dipendenti.value.forEach(dipendente => {
+    // Calcola ore della settimana corrente per questo dipendente
+    const oreSettimana = timesheetDettagli.value
+      .filter(t => {
+        const dataTimesheet = new Date(t.data)
+        return t.dipendenteId === dipendente.id && 
+               dataTimesheet >= startOfWeek && 
+               dataTimesheet <= endOfWeek
+      })
+      .reduce((total, t) => total + (t.ore || 0), 0)
+    
+    // Aggiorna ore settimanali
+    dipendente.oreTotaliSettimana = oreSettimana
+  })
+}
+
 // Computed
 const filteredDipendenti = computed(() => {
   let result = dipendenti.value
@@ -1123,10 +1245,8 @@ const formatDate = (dateString) => {
 }
 
 const saveDipendente = async () => {
-  const { success, error } = useToast()
-  
   if (!newDipendente.value.nome || !newDipendente.value.cognome || !newDipendente.value.email) {
-    error('Compila tutti i campi obbligatori!')
+    error('Campi Mancanti', 'Compila tutti i campi obbligatori!')
     return
   }
 
@@ -1138,45 +1258,66 @@ const saveDipendente = async () => {
       await loadDipendenti()
       
       closeAddModal()
-      success(`Dipendente ${newDipendente.value.nome} ${newDipendente.value.cognome} aggiunto con successo!`, '👤 Dipendente Creato')
+      success('Dipendente Creato', `${newDipendente.value.nome} ${newDipendente.value.cognome} aggiunto con successo!`)
     } else {
       throw new Error(result.error || 'Errore sconosciuto')
     }
   } catch (err) {
     console.error('Errore creazione dipendente:', err)
-    error(`Errore nella creazione del dipendente: ${err.message}`, '❌ Errore Creazione')
+    error('Errore Creazione', `Impossibile creare il dipendente: ${err.message}`)
   }
 }
 
-const saveTimesheet = () => {
+const saveTimesheet = async () => {
   if (!newTimesheet.value.dipendenteId || !newTimesheet.value.ore || !newTimesheet.value.cantiere) {
-    alert('❌ Compila tutti i campi obbligatori!')
+    error('Campi Mancanti', 'Compila tutti i campi obbligatori!')
     return
   }
 
-  const nuovoTimesheet = {
-    id: Date.now(),
-    dipendenteId: parseInt(newTimesheet.value.dipendenteId),
-    data: newTimesheet.value.data,
-    cantiere: newTimesheet.value.cantiere,
-    ore: parseFloat(newTimesheet.value.ore),
-    note: newTimesheet.value.note
-  }
+  try {
+    const dipendente = dipendenti.value.find(d => d.id === newTimesheet.value.dipendenteId)
+    if (!dipendente) {
+      error('Errore', 'Dipendente non trovato!')
+      return
+    }
 
-  timesheetDettagli.value.push(nuovoTimesheet)
-  
-  // Aggiorna ore settimanali
-  const dipendente = dipendenti.value.find(d => d.id === parseInt(newTimesheet.value.dipendenteId))
-  if (dipendente) {
-    dipendente.oreTotaliSettimana += nuovoTimesheet.ore
-  }
+    const timesheetData = {
+      dipendenteId: newTimesheet.value.dipendenteId,
+      data: newTimesheet.value.data,
+      cantiere: newTimesheet.value.cantiere,
+      ore: parseFloat(newTimesheet.value.ore),
+      note: newTimesheet.value.note,
+      costoOrario: dipendente.pagaOraria || 25,
+      costoTotale: parseFloat(newTimesheet.value.ore) * (dipendente.pagaOraria || 25),
+      fonte: 'manuale', // Per distinguere da quelli auto-generati dal giornale
+      turno: 'giornaliero',
+      createdAt: new Date().toISOString()
+    }
 
-  closeTimesheetModal()
-  alert(`✅ Ore registrate per ${dipendente?.nome} ${dipendente?.cognome}!`)
+    // Salva in Firestore
+    const result = await firestoreStore.registraTimesheet(timesheetData)
+    
+    if (result.success) {
+      // Ricarica i timesheet
+      await loadTimesheet()
+      
+      closeTimesheetModal()
+      success('Ore Registrate', `Timesheet per ${dipendente?.nome} ${dipendente?.cognome} salvato con successo!`)
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore salvataggio timesheet:', err)
+    error('Errore Salvataggio', `Impossibile salvare il timesheet: ${err.message}`)
+  }
 }
 
-const viewTimesheet = (dipendente) => {
+const viewTimesheet = async (dipendente) => {
   selectedDipendente.value = dipendente
+  
+  // Carica i timesheet specifici per questo dipendente
+  await loadTimesheet(dipendente.id)
+  
   showDetailModal.value = true
 }
 
@@ -1198,10 +1339,8 @@ const editDipendente = (dipendente) => {
 }
 
 const saveEditedDipendente = async () => {
-  const { success, error } = useToast()
-  
   if (!editingDipendente.value.nome || !editingDipendente.value.cognome || !editingDipendente.value.email) {
-    error('Compila tutti i campi obbligatori!')
+    error('Campi Mancanti', 'Compila tutti i campi obbligatori!')
     return
   }
 
@@ -1225,13 +1364,13 @@ const saveEditedDipendente = async () => {
       await loadDipendenti()
       
       closeEditModal()
-      success(`Dipendente ${editingDipendente.value.nome} ${editingDipendente.value.cognome} aggiornato!`, '✏️ Dipendente Modificato')
+      success('Dipendente Modificato', `${editingDipendente.value.nome} ${editingDipendente.value.cognome} aggiornato con successo!`)
     } else {
       throw new Error(result.error || 'Errore sconosciuto')
     }
   } catch (err) {
     console.error('Errore aggiornamento dipendente:', err)
-    error(`Errore nell'aggiornamento del dipendente: ${err.message}`, '❌ Errore Modifica')
+    error('Errore Modifica', `Impossibile aggiornare il dipendente: ${err.message}`)
   }
 }
 
@@ -1258,7 +1397,9 @@ const viewSchedule = (dipendente) => {
 }
 
 const getTimesheetForDipendente = (dipendenteId) => {
-  return timesheetDettagli.value.filter(t => t.dipendenteId === dipendenteId)
+  return timesheetDettagli.value
+    .filter(t => t.dipendenteId === dipendenteId)
+    .sort((a, b) => new Date(b.data) - new Date(a.data)) // Ordina per data decrescente
 }
 
 const closeAddModal = () => {
@@ -1309,18 +1450,14 @@ const getPresenza = (dipendenteId) => {
 }
 
 const calcolaOreTotali = (dipendenteId) => {
-  const presenza = getPresenza(dipendenteId)
-  if (presenza.stato !== 'presente' || !presenza.entrata || !presenza.uscita) {
-    return 0
-  }
+  // Calcola le ore oggi basandosi sui timesheet reali
+  const oggi = new Date().toISOString().split('T')[0]
   
-  const entrata = new Date(`2000-01-01 ${presenza.entrata}`)
-  const uscita = new Date(`2000-01-01 ${presenza.uscita}`)
-  const diffMs = uscita - entrata
-  const diffHours = diffMs / (1000 * 60 * 60)
-  const pausaHours = (presenza.pausa || 0) / 60
+  const oreOggi = timesheetDettagli.value
+    .filter(t => t.dipendenteId === dipendenteId && t.data === oggi)
+    .reduce((total, t) => total + (t.ore || 0), 0)
   
-  return Math.max(0, Math.round((diffHours - pausaHours) * 2) / 2) // Arrotonda a 0.5
+  return Math.round(oreOggi * 2) / 2 // Arrotonda a 0.5
 }
 
 const markAllPresent = () => {
@@ -1331,7 +1468,7 @@ const markAllPresent = () => {
     presenza.uscita = '17:00'
     presenza.pausa = 60
   })
-  alert('✅ Tutti i dipendenti sono stati segnati come presenti!')
+  success('Presenze Aggiornate', 'Tutti i dipendenti sono stati segnati come presenti!')
 }
 
 const getRiepilogoPresenze = () => {
@@ -1371,8 +1508,9 @@ const closeScheduleModal = () => {
 }
 
 // Funzione per pulire tutti i dati di esempio
-const clearAllData = () => {
-  if (confirm('⚠️ Sei sicuro di voler eliminare TUTTI i dipendenti e i dati? Questa operazione non può essere annullata.')) {
+const clearAllData = async () => {
+  const confirmed = await confirm('Eliminare Tutti i Dati', 'Sei sicuro di voler eliminare TUTTI i dipendenti e i dati? Questa operazione non può essere annullata.')
+  if (confirmed) {
     // Pulisci tutti i dati
     dipendenti.value = []
     timesheetData.value = []
@@ -1390,7 +1528,7 @@ const clearAllData = () => {
     // Pulisci localStorage
     localStorage.removeItem('legnosystem_dipendenti')
     
-    alert('✅ Tutti i dati sono stati eliminati! La pagina è ora pulita.')
+    success('Dati Eliminati', 'Tutti i dati sono stati eliminati! La pagina è ora pulita.')
   }
 }
 
@@ -1401,5 +1539,8 @@ onMounted(async () => {
   
   // Carica dipendenti da Firestore
   await loadDipendenti()
+  
+  // Carica tutti i timesheet da Firestore
+  await loadTimesheet()
 })
 </script> 

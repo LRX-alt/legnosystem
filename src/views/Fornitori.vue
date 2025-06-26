@@ -769,7 +769,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useFirestoreStore } from '../stores/firestore.js'
-import { useToast } from '../composables/useToast.js'
+import { usePopup } from '../composables/usePopup.js'
 import { 
   PlusIcon, 
   BuildingOfficeIcon,
@@ -787,7 +787,7 @@ import MaterialAttachmentsModal from '@/components/MaterialAttachmentsModal.vue'
 
 // Stores
 const firestoreStore = useFirestoreStore()
-const { success, error } = useToast()
+const { success, error, confirm, info } = usePopup()
 
 // Stato della pagina
 const showAddModal = ref(false)
@@ -965,9 +965,10 @@ const closeDetailModal = () => {
   selectedFornitore.value = null
 }
 
-const contactFornitore = (fornitore) => {
+const contactFornitore = async (fornitore) => {
   const message = `Vuoi contattare ${fornitore.nome}?`
-  if (confirm(message)) {
+  const confirmed = await confirm("Contatta Fornitore", message)
+  if (confirmed) {
     // Qui potresti integrare con un sistema di comunicazione
     window.open(`mailto:${fornitore.email}?subject=Richiesta informazioni - Legnosystem`)
   }
@@ -1007,10 +1008,11 @@ const createOrder = (fornitore) => {
   alert(`🛒 Nuovo ordine per ${fornitore.nome} - Funzionalità in implementazione`)
 }
 
-const deleteFornitore = (fornitore) => {
+const deleteFornitore = async (fornitore) => {
   const message = `⚠️ Eliminazione Fornitore\n\nSei sicuro di voler eliminare "${fornitore.nome}"?\n\n❗ Questa azione non può essere annullata.\n\n📊 Informazioni correnti:\n• Ordini 2024: ${fornitore.ordiniAnno}\n• Valore totale: €${fornitore.valoreAnno.toLocaleString()}\n• Cantieri attivi: ${getFornitoreRelations(fornitore.id).cantieri.length}`
   
-  if (confirm(message)) {
+  const confirmed = await confirm("Elimina Fornitore", message)
+  if (confirmed) {
     const index = fornitori.value.findIndex(f => f.id === fornitore.id)
     if (index > -1) {
       fornitori.value.splice(index, 1)
@@ -1021,7 +1023,7 @@ const deleteFornitore = (fornitore) => {
         closeDetailModal()
       }
       
-      alert(`✅ Fornitore "${fornitore.nome}" eliminato con successo!`)
+      success("Fornitore Eliminato", "Fornitore rimosso dal sistema con successo")
     }
   }
 }
@@ -1090,7 +1092,7 @@ const closeAddModal = () => {
 
 const updateFornitore = () => {
   if (!editingFornitore.value.nome || !editingFornitore.value.categoria) {
-    alert('❌ Compila tutti i campi obbligatori!')
+    error("Campi Mancanti", "Compila tutti i campi obbligatori per continuare")
     return
   }
 

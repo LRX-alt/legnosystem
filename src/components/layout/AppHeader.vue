@@ -13,12 +13,12 @@
           
           <!-- Logo e Brand -->
           <div class="flex-shrink-0 flex items-center">
-            <!-- Logo Icon -->
-            <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-lg flex items-center justify-center mr-3">
-              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 2L3 7v11h4v-6h6v6h4V7l-7-5z"/>
-              </svg>
-            </div>
+            <!-- Logo Legnosystem -->
+            <img 
+              :src="logoLegnosystem" 
+              alt="Legno System Logo" 
+              class="w-8 h-8 sm:w-10 sm:h-10 mr-3 rounded-lg object-contain"
+            />
             <div>
               <h1 class="text-lg sm:text-xl font-display font-bold text-primary-800">Legnosystem.bio</h1>
               <p class="text-xs text-gray-500 leading-none hidden sm:block">Gestionale Aziendale</p>
@@ -43,32 +43,56 @@
             <button @click="showUserMenu = !showUserMenu"
                     class="flex items-center space-x-2 sm:space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200">
               <div class="w-7 h-7 sm:w-8 sm:h-8 bg-primary-500 rounded-full flex items-center justify-center">
-                <span class="text-white text-xs sm:text-sm font-medium">U</span>
+                <span class="text-white text-xs sm:text-sm font-medium">
+                  {{ userInitials }}
+                </span>
               </div>
               <div class="hidden md:block text-left">
                 <p class="text-sm font-medium text-gray-900">{{ userName }}</p>
-                <p class="text-xs text-gray-500">{{ userRole === 'admin' ? 'Amministratore' : 'Utente' }}</p>
+                <p class="text-xs text-gray-500">{{ userRoleLabel }}</p>
               </div>
               <ChevronDownIcon class="w-4 h-4 text-gray-400 hidden sm:block" />
             </button>
 
             <!-- User Dropdown -->
             <div v-if="showUserMenu" 
-                 class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                 class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
               
-              <!-- Se autenticato -->
-              <template v-if="isAuthenticated">
-              <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profilo</a>
-              <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Impostazioni</a>
-              <hr class="my-1">
-                <button @click="handleLogout" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</button>
-              </template>
+              <!-- Header del profilo -->
+              <div class="px-4 py-2 border-b border-gray-100">
+                <p class="text-sm font-medium text-gray-900">{{ userName }}</p>
+                <p class="text-xs text-gray-500">{{ userProfile?.email }}</p>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 mt-1">
+                  {{ userRoleLabel }}
+                </span>
+              </div>
               
-              <!-- Se NON autenticato -->
-              <template v-else>
-                <button @click="showLoginForm" class="block w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 font-medium">🔑 Login</button>
-                <button @click="createFirebaseAdmin" class="block w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 font-medium">🔥 Crea Admin Firebase</button>
-              </template>
+              <!-- Menu items -->
+              <div class="py-1">
+                <button @click="viewProfile" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <span class="mr-3">👤</span>
+                  Profilo
+                </button>
+                <button @click="viewSettings" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <span class="mr-3">⚙️</span>
+                  Impostazioni
+                </button>
+                <button v-if="authStore.isAdmin" @click="createAdminUser" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <span class="mr-3">🔧</span>
+                  Crea Admin
+                </button>
+                <button v-if="authStore.isAdmin" @click="viewRegistrationRequests" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <span class="mr-3">📋</span>
+                  Richieste Registrazione
+                </button>
+              </div>
+              
+              <div class="border-t border-gray-100 py-1">
+                <button @click="handleLogout" class="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50">
+                  <span class="mr-3">🚪</span>
+                  Esci
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -96,14 +120,19 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { BellIcon, ChevronDownIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
+import { usePopup } from '@/composables/usePopup'
+import logoLegnosystem from '@/assets/logo legnosystem.avif'
 
 // Emit per comunicare con il componente padre
 defineEmits(['toggle-sidebar'])
 
 // Firebase Auth Store
 const authStore = useAuthStore()
+const { success, error } = usePopup()
+const router = useRouter()
 
 // UI State
 const showNotifications = ref(false)
@@ -113,7 +142,29 @@ const unreadNotifications = ref(3)
 // Firebase Auth Data
 const userName = computed(() => authStore.userName || 'Utente')
 const userRole = computed(() => authStore.userRole)
+const userProfile = computed(() => authStore.userProfile)
 const isAuthenticated = computed(() => authStore.isAuthenticated)
+
+// User computed data
+const userInitials = computed(() => {
+  const name = userName.value
+  if (name && name !== 'Utente') {
+    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
+  }
+  return userProfile.value?.email?.[0]?.toUpperCase() || 'U'
+})
+
+const userRoleLabel = computed(() => {
+  const roleLabels = {
+    admin: '🔧 Amministratore',
+    manager: '👔 Manager',
+    capo_cantiere: '👷‍♂️ Capo Cantiere',
+    amministrativo: '📋 Amministrativo',
+    employee: '👷 Operaio',
+    user: '👤 Utente'
+  }
+  return roleLabels[userRole.value] || '👤 Utente'
+})
 
 const notifications = ref([
   { id: 1, message: 'Scorte legno di quercia sotto il minimo', time: '5 min fa' },
@@ -121,50 +172,45 @@ const notifications = ref([
   { id: 3, message: 'Nuovo preventivo richiesto', time: '2 ore fa' }
 ])
 
-// Logout function
+// Methods
 const handleLogout = async () => {
-  await authStore.logout()
+  try {
+    await authStore.logout()
+    showUserMenu.value = false
+    success('Logout Effettuato', 'Arrivederci!')
+  } catch (error) {
+    console.error('Errore logout:', error)
+  }
+}
+
+const viewProfile = () => {
   showUserMenu.value = false
+  // TODO: Implementare modal profilo
+  success('Profilo', 'Funzionalità in sviluppo')
 }
 
-// Login function
-const showLoginForm = async () => {
-  const email = prompt('Email per Login:')
-  const password = prompt('Password:')
-  
-  if (email && password) {
-    try {
-      const result = await authStore.login(email, password)
-      if (result.success) {
-        alert('✅ Login effettuato con successo!')
-        showUserMenu.value = false
-      } else {
-        alert('❌ Errore login: ' + result.error)
-      }
-    } catch (error) {
-      alert('❌ Errore: ' + error.message)
+const viewSettings = () => {
+  showUserMenu.value = false
+  // TODO: Implementare modal impostazioni
+  success('Impostazioni', 'Funzionalità in sviluppo')
+}
+
+const createAdminUser = async () => {
+  try {
+    const result = await authStore.createAdminProfile()
+    if (result.success) {
+      success('Admin Creato', 'Profilo amministratore creato con successo!')
     }
+    showUserMenu.value = false
+  } catch (error) {
+    console.error('Errore creazione admin:', error)
+    error('Errore', 'Impossibile creare profilo amministratore')
   }
 }
 
-// Create Firebase Admin function
-const createFirebaseAdmin = async () => {
-  const email = prompt('Email per Admin Firebase:')
-  const password = prompt('Password per Admin Firebase:')
-  
-  if (email && password) {
-    try {
-      const result = await authStore.register(email, password, 'Admin Legnosystem', 'admin')
-      if (result.success) {
-        alert('✅ Admin Firebase creato con successo!')
-        showUserMenu.value = false
-      } else {
-        alert('❌ Errore: ' + result.error)
-      }
-    } catch (error) {
-      alert('❌ Errore: ' + error.message)
-    }
-  }
+const viewRegistrationRequests = () => {
+  showUserMenu.value = false
+  router.push('/registration-requests')
 }
 
 // Chiudi dropdown quando si clicca fuori

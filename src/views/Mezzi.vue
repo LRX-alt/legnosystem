@@ -473,6 +473,10 @@ import {
   BuildingOfficeIcon,
   XMarkIcon
 } from '@heroicons/vue/24/outline'
+import { usePopup } from '@/composables/usePopup'
+
+// Popup system
+const { success, info, confirm } = usePopup()
 
 // Stato reattivo
 const showDetailModal = ref(false)
@@ -643,7 +647,7 @@ const saveMezzo = () => {
   
   mezzi.value.push(newMezzo)
   closeAddModal()
-  alert(`✅ Mezzo "${newMezzo.nome}" aggiunto con successo!`)
+  success('Mezzo Aggiunto', `"${newMezzo.nome}" aggiunto alla flotta con successo!`)
 }
 
 const saveEditedMezzo = () => {
@@ -655,7 +659,7 @@ const saveEditedMezzo = () => {
       ...mezzoForm.value
     }
     closeAddModal()
-    alert(`✅ Mezzo "${mezzoForm.value.nome}" aggiornato con successo!`)
+    success('Mezzo Aggiornato', `"${mezzoForm.value.nome}" modificato con successo!`)
   }
 }
 
@@ -677,18 +681,19 @@ const closeAddModal = () => {
 }
 
 const manageMaintenance = (mezzo) => {
-  alert(`🔧 Gestione manutenzioni per ${mezzo.nome} - Funzionalità in sviluppo`)
+  info('Funzionalità in Sviluppo', `Gestione manutenzioni per ${mezzo.nome} sarà disponibile a breve`)
 }
 
 const assignToCantiere = (mezzo) => {
-  alert(`🏗️ Assegnazione cantiere per ${mezzo.nome} - Funzionalità in sviluppo`)
+  info('Funzionalità in Sviluppo', `Assegnazione cantiere per ${mezzo.nome} sarà disponibile a breve`)
 }
 
-const deleteMezzo = (mezzo) => {
-  if (confirm(`Sei sicuro di voler eliminare ${mezzo.nome}?`)) {
+const deleteMezzo = async (mezzo) => {
+  const confirmed = await confirm('Eliminare Mezzo', `Sei sicuro di voler eliminare ${mezzo.nome}? Questa azione non può essere annullata.`)
+  if (confirmed) {
     const index = mezzi.value.findIndex(m => m.id === mezzo.id)
     mezzi.value.splice(index, 1)
-    alert(`✅ Mezzo "${mezzo.nome}" eliminato con successo!`)
+    success('Mezzo Eliminato', `"${mezzo.nome}" rimosso dalla flotta`)
   }
 }
 

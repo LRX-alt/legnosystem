@@ -15,6 +15,7 @@
           <DocumentArrowDownIcon class="w-5 h-5 mr-2" />
           Export PDF
         </button>
+
       </div>
     </div>
 
@@ -390,6 +391,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useFirestoreStore } from '@/stores/firestore'
+import { usePopup } from '@/composables/usePopup'
 import { jsPDF } from 'jspdf'
 import { 
   PlusIcon,
@@ -403,6 +405,9 @@ import {
 // Route e Store
 const route = useRoute()
 const firestoreStore = useFirestoreStore()
+const { success, error, warning, info, confirm } = usePopup()
+
+
 
 // Stato reattivo
 const cantiere = ref(null)
@@ -601,9 +606,79 @@ const calculateDayCost = () => {
 
 // ===== FINE FUNZIONI GESTIONE TEAM PRESENTE =====
 
+// 📊 Funzione per sincronizzare i timesheet dei dipendenti
+const syncTimesheetFromGiornale = async (entryData, registrazioneId = null) => {
+  if (!entryData.teamPresente?.length || !entryData.data || !cantiere.value?.id) {
+    console.warn('Dati insufficienti per sincronizzare timesheet')
+    return
+  }
+
+  try {
+    // Calcola le ore per ogni dipendente (dividi le ore totali per il numero di persone)
+    const orePerPersona = entryData.oreTotali / entryData.teamPresente.length
+
+    for (const membro of entryData.teamPresente) {
+      // Crea voce timesheet per ogni dipendente
+      const timesheetData = {
+        dipendenteId: membro.id,
+        data: entryData.data,
+        cantiere: cantiere.value.nome,
+        cantiereId: cantiere.value.id,
+        ore: orePerPersona,
+        note: `Auto-generato da Giornale Cantiere - ${entryData.attivita?.[0] || 'Lavori generici'}`,
+        costoOrario: membro.pagaOraria,
+        costoTotale: orePerPersona * membro.pagaOraria,
+        turno: entryData.turno,
+        fonte: 'giornale_cantiere', // Per identificare l'origine del dato
+        registrazioneGiornaleId: registrazioneId // Collega alla registrazione del giornale
+      }
+
+      // Salva in Firestore
+      const result = await firestoreStore.registraTimesheet(timesheetData)
+      
+      if (result.success) {
+        console.log(`✅ Timesheet creato per ${membro.nome}: ${orePerPersona}h su ${cantiere.value.nome}`)
+      } else {
+        console.error(`❌ Errore creazione timesheet per ${membro.nome}:`, result.error)
+      }
+    }
+
+    // 🎯 Aggiorna le ore settimanali dei dipendenti
+    await updateDipendentiOreSettimanali(entryData.teamPresente, orePerPersona)
+
+  } catch (error) {
+    console.error('Errore sincronizzazione timesheet:', error)
+  }
+}
+
+// 📈 Aggiorna le ore settimanali accumulate dei dipendenti
+const updateDipendentiOreSettimanali = async (teamPresente, orePerPersona) => {
+  for (const membro of teamPresente) {
+    try {
+      // Trova il dipendente nello store
+      const dipendente = firestoreStore.dipendenti.find(d => d.id === membro.id)
+      
+      if (dipendente) {
+        // Aggiorna le ore settimanali accumulate
+        const nuoveOreTotali = (dipendente.oreTotaliSettimana || 0) + orePerPersona
+        
+        await firestoreStore.updateDocument('dipendenti', membro.id, {
+          oreTotaliSettimana: nuoveOreTotali,
+          cantiereAttuale: cantiere.value.nome, // Aggiorna anche il cantiere attuale
+          ultimaAttivita: new Date().toISOString()
+        })
+        
+        console.log(`📊 Ore settimanali aggiornate per ${membro.nome}: ${nuoveOreTotali}h`)
+      }
+    } catch (error) {
+      console.error(`Errore aggiornamento ore settimanali per ${membro.nome}:`, error)
+    }
+  }
+}
+
 const saveEntry = async () => {
   if (!cantiere.value?.id) {
-    alert('❌ Errore: Cantiere non selezionato')
+    error('Errore', 'Cantiere non selezionato')
     return
   }
 
@@ -623,12 +698,16 @@ const saveEntry = async () => {
       allegati: editingEntry.value?.allegati || []
     }
 
+    let registrazioneId = null
+    
     if (editingEntry.value) {
       // Aggiorna registrazione esistente
       await firestoreStore.updateRegistrazioneGiornale(editingEntry.value.id, entryData)
+      registrazioneId = editingEntry.value.id
     } else {
       // Crea nuova registrazione
-      await firestoreStore.createRegistrazioneGiornale(cantiere.value.id, entryData)
+      const result = await firestoreStore.createRegistrazioneGiornale(cantiere.value.id, entryData)
+      registrazioneId = result.success ? result.data?.id : null
     }
 
     // Ricarica le registrazioni
@@ -637,29 +716,94 @@ const saveEntry = async () => {
     // 💰 Aggiorna automaticamente i costi dopo salvataggio registrazione
     await updateCostiCantiere()
     
+    // 📊 Sincronizza automaticamente i timesheet dei dipendenti
+    if (!editingEntry.value && registrazioneId) {
+      // Solo per nuove registrazioni, evita duplicati per modifiche
+      console.log('🔄 Sincronizzando timesheet per registrazione:', entryData)
+      await syncTimesheetFromGiornale(entryData, registrazioneId)
+    } else if (editingEntry.value) {
+      console.log('⏩ Modifica registrazione - non sincronizzando timesheet per evitare duplicati')
+    } else {
+      console.warn('⚠️ Impossibile sincronizzare timesheet: ID registrazione non disponibile')
+    }
+    
     closeEntryModal()
     
-    alert(`✅ Registrazione ${editingEntry.value ? 'aggiornata' : 'salvata'} con successo!`)
-  } catch (error) {
-    console.error('Errore nel salvataggio della registrazione:', error)
-    alert(`❌ Errore nel salvataggio: ${error.message}`)
+    // 🎉 Popup di successo moderno che sparisce dopo 2 secondi
+    const isUpdate = !!editingEntry.value
+    const dataFormatted = new Date(entryForm.value.data).toLocaleDateString('it-IT', {
+      day: 'numeric',
+      month: 'short'
+    })
+    
+    if (isUpdate) {
+      success(
+        'Registrazione Aggiornata',
+        `${dataFormatted} • ${entryForm.value.oreTotali}h • €${calculateDayCost().toLocaleString()}`
+      )
+    } else {
+      success(
+        'Registrazione Salvata',
+        `${dataFormatted} • ${entryForm.value.teamPresente.length} persone • ${entryForm.value.oreTotali}h • €${calculateDayCost().toLocaleString()}`
+      )
+    }
+  } catch (errorObj) {
+    console.error('Errore nel salvataggio della registrazione:', errorObj)
+    error('Errore Salvataggio', errorObj.message)
   }
 }
 
 const deleteEntry = async (entryId) => {
-  if (confirm('Sei sicuro di voler eliminare questa registrazione?')) {
+  const userConfirmed = await confirm(
+    'Eliminare Registrazione', 
+    'Sei sicuro di voler eliminare questa registrazione? Verranno eliminate anche le voci timesheet associate. Questa azione non può essere annullata.'
+  )
+  
+  if (userConfirmed) {
     try {
+      // 📊 Prima di eliminare, rimuovi anche i timesheet associati
+      await deleteTimesheetByRegistrazione(entryId)
+      
       await firestoreStore.deleteRegistrazioneGiornale(entryId)
       await loadGiornaleEntries()
       
       // 💰 Aggiorna automaticamente i costi dopo eliminazione
       await updateCostiCantiere()
       
-      alert('✅ Registrazione eliminata con successo!')
-    } catch (error) {
-      console.error('Errore nell\'eliminazione della registrazione:', error)
-      alert(`❌ Errore nell'eliminazione: ${error.message}`)
+      // 🗑️ Popup di successo per eliminazione
+      success(
+        'Registrazione Eliminata',
+        'Timesheet e costi aggiornati automaticamente'
+      )
+    } catch (errorObj) {
+      console.error('Errore nell\'eliminazione della registrazione:', errorObj)
+      error('Errore Eliminazione', errorObj.message)
     }
+  }
+}
+
+// 🗑️ Elimina i timesheet associati a una registrazione del giornale
+const deleteTimesheetByRegistrazione = async (registrazioneId) => {
+  try {
+    // Carica tutti i timesheet per trovare quelli associati a questa registrazione
+    const result = await firestoreStore.loadCollection('timesheet')
+    
+    if (result.success) {
+      const timesheetAssociati = result.data.filter(t => 
+        t.registrazioneGiornaleId === registrazioneId || 
+        t.fonte === 'giornale_cantiere'
+      )
+      
+      // Elimina ogni timesheet associato
+      for (const timesheet of timesheetAssociati) {
+        await firestoreStore.deleteDocument('timesheet', timesheet.id)
+        console.log(`🗑️ Timesheet eliminato: ${timesheet.id}`)
+      }
+      
+      console.log(`✅ Eliminati ${timesheetAssociati.length} timesheet associati alla registrazione`)
+    }
+  } catch (error) {
+    console.error('Errore eliminazione timesheet associati:', error)
   }
 }
 
@@ -670,7 +814,7 @@ const resetFilters = () => {
 
 const exportPDF = () => {
   if (!cantiere.value) {
-    alert('❌ Errore: Dati cantiere non disponibili per l\'esportazione')
+          error('Errore Export', 'Dati cantiere non disponibili')
     return
   }
 
@@ -873,12 +1017,15 @@ const exportPDF = () => {
     const fileName = `Giornale_Cantiere_${cantiere.value.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
     doc.save(fileName)
     
-    // Messaggio di successo
-    alert(`📄 Export PDF completato!\n\n📋 Report include:\n• Informazioni cantiere complete\n• ${filteredEntries.value.length} registrazioni\n• ${oreTotali}h ore totali lavorate\n• Statistiche riepilogative\n\n💾 File salvato: ${fileName}`)
+    // 📄 Popup di successo per export PDF
+    success(
+      'PDF Generato',
+      `${filteredEntries.value.length} registrazioni • ${oreTotali}h totali`
+    )
     
-  } catch (error) {
-    console.error('Errore durante l\'export PDF:', error)
-    alert(`❌ Errore durante l'esportazione PDF: ${error.message}`)
+  } catch (errorObj) {
+    console.error('Errore durante l\'export PDF:', errorObj)
+    error('Errore Export', errorObj.message)
   }
 }
 
@@ -902,6 +1049,7 @@ const loadCantiereData = async () => {
     
     if (!cantiereId) {
       console.error('ID cantiere non trovato nella route')
+      error('Errore Navigazione', 'ID cantiere non trovato')
       return
     }
     
@@ -915,6 +1063,7 @@ const loadCantiereData = async () => {
     
     if (!cantiere.value) {
       console.error(`Cantiere con ID ${cantiereId} non trovato`)
+      error('Cantiere Non Trovato', `ID ${cantiereId} non valido`)
     } else {
       // Carica anche le registrazioni del giornale
       await loadGiornaleEntries()
@@ -924,8 +1073,9 @@ const loadCantiereData = async () => {
         await firestoreStore.loadDipendenti()
       }
     }
-  } catch (error) {
-    console.error('Errore nel caricamento del cantiere:', error)
+  } catch (errorObj) {
+    console.error('Errore nel caricamento del cantiere:', errorObj)
+    error('Errore Caricamento', errorObj.message)
   }
 }
 
@@ -1041,7 +1191,7 @@ const calculateMaterialsCosts = async () => {
 // Funzione per aggiornare manualmente i costi (pulsante "Aggiorna")
 const refreshCosts = async () => {
   await updateCostiCantiere()
-  alert('💰 Costi aggiornati!')
+  success('Costi Aggiornati', 'Calcoli costi cantiere completati!')
 }
 
 // ===== FINE FUNZIONI GESTIONE COSTI =====
@@ -1049,10 +1199,31 @@ const refreshCosts = async () => {
 
 <style scoped>
 .form-input {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
 }
 
 .form-select {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 16px;
+  background-color: white;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
 }
 </style> 

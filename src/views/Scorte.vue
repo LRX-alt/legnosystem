@@ -479,6 +479,10 @@ import {
   CheckIcon,
   XMarkIcon
 } from '@heroicons/vue/24/outline'
+import { usePopup } from '@/composables/usePopup'
+
+// Popup system
+const { success, error } = usePopup()
 
 // Stato della pagina
 const showOrderModal = ref(false)
@@ -654,13 +658,13 @@ const closeEditModal = () => {
 
 const saveOrder = () => {
   if (!newOrder.value.materialeId || !newOrder.value.quantita || !newOrder.value.fornitore) {
-    alert('❌ Compila tutti i campi obbligatori!')
+    error('Campi Mancanti', 'Compila tutti i campi obbligatori!')
     return
   }
 
   const materiale = materiali.value.find(m => m.id === newOrder.value.materialeId)
   if (!materiale) {
-    alert('❌ Materiale non trovato!')
+    error('Materiale Non Trovato', 'Il materiale selezionato non esiste!')
     return
   }
 
@@ -685,12 +689,12 @@ const saveOrder = () => {
   stats.value.valoreOrdini += nuovoOrdine.importo
 
   closeOrderModal()
-  alert(`✅ Ordine creato con successo per ${newOrder.value.quantita} ${materiale.unita} di ${materiale.nome}!`)
+  success('Ordine Creato', `${newOrder.value.quantita} ${materiale.unita} di ${materiale.nome} ordinati con successo!`)
 }
 
 const saveEditMinimo = () => {
   if (editingMateriale.value.nuovaScortaMinima < 0) {
-    alert('❌ La scorta minima deve essere maggiore o uguale a 0!')
+    error('Valore Non Valido', 'La scorta minima deve essere maggiore o uguale a 0!')
     return
   }
 
@@ -712,6 +716,6 @@ const saveEditMinimo = () => {
   }
 
   closeEditModal()
-  alert(`✅ Scorta minima aggiornata a ${editingMateriale.value.nuovaScortaMinima} ${editingMateriale.value.unita}!`)
+  success('Scorta Aggiornata', `Scorta minima aggiornata a ${editingMateriale.value.nuovaScortaMinima} ${editingMateriale.value.unita}!`)
 }
 </script> 

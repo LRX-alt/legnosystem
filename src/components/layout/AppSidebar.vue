@@ -122,25 +122,6 @@
           </div>
         </div>
       </nav>
-
-      <!-- Footer della sidebar -->
-      <div class="p-4 border-t border-gray-200">
-        <div class="flex items-center space-x-3 mb-3">
-          <div class="w-8 h-8 bg-accent-500 rounded-full flex items-center justify-center">
-            <span class="text-white text-xs font-medium">🌿</span>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 truncate">Legnosystem.bio</p>
-            <p class="text-xs text-gray-500 truncate">v1.13.0</p>
-          </div>
-        </div>
-        <div class="text-center">
-          <p class="text-xs text-gray-400 leading-relaxed">
-            Ideato e sviluppato da<br>
-            <span class="font-medium text-primary-600">Di Furio Loris</span>
-          </p>
-        </div>
-      </div>
     </div>
   </aside>
 </template>

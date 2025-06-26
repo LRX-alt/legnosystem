@@ -65,6 +65,7 @@ export const firestoreConfig = {
     // 👥 Gestione utenti e autenticazione
     users: 'users',
     userProfiles: 'userProfiles',
+    registrationRequests: 'registrationRequests',
     
     // 🏗️ Gestione cantieri
     cantieri: 'cantieri',

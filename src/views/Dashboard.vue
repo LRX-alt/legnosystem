@@ -284,7 +284,7 @@ import { useFirestore } from '@/composables/useFirestore'
 import { useFirebaseAnalytics } from '@/composables/useFirebaseAnalytics'
 import { useFirestoreRealtime } from '@/composables/useFirestoreRealtime'
 import { useAuthStore } from '@/stores/auth'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 
 
 // Stores & Composables
@@ -293,7 +293,7 @@ const firestoreStore = useFirestoreStore()
 const firestore = useFirestore()
 const analytics = useFirebaseAnalytics()
 const realtime = useFirestoreRealtime()
-const toast = useToast()
+const { success, error, info } = usePopup()
 
 // State per real-time
 const realtimeActive = ref(false)
@@ -444,7 +444,7 @@ const startRealtimeSync = () => {
     console.log('✅ Real-time sync attivato per dashboard')
   } catch (error) {
     console.error('Errore attivazione real-time sync:', error)
-    toast.error('Errore sincronizzazione real-time', '❌ Sync Error')
+            error('Errore Sincronizzazione', 'Problemi di connessione real-time con Firebase')
   }
 }
 
@@ -487,7 +487,7 @@ const loadDashboardData = async () => {
       action: 'loadData'
     })
     
-    toast.error(`Errore caricamento: ${error.message}`, '❌ Errore Dashboard')
+    error('Errore Dashboard', `Impossibile caricare i dati: ${error.message}`)
   }
 }
 

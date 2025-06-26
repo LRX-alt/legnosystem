@@ -11,7 +11,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential
 } from 'firebase/auth'
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { auth, db, firestoreConfig } from '@/config/firebase'
 import { useToast } from '@/composables/useToast'
 
@@ -264,6 +264,180 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Richiesta di registrazione (da approvare)
+   */
+  const requestRegistration = async (userData) => {
+    try {
+      loading.value = true
+      
+      // Verifica se l'email è già in uso o in attesa
+      const existingRequestQuery = await getDocs(
+        query(
+          collection(db, firestoreConfig.collections.registrationRequests),
+          where('email', '==', userData.email)
+        )
+      )
+      
+      if (!existingRequestQuery.empty) {
+        throw new Error('Una richiesta con questa email è già in attesa di approvazione')
+      }
+      
+      // Crea richiesta di registrazione
+      const requestData = {
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        department: userData.department || 'generale',
+        phone: userData.phone || '',
+        position: userData.position || '',
+        requestedAt: serverTimestamp(),
+        status: 'pending', // pending, approved, rejected
+        notes: '',
+        processedBy: null,
+        processedAt: null
+      }
+      
+      await addDoc(collection(db, firestoreConfig.collections.registrationRequests), requestData)
+      
+      toast.success(
+        'Richiesta di registrazione inviata! Ti contatteremo per l\'approvazione.',
+        '📧 Richiesta Inviata'
+      )
+      
+      return { success: true }
+    } catch (error) {
+      console.error('Errore richiesta registrazione:', error)
+      toast.error(error.message || 'Errore durante l\'invio della richiesta', '❌ Errore Richiesta')
+      return { success: false, error: error.message }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Ottieni richieste di registrazione (solo admin)
+   */
+  const getRegistrationRequests = async () => {
+    if (!isAdmin.value) {
+      throw new Error('Accesso negato: solo amministratori')
+    }
+    
+    try {
+      const requestsQuery = query(
+        collection(db, firestoreConfig.collections.registrationRequests),
+        orderBy('requestedAt', 'desc')
+      )
+      
+      const snapshot = await getDocs(requestsQuery)
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+    } catch (error) {
+      console.error('Errore caricamento richieste:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Approva richiesta di registrazione (solo admin)
+   */
+  const approveRegistrationRequest = async (requestId, requestData) => {
+    if (!isAdmin.value) {
+      throw new Error('Accesso negato: solo amministratori')
+    }
+    
+    try {
+      // Genera password temporanea
+      const tempPassword = generateTemporaryPassword()
+      
+      // Crea account Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        requestData.email, 
+        tempPassword
+      )
+      
+      // Aggiorna profilo Firebase
+      await updateProfile(userCredential.user, {
+        displayName: requestData.name
+      })
+      
+      // Crea profilo Firestore
+      const profileData = {
+        name: requestData.name,
+        email: requestData.email,
+        role: requestData.role,
+        department: requestData.department,
+        phone: requestData.phone,
+        position: requestData.position,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isActive: true,
+        loginCount: 0,
+        approvedBy: user.value.uid,
+        approvedAt: serverTimestamp()
+      }
+      
+      await setDoc(doc(db, firestoreConfig.collections.userProfiles, userCredential.user.uid), profileData)
+      
+      // Aggiorna richiesta come approvata
+      await updateDoc(doc(db, firestoreConfig.collections.registrationRequests, requestId), {
+        status: 'approved',
+        processedBy: user.value.uid,
+        processedAt: serverTimestamp(),
+        createdUserId: userCredential.user.uid
+      })
+      
+      // Invia email di reset password per il primo accesso
+      await sendPasswordResetEmail(auth, requestData.email)
+      
+      toast.success(
+        `Account creato per ${requestData.name}. Email di impostazione password inviata.`,
+        '✅ Registrazione Approvata'
+      )
+      
+      return { success: true, userId: userCredential.user.uid }
+    } catch (error) {
+      console.error('Errore approvazione richiesta:', error)
+      toast.error(error.message || 'Errore durante l\'approvazione', '❌ Errore Approvazione')
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Rifiuta richiesta di registrazione (solo admin)
+   */
+  const rejectRegistrationRequest = async (requestId, reason = '') => {
+    if (!isAdmin.value) {
+      throw new Error('Accesso negato: solo amministratori')
+    }
+    
+    try {
+      await updateDoc(doc(db, firestoreConfig.collections.registrationRequests, requestId), {
+        status: 'rejected',
+        processedBy: user.value.uid,
+        processedAt: serverTimestamp(),
+        notes: reason
+      })
+      
+      toast.success('Richiesta rifiutata', '❌ Richiesta Rifiutata')
+      return { success: true }
+    } catch (error) {
+      console.error('Errore rifiuto richiesta:', error)
+      toast.error(error.message || 'Errore durante il rifiuto', '❌ Errore')
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Genera password temporanea
+   */
+  const generateTemporaryPassword = () => {
+    return Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
+  }
+
+  /**
    * Aggiorna profilo utente
    */
   const updateUserProfile = async (updates) => {
@@ -408,8 +582,8 @@ export const useAuthStore = defineStore('auth', () => {
     canManagePersonnel,
     canViewFinancials,
     
-         // Methods
-     initializeAuth,
+    // Methods
+    initializeAuth,
     login,
     register,
     logout,
@@ -419,6 +593,12 @@ export const useAuthStore = defineStore('auth', () => {
     loadUserProfile,
     createAdminProfile,
     hasPermission,
-    canAccess
+    canAccess,
+    
+    // Registration requests
+    requestRegistration,
+    getRegistrationRequests,
+    approveRegistrationRequest,
+    rejectRegistrationRequest
   }
 }) 

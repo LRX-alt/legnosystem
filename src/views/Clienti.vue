@@ -573,11 +573,11 @@ import {
   StarIcon
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '@/stores/firestore'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 
 // Stores
 const firestoreStore = useFirestoreStore()
-const { showToast } = useToast()
+const { success, error, confirm } = usePopup()
 
 // Stato della pagina
 const showAddModal = ref(false)
@@ -703,13 +703,13 @@ const updateCliente = async () => {
       showEditModal.value = false
       selectedCliente.value = null
       
-      showToast('Cliente aggiornato con successo!', 'success')
+      success('Cliente Aggiornato', 'Informazioni cliente salvate con successo!')
     } else {
-      showToast('Errore nell\'aggiornamento del cliente: ' + result.error, 'error')
+      error("Errore Cliente", "Operazione fallita")
     }
   } catch (error) {
     console.error('Errore aggiornamento cliente:', error)
-    showToast('Errore nell\'aggiornamento del cliente', 'error')
+    error("Errore Cliente", "Operazione fallita")
   } finally {
     loading.value = false
   }
@@ -717,7 +717,8 @@ const updateCliente = async () => {
 
 // Elimina cliente
 const deleteCliente = async (clienteId) => {
-  if (!confirm('Sei sicuro di voler eliminare questo cliente?')) {
+  const confirmed = await confirm('Eliminare Cliente', 'Sei sicuro di voler eliminare questo cliente? Questa azione non può essere annullata.')
+  if (!confirmed) {
     return
   }
   
@@ -730,13 +731,13 @@ const deleteCliente = async (clienteId) => {
       // Rimuovi dalla lista locale
       clienti.value = clienti.value.filter(c => c.id !== clienteId)
       
-      showToast('Cliente eliminato con successo!', 'success')
+      success("Operazione Completata", "Cliente gestito con successo!")
     } else {
-      showToast('Errore nell\'eliminazione del cliente: ' + result.error, 'error')
+      error("Errore Cliente", "Operazione fallita")
     }
   } catch (error) {
     console.error('Errore eliminazione cliente:', error)
-    showToast('Errore nell\'eliminazione del cliente', 'error')
+    error("Errore Cliente", "Operazione fallita")
   } finally {
     loading.value = false
   }
@@ -768,13 +769,13 @@ const createCliente = async () => {
       resetForm()
       showAddModal.value = false
       
-      showToast('Cliente creato con successo!', 'success')
+      success("Operazione Completata", "Cliente gestito con successo!")
     } else {
-      showToast('Errore nella creazione del cliente: ' + result.error, 'error')
+      error("Errore Cliente", "Operazione fallita")
     }
   } catch (error) {
     console.error('Errore creazione cliente:', error)
-    showToast('Errore nella creazione del cliente', 'error')
+    error("Errore Cliente", "Operazione fallita")
   } finally {
     loading.value = false
   }

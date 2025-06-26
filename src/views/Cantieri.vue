@@ -2093,12 +2093,13 @@ import {
   DocumentTextIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 import { useFirestore } from '@/composables/useFirestore'
 
 // Firestore operations with validation and error handling
 const firestore = useFirestore()
 const router = useRouter()
+const { success, error, confirm, info } = usePopup()
 
 // Stato della pagina
 const showDetailModal = ref(false)
@@ -2351,7 +2352,7 @@ const closeModal = () => {
 const editCantiere = (cantiere) => {
   // Verifica che il cantiere sia valido prima di copiarlo
   if (!cantiere || !cantiere.id || !cantiere.nome) {
-    const { error } = useToast()
+    const { error } = usePopup()
     error('Errore: cantiere non valido per la modifica!', '❌ Errore Validazione')
     return
   }
@@ -2366,7 +2367,7 @@ const closeEditModal = () => {
 }
 
 const saveCantiereChanges = async () => {
-  const { success, error } = useToast()
+  const { success, error } = usePopup()
   
   // Verifica che editingCantiere sia valido
   if (!editingCantiere.value || !editingCantiere.value.id || !editingCantiere.value.nome) {
@@ -2396,7 +2397,7 @@ const saveCantiereChanges = async () => {
 
 // Funzione per eliminare un cantiere
 const deleteCantiere = async (cantiere) => {
-  const { success, error } = useToast()
+  const { success, error } = usePopup()
   
   // Verifica che il cantiere sia valido
   if (!cantiere || !cantiere.id) {
@@ -2454,7 +2455,7 @@ const deleteCantiere = async (cantiere) => {
 const updateProgress = (cantiere) => {
   // Verifica che il cantiere sia valido
   if (!cantiere || !cantiere.id) {
-    const { error } = useToast()
+    const { error } = usePopup()
     error('Errore: cantiere non valido!', '❌ Errore Validazione')
     return
   }
@@ -2484,7 +2485,7 @@ const closeProgressModal = () => {
 }
 
 const saveProgressUpdate = async () => {
-  const { success, error } = useToast()
+  const { success, error } = usePopup()
   
   // Verifica che selectedCantiere sia valido
   if (!selectedCantiere.value || !selectedCantiere.value.id) {
@@ -2562,7 +2563,7 @@ const getProgressHistory = (cantiereId) => {
 const viewMaterials = async (cantiere) => {
   // Verifica che il cantiere sia valido
   if (!cantiere || !cantiere.id) {
-    const { error } = useToast()
+    const { error } = usePopup()
     error('Errore: cantiere non valido!', '❌ Errore Validazione')
     return
   }
@@ -2749,9 +2750,9 @@ const calculateDailyCost = (cantiere) => {
   return costoOrario * 8 // 8 ore lavorative giornaliere
 }
 
-// Calcola il costo mensile stimato della manodopera (22 giorni lavorativi)
+// Calcola il costo mensile stimato della manodopera (26 giorni lavorativi - 6 giorni/settimana)
 const calculateMonthlyCost = (cantiere) => {
-  return calculateDailyCost(cantiere) * 22
+  return calculateDailyCost(cantiere) * 26
 }
 
 // 💰 ===== NUOVE FUNZIONI SISTEMA COSTI CANTIERE =====
@@ -2909,7 +2910,7 @@ const updateCantiereAccumulatedCosts = async (cantiereId) => {
 
 // Aggiorna manualmente i costi di un cantiere (funzione per il pulsante "Aggiorna")
 const refreshCantiereCosts = async (cantiere) => {
-  const { success, error } = useToast()
+  const { success, error } = usePopup()
   
   if (!cantiere?.id) {
     error('Errore: cantiere non valido!', '❌ Errore')
@@ -2953,7 +2954,7 @@ const removeMemberFromTeam = (memberId) => {
 }
 
 const saveTeamChanges = async () => {
-  const { success, error } = useToast()
+  const { success, error } = usePopup()
   
   // Verifica che selectedCantiere sia valido
   if (!selectedCantiere.value || !selectedCantiere.value.id) {
@@ -3093,12 +3094,12 @@ const downloadFile = (file) => {
   link.click()
   document.body.removeChild(link)
   
-  alert(`📥 Download di "${file.name}" avviato!`)
+  success("Download Avviato", `File "${file.name}" in download...`)
 }
 
 const deleteFile = async (file) => {
   if (!selectedCantiere.value || !selectedCantiere.value.id) {
-    alert('❌ Errore: cantiere non valido!')
+    error("Errore Cantiere", "Cantiere non valido per questa operazione")
     return
   }
   
@@ -3365,7 +3366,7 @@ const saveMaterialChanges = async () => {
     }
   }
   
-  const { success } = useToast()
+  const { success } = usePopup()
   
   // 💾 Salva i valori PRIMA di chiudere il modal (che imposta editingMaterial.value = null)
   const quantitaUtilizzata = editingMaterial.value?.quantitaUtilizzata || 0
@@ -4002,7 +4003,7 @@ onMounted(async () => {
     console.log('✅ Dati cantieri caricati con successo')
   } catch (error) {
     console.error('❌ Errore nel caricamento dati Cantieri:', error)
-    const { error: showError } = useToast()
+    const { error: showError } = usePopup()
     showError('Errore durante il caricamento dei dati', '❌ Errore Caricamento')
   }
 })
