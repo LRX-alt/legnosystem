@@ -179,76 +179,6 @@
         </form>
       </div>
 
-      <!-- Demo Section -->
-      <div class="mt-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-green-100 overflow-hidden">
-        <div class="bg-gradient-to-r from-gray-50 to-green-50 px-6 py-4 border-b border-green-100">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="font-semibold text-gray-800">🧪 Ambiente Demo</h3>
-              <p class="text-xs text-gray-600">Account di test per valutazione</p>
-            </div>
-            <button
-              type="button"
-              @click="createDemoAccounts"
-              :disabled="loading || creatingDemo"
-              class="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 font-medium transition-colors"
-            >
-              {{ creatingDemo ? 'Creando...' : '+ Crea Demo' }}
-            </button>
-          </div>
-        </div>
-        
-        <div class="p-6 space-y-3">
-          <button
-            type="button"
-            @click="loginDemo('admin')"
-            :disabled="loading"
-            class="w-full flex items-center justify-between px-4 py-3 border-2 border-gray-200 rounded-xl text-gray-700 hover:border-green-300 hover:bg-green-50 disabled:opacity-50 transition-all duration-200"
-          >
-            <span class="flex items-center">
-              <span class="mr-3 text-lg">🔧</span>
-              <div class="text-left">
-                <div class="font-medium">Amministratore</div>
-                <div class="text-xs text-gray-500">admin@legnosystem.it</div>
-              </div>
-            </span>
-            <span class="text-green-600">→</span>
-          </button>
-          
-          <button
-            type="button"
-            @click="loginDemo('manager')"
-            :disabled="loading"
-            class="w-full flex items-center justify-between px-4 py-3 border-2 border-gray-200 rounded-xl text-gray-700 hover:border-green-300 hover:bg-green-50 disabled:opacity-50 transition-all duration-200"
-          >
-            <span class="flex items-center">
-              <span class="mr-3 text-lg">👔</span>
-              <div class="text-left">
-                <div class="font-medium">Direttore</div>
-                <div class="text-xs text-gray-500">manager@legnosystem.it</div>
-              </div>
-            </span>
-            <span class="text-green-600">→</span>
-          </button>
-          
-          <button
-            type="button"
-            @click="loginDemo('capo')"
-            :disabled="loading"
-            class="w-full flex items-center justify-between px-4 py-3 border-2 border-gray-200 rounded-xl text-gray-700 hover:border-green-300 hover:bg-green-50 disabled:opacity-50 transition-all duration-200"
-          >
-            <span class="flex items-center">
-              <span class="mr-3 text-lg">👷‍♂️</span>
-              <div class="text-left">
-                <div class="font-medium">Capo Cantiere</div>
-                <div class="text-xs text-gray-500">capo@legnosystem.it</div>
-              </div>
-            </span>
-            <span class="text-green-600">→</span>
-          </button>
-        </div>
-      </div>
-
       <!-- Footer -->
       <div class="mt-8 text-center text-xs text-gray-500 pb-8">
         <p>&copy; {{ currentYear }} Legno System • Abitare in natura dal 1959</p>
@@ -313,7 +243,6 @@
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePopup } from '@/composables/usePopup'
-import { createDemoUsers } from '@/utils/createDemoUsers'
 import logoLegnosystem from '@/assets/logo legnosystem.avif'
 
 // Emits
@@ -336,19 +265,11 @@ const form = ref({
 const showPassword = ref(false)
 const loading = ref(false)
 const errorMessage = ref('')
-const creatingDemo = ref(false)
 
 // Forgot Password
 const showForgotPassword = ref(false)
 const resetEmail = ref('')
 const resetLoading = ref(false)
-
-// Demo accounts
-const demoAccounts = {
-  admin: { email: 'admin@legnosystem.it', password: 'demo123' },
-  manager: { email: 'manager@legnosystem.it', password: 'demo123' },
-  capo: { email: 'capo@legnosystem.it', password: 'demo123' }
-}
 
 // Computed
 const isFormValid = computed(() => {
@@ -378,16 +299,6 @@ const handleLogin = async () => {
   }
 }
 
-const loginDemo = async (type) => {
-  const account = demoAccounts[type]
-  if (!account) return
-  
-  form.value.email = account.email
-  form.value.password = account.password
-  
-  await handleLogin()
-}
-
 const handleForgotPassword = async () => {
   if (!resetEmail.value) return
   
@@ -408,36 +319,6 @@ const handleForgotPassword = async () => {
     error('Errore Reset', 'Si è verificato un errore durante l\'invio dell\'email')
   } finally {
     resetLoading.value = false
-  }
-}
-
-const createDemoAccounts = async () => {
-  creatingDemo.value = true
-  
-  try {
-    const results = await createDemoUsers()
-    const successful = results.filter(r => r.success)
-    const failed = results.filter(r => !r.success)
-    
-    if (successful.length > 0) {
-      success(
-        'Account Demo Creati', 
-        `${successful.length} account demo creati con successo! Ora puoi accedere usando i pulsanti sopra.`
-      )
-    }
-    
-    if (failed.length > 0) {
-      console.warn('Alcuni account non sono stati creati:', failed)
-      // Non mostrare errore se sono già esistenti
-      if (!failed.every(f => f.error?.includes('already-in-use'))) {
-        error('Attenzione', `${failed.length} account non sono stati creati. Potrebbero già esistere.`)
-      }
-    }
-  } catch (err) {
-    console.error('Errore creazione account demo:', err)
-    error('Errore', 'Impossibile creare account demo. Verifica la configurazione Firebase.')
-  } finally {
-    creatingDemo.value = false
   }
 }
 </script>
