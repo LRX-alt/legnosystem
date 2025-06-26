@@ -15,7 +15,11 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
-// Initialize Firebase Auth
+// Mount the app immediately
+app.mount('#app')
+
+// Initialize Firebase Auth in the background
+// The router guard will handle redirection based on auth state.
 const authStore = useAuthStore()
 authStore.initializeAuth().then(() => {
   console.log('🔥 Firebase Auth inizializzato')
@@ -36,11 +40,6 @@ authStore.initializeAuth().then(() => {
         .catch(err => console.error('❌ Firestore test failed:', err))
     }, 2000)
   }
-  
-  // Mount app after auth initialization
-  app.mount('#app')
 }).catch((error) => {
   console.error('❌ Errore inizializzazione Firebase Auth:', error)
-  // Mount app anyway for development
-  app.mount('#app')
 })
