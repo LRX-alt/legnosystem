@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
+import path from 'path'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
@@ -12,12 +13,16 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': path.resolve(__dirname, './src')
     },
   },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false
+  },
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify('2.5.0'),
+    'import.meta.env.VITE_APP_NAME': JSON.stringify('Legnosystem.bio')
   }
 })
