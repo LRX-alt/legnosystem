@@ -92,6 +92,44 @@ export const useFirestore = () => {
     }
   }
 
+  // 📦 Operazioni Materiali con error handling
+  const materialiOperations = {
+    async load() {
+      return withErrorHandling(
+        () => firestoreStore.loadMateriali(),
+        'Caricamento materiali'
+      )
+    },
+
+    async create(data) {
+      return withErrorHandling(
+        () => firestoreStore.createMateriale(data),
+        'Creazione materiale'
+      )
+    },
+
+    async update(id, data) {
+      return withErrorHandling(
+        () => firestoreStore.updateDocument('materiali', id, data),
+        'Aggiornamento materiale'
+      )
+    },
+
+    async delete(id) {
+      return withErrorHandling(
+        () => firestoreStore.deleteDocument('materiali', id),
+        'Eliminazione materiale'
+      )
+    },
+
+    async updateQuantita(id, quantitaDelta, movimento = 'manuale') {
+      return withErrorHandling(
+        () => firestoreStore.updateMaterialeQuantita(id, quantitaDelta, movimento),
+        'Aggiornamento quantità'
+      )
+    }
+  }
+
   // 📦 Operazioni Materiali Cantiere con error handling
   const materialiCantiereOperations = {
     async load(cantiereId) {
@@ -233,48 +271,41 @@ export const useFirestore = () => {
     }
   }
 
-  // 🔄 Caricamento dati multipli con Promise.all
+  // 🔄 Funzione per caricare tutti i dati
   const loadAllData = async () => {
-    return withErrorHandling(
-      async () => {
-        const results = await Promise.allSettled([
-          firestoreStore.loadCantieri(),
-          firestoreStore.loadClienti(),
-          firestoreStore.loadDipendenti(),
-          firestoreStore.loadMateriali(),
-          firestoreStore.loadFornitori()
-        ])
-
-        // Controllo se qualche caricamento è fallito
-        const failed = results.filter(r => r.status === 'rejected')
-        if (failed.length > 0) {
-          console.warn('⚠️ Alcuni caricamenti sono falliti:', failed)
-          toast.warning(`⚠️ ${failed.length} caricamenti falliti, vedi console`)
-        }
-
-        const successful = results.filter(r => r.status === 'fulfilled').length
-        // Note: Removed success notification to avoid spam
-
-        return { success: true, results }
-      },
-      'Caricamento dati'
-    )
+    try {
+      await Promise.all([
+        cantieriOperations.load(),
+        clientiOperations.load(),
+        materialiOperations.load(),
+        dipendentiOperations.load(),
+        fornitoriOperations.load()
+      ])
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Errore caricamento dati:', error)
+      return { success: false, error: error.message }
+    }
   }
 
   return {
-    // Loading state
-    loading: firestoreStore.loading,
-    
-    // Operazioni specifiche
-    cantieri: cantieriOperations,
-    materialiCantiere: materialiCantiereOperations,
-    allegati: allegatiOperations,
-    allegatiMateriali: allegatiMaterialiOperations,
-    clienti: clientiOperations,
-    dipendenti: dipendentiOperations,
-    
-    // Operazioni globali
+    cantieriOperations,
+    clientiOperations,
+    materialiOperations,
+    materialiCantiereOperations,
+    dipendentiOperations,
+    fornitoriOperations: {
+      async load() {
+        return withErrorHandling(
+          () => firestoreStore.loadFornitori(),
+          'Caricamento fornitori'
+        )
+      }
+    },
+    allegatiOperations,
+    allegatiMaterialiOperations,
     loadAllData,
-    withErrorHandling
+    loading: firestoreStore.loading,
+    error: firestoreStore.error
   }
 } 

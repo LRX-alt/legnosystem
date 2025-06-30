@@ -1,3 +1,303 @@
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useFirestore } from '@/composables/useFirestore'
+import { usePopup } from '@/composables/usePopup'
+import { useToast } from '@/composables/useToast'
+import {
+  PlusIcon,
+  XMarkIcon,
+  ChartBarIcon,
+  BuildingOfficeIcon,
+  CurrencyEuroIcon,
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  PencilIcon,
+  CubeIcon,
+  PaperClipIcon,
+  UsersIcon,
+  TrashIcon,
+  DocumentTextIcon
+} from '@heroicons/vue/24/outline'
+
+const router = useRouter()
+const popup = usePopup()
+const { showToast } = useToast()
+const firestore = useFirestore()
+
+// Reactive state
+const cantieri = ref([])
+const searchTerm = ref('')
+const selectedStatus = ref('')
+const selectedPriority = ref('')
+const showAddModal = ref(false)
+const showDetailModal = ref(false)
+const showEditModal = ref(false)
+const showProgressModal = ref(false)
+const showTeamModal = ref(false)
+const showAttachmentsModal = ref(false)
+const showManageMaterialsModal = ref(false)
+const showAddMaterialModal = ref(false)
+const showEditMaterialModal = ref(false)
+const showMaterialAttachmentsModal = ref(false)
+
+const selectedCantiere = ref(null)
+const editingCantiere = ref(null)
+const newCantiere = ref({
+  nome: '',
+  cliente: {
+    id: '',
+    nome: ''
+  },
+  indirizzo: '',
+  tipoLavoro: '',
+  valore: 0,
+  dataInizio: '',
+  scadenza: '',
+  stato: 'pianificato',
+  priorita: 'media',
+  progresso: 0,
+  team: [],
+  costiAccumulati: {
+    materiali: 0,
+    manodopera: 0,
+    totale: 0
+  }
+})
+
+const clientSelectionMode = ref('existing')
+const selectedClientFromList = ref('')
+const materialSelectionMode = ref('existing')
+const selectedMaterialFromStock = ref('')
+const selectedMaterial = ref(null)
+const editingMaterial = ref(null)
+const materialiCantiere = ref([])
+const materialiMagazzino = ref([])
+const fornitori = ref([])
+const availableClients = ref([])
+
+// Computed properties
+const filteredCantieri = computed(() => {
+  return cantieri.value.filter(cantiere => {
+    const matchesSearch = cantiere.nome.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
+                         getClienteNome(cantiere.cliente).toLowerCase().includes(searchTerm.value.toLowerCase()) ||
+                         cantiere.indirizzo.toLowerCase().includes(searchTerm.value.toLowerCase())
+    
+    const matchesStatus = !selectedStatus.value || cantiere.stato === selectedStatus.value
+    const matchesPriority = !selectedPriority.value || cantiere.priorita === selectedPriority.value
+    
+    return matchesSearch && matchesStatus && matchesPriority
+  })
+})
+
+const stats = computed(() => {
+  const now = new Date()
+  const inOneMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())
+  
+  return {
+    attivi: cantieri.value.filter(c => c.stato === 'in-corso').length,
+    valoreTotale: cantieri.value.reduce((acc, c) => acc + (c.valore || 0), 0),
+    inScadenza: cantieri.value.filter(c => {
+      const scadenza = new Date(c.scadenza)
+      return scadenza <= inOneMonth && c.stato !== 'completato'
+    }).length,
+    completatiMese: cantieri.value.filter(c => {
+      const dataCompletamento = new Date(c.dataCompletamento)
+      return dataCompletamento.getMonth() === now.getMonth() && 
+             dataCompletamento.getFullYear() === now.getFullYear()
+    }).length
+  }
+})
+
+// Methods
+const getStatusColor = (stato) => {
+  const colors = {
+    'pianificato': 'bg-blue-100 text-blue-800',
+    'in-corso': 'bg-accent-100 text-accent-800',
+    'completato': 'bg-green-100 text-green-800',
+    'sospeso': 'bg-red-100 text-red-800'
+  }
+  return colors[stato] || 'bg-gray-100 text-gray-800'
+}
+
+const getStatusLabel = (stato) => {
+  const labels = {
+    'pianificato': 'Pianificato',
+    'in-corso': 'In Corso',
+    'completato': 'Completato',
+    'sospeso': 'Sospeso'
+  }
+  return labels[stato] || stato
+}
+
+const getPriorityColor = (priorita) => {
+  const colors = {
+    'alta': 'bg-red-100 text-red-800',
+    'media': 'bg-yellow-100 text-yellow-800',
+    'bassa': 'bg-gray-100 text-gray-800'
+  }
+  return colors[priorita] || 'bg-gray-100 text-gray-800'
+}
+
+// 🎨 Helper per il colore del tipo cliente
+const getTipoColor = (tipo) => {
+  const colors = {
+    'privato': 'bg-blue-100 text-blue-800',
+    'azienda': 'bg-purple-100 text-purple-800',
+    'ente': 'bg-green-100 text-green-800'
+  }
+  return colors[tipo] || 'bg-gray-100 text-gray-800'
+}
+
+// 🏷️ Helper per l'etichetta del tipo cliente
+const getTipoLabel = (tipo) => {
+  const labels = {
+    'privato': 'Privato',
+    'azienda': 'Azienda',
+    'ente': 'Ente Pubblico'
+  }
+  return labels[tipo] || tipo
+}
+
+// 🔧 Helper per gestire il campo cliente (compatibilità oggetto/stringa)
+const getClienteNome = (cliente) => {
+  if (!cliente) return 'Cliente non specificato'
+  
+  // Se è un oggetto con proprietà 'nome', usa quella
+  if (typeof cliente === 'object' && cliente.nome) {
+    return cliente.nome
+  }
+  
+  // Se è una stringa, usala direttamente (cantieri vecchi)
+  if (typeof cliente === 'string') {
+    return cliente
+  }
+  
+  // Fallback
+  return 'Cliente non valido'
+}
+
+// 🔍 Helper per ottenere il cliente selezionato
+const getSelectedClient = () => {
+  if (clientSelectionMode.value === 'existing') {
+    return availableClients.value.find(c => c.id === selectedClientFromList.value)
+  } else if (clientSelectionMode.value === 'new') {
+    return newCantiere.value.cliente
+  }
+  return null
+}
+
+// 👀 Watch per gestire il cambio di modalità cliente
+watch(clientSelectionMode, (newMode) => {
+  // Reset dei campi cliente quando si cambia modalità
+  if (newMode === 'new') {
+    // Per nuovo cliente, inizializza con oggetto vuoto
+    newCantiere.value.cliente = {
+      id: '',
+      nome: ''
+    }
+    // Reset altri campi cliente
+    newCantiere.value.clienteTipo = 'privato'
+    newCantiere.value.clienteEmail = ''
+    newCantiere.value.clienteTelefono = ''
+    newCantiere.value.clienteIndirizzo = ''
+    newCantiere.value.indirizzo = ''
+  } else {
+    // Per cliente esistente, resetta la selezione
+    selectedClientFromList.value = ''
+    newCantiere.value.cliente = {
+      id: '',
+      nome: ''
+    }
+  }
+}, { immediate: true })
+
+// Hook lifecycle per inizializzazione
+onMounted(async () => {
+  try {
+    // Carica tutti i dati necessari usando Promise.all per efficienza
+    const [cantieriResult, dipendentiResult, materialiResult, fornitoriResult, clientiResult] = await Promise.all([
+      firestore.cantieriOperations.load(),
+      firestore.dipendentiOperations.load(),
+      firestore.materialiOperations.load(),
+      firestore.fornitoriOperations.load(),
+      firestore.clientiOperations.load()
+    ])
+    
+    // Aggiorna i refs con i dati caricati
+    if (cantieriResult?.success) {
+      cantieri.value = cantieriResult.data || []
+    }
+    
+    if (clientiResult?.success) {
+      availableClients.value = clientiResult.data || []
+    }
+    
+    if (materialiResult?.success) {
+      materialiMagazzino.value = materialiResult.data || []
+    }
+    
+    if (fornitoriResult?.success) {
+      fornitori.value = fornitoriResult.data || []
+    }
+    
+    console.log('✅ Dati cantieri caricati con successo')
+  } catch (error) {
+    console.error('❌ Errore nel caricamento dati Cantieri:', error)
+    popup.error('Errore Caricamento', 'Si è verificato un errore durante il caricamento dei dati')
+  }
+})
+
+// 🚪 Funzioni di chiusura modali
+const closeAddModal = () => {
+  showAddModal.value = false
+  resetNewCantiere()
+}
+
+const closeDetailModal = () => {
+  showDetailModal.value = false
+  selectedCantiere.value = null
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingCantiere.value = null
+}
+
+const closeProgressModal = () => {
+  showProgressModal.value = false
+}
+
+const closeTeamModal = () => {
+  showTeamModal.value = false
+}
+
+const closeAttachmentsModal = () => {
+  showAttachmentsModal.value = false
+}
+
+const closeManageMaterialsModal = () => {
+  showManageMaterialsModal.value = false
+  selectedMaterial.value = null
+  editingMaterial.value = null
+  materialSelectionMode.value = 'existing'
+  selectedMaterialFromStock.value = ''
+}
+
+const closeAddMaterialModal = () => {
+  showAddMaterialModal.value = false
+}
+
+const closeEditMaterialModal = () => {
+  showEditMaterialModal.value = false
+  editingMaterial.value = null
+}
+
+const closeMaterialAttachmentsModal = () => {
+  showMaterialAttachmentsModal.value = false
+}
+</script>
+
 <template>
   <div class="space-y-6">
     <!-- Header Cantieri -->
@@ -116,7 +416,7 @@
         <div class="flex items-start justify-between mb-4">
           <div class="flex-1">
             <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ cantiere.nome || 'Cantiere senza nome' }}</h3>
-            <p class="text-sm text-gray-600">{{ cantiere.cliente }}</p>
+            <p class="text-sm text-gray-600">{{ getClienteNome(cantiere.cliente) }}</p>
             <p class="text-xs text-gray-500">{{ cantiere.indirizzo }}</p>
           </div>
           <div class="flex items-center space-x-2">
@@ -364,7 +664,7 @@
                 <div class="space-y-3 text-sm">
                   <div class="flex justify-between min-w-0">
                     <span class="text-gray-600 flex-shrink-0">Cliente:</span> 
-                    <span class="font-medium truncate ml-2">{{ selectedCantiere.cliente }}</span>
+                    <span class="font-medium truncate ml-2">{{ getClienteNome(selectedCantiere.cliente) }}</span>
                   </div>
                   <div class="flex justify-between min-w-0">
                     <span class="text-gray-600 flex-shrink-0">Indirizzo:</span> 
@@ -433,7 +733,7 @@
               <div class="space-y-4">
                 <h4 class="font-medium text-gray-900">Informazioni Generali</h4>
                 <div class="space-y-2 text-sm">
-                  <div><span class="text-gray-600">Cliente:</span> {{ selectedCantiere.cliente }}</div>
+                  <div><span class="text-gray-600">Cliente:</span> {{ getClienteNome(selectedCantiere.cliente) }}</div>
                   <div><span class="text-gray-600">Indirizzo:</span> {{ selectedCantiere.indirizzo }}</div>
                   <div><span class="text-gray-600">Tipo Lavoro:</span> {{ selectedCantiere.tipoLavoro }}</div>
                   <div><span class="text-gray-600">Valore:</span> €{{ selectedCantiere.valore ? selectedCantiere.valore.toLocaleString() : '0' }}</div>
@@ -629,7 +929,7 @@
     </div>
 
     <!-- Modal Materiali Cantiere -->
-    <div v-if="showMaterialsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeMaterialsModal">
+    <div v-if="showManageMaterialsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeManageMaterialsModal">
       <div class="relative top-4 mx-auto border w-full max-w-4xl shadow-lg rounded-md bg-white" @click.stop>
         <div class="p-6">
           <div class="flex items-center justify-between mb-6">
@@ -1021,7 +1321,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <input
-                      v-model="newCantiere.cliente"
+                      v-model="newCantiere.cliente.nome"
                       type="text"
                       required
                       placeholder="Nome cliente/azienda..."
@@ -1078,11 +1378,20 @@
 
             <!-- Indirizzo -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Indirizzo</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Indirizzo Cantiere
+                <span v-if="clientSelectionMode === 'existing' && getSelectedClient()?.indirizzo" 
+                      class="text-xs text-gray-500 font-normal">
+                  (pre-popolato con indirizzo cliente - puoi modificarlo)
+                </span>
+              </label>
               <textarea
                 v-model="newCantiere.indirizzo"
                 rows="2"
                 required
+                :placeholder="clientSelectionMode === 'existing' && getSelectedClient()?.indirizzo ? 
+                  'Indirizzo del cantiere (modificabile se diverso dal cliente)' : 
+                  'Indirizzo dove si svolgerà il cantiere...'"
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
               ></textarea>
             </div>
@@ -2072,2038 +2381,6 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { 
-  PlusIcon,
-  BuildingOfficeIcon,
-  CurrencyEuroIcon,
-  CalendarDaysIcon,
-  CheckCircleIcon,
-  PencilIcon,
-  ChartBarIcon,
-  CubeIcon,
-  XMarkIcon,
-  CheckIcon,
-  ExclamationTriangleIcon,
-  ClockIcon,
-  UsersIcon,
-  PaperClipIcon,
-  DocumentTextIcon,
-  TrashIcon
-} from '@heroicons/vue/24/outline'
-import { usePopup } from '@/composables/usePopup'
-import { useFirestore } from '@/composables/useFirestore'
-
-// Firestore operations with validation and error handling
-const firestore = useFirestore()
-const router = useRouter()
-const { success, error, confirm, info } = usePopup()
-
-// Stato della pagina
-const showDetailModal = ref(false)
-const showEditModal = ref(false)
-const showMaterialsModal = ref(false)
-const showAddModal = ref(false)
-const showTeamModal = ref(false)
-const showAttachmentsModal = ref(false)
-const showManageMaterialsModal = ref(false)
-const showAddMaterialModal = ref(false)
-const showEditMaterialModal = ref(false)
-const showMaterialAttachmentsModal = ref(false)
-const showProgressModal = ref(false)
-
-const searchTerm = ref('')
-const selectedStatus = ref('')
-const selectedPriority = ref('')
-
-const selectedCantiere = ref(null)
-const editingCantiere = ref(null)
-const materialiCantiere = ref([])
-const editingMaterial = ref(null)
-
-// Progresso e storico
-const progressUpdate = ref({
-  incremento: 10,
-  nota: '',
-  fase: '',
-  dataCompletamento: ''
-})
-const cantieriProgressHistory = ref({})
-const newMaterial = ref({
-  nome: '',
-  descrizione: '',
-  codice: '',
-  quantitaRichiesta: 0,
-  unita: 'pz',
-  prezzoUnitario: 0,
-  stato: 'pianificato',
-  fornitoreId: null,
-  dataAcquisto: '',
-  note: ''
-})
-
-// Nuovo cantiere
-const newCantiere = ref({
-  nome: '',
-  cliente: '',
-  clienteTipo: 'privato',
-  clienteEmail: '',
-  clienteTelefono: '',
-  clienteIndirizzo: '',
-  indirizzo: '',
-  tipoLavoro: '',
-  valore: 0,
-  dataInizio: '',
-  scadenza: '',
-  stato: 'pianificato',
-  priorita: 'media'
-})
-
-
-
-// Stats - Calcolate dinamicamente dai dati Firestore
-const stats = computed(() => {
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  
-  return {
-    attivi: cantieri.value.filter(c => c.stato === 'in-corso').length,
-    valoreTotale: cantieri.value.reduce((total, c) => total + (c.valore || 0), 0),
-    inScadenza: cantieri.value.filter(c => {
-      if (!c.scadenza) return false
-      const scadenza = new Date(c.scadenza)
-      const diffDays = Math.ceil((scadenza - now) / (1000 * 60 * 60 * 24))
-      return diffDays <= 7 && diffDays >= 0
-    }).length,
-    completatiMese: cantieri.value.filter(c => {
-      if (c.stato !== 'completato' || !c.dataCompletamento) return false
-      const completamento = new Date(c.dataCompletamento)
-      return completamento >= startOfMonth
-    }).length
-  }
-})
-
-// Import diretto dal Firestore store per dati reattivi
-import { useFirestoreStore } from '@/stores/firestore'
-const firestoreStore = useFirestoreStore()
-
-// Dati da Firestore - computed per reattività
-const cantieri = computed(() => firestoreStore.cantieri)
-const dipendentiDisponibili = computed(() => firestoreStore.dipendenti)
-const materialiMagazzino = computed(() => firestoreStore.materiali)
-const fornitori = computed(() => firestoreStore.fornitori)
-
-// Gestione allegati locali (da migrare a Firestore Storage in futuro)
-const cantieriAttachments = ref({})
-const materialiAttachments = ref({})
-const selectedMaterial = ref(null)
-
-// ✅ Funzioni Firestore per allegati cantieri
-const loadAllegatiCantiere = async (cantiereId) => {
-  try {
-    const result = await firestore.allegati.load(cantiereId)
-    if (result.success && result.data) {
-      // Converti da formato Firestore a formato locale per compatibilità
-      cantieriAttachments.value[cantiereId] = result.data.map(allegato => ({
-        id: allegato.id,
-        name: allegato.nome,
-        url: allegato.url,
-        type: allegato.tipo,
-        size: allegato.dimensione,
-        description: allegato.descrizione,
-        category: allegato.categoria,
-        uploadDate: allegato.uploadedAt?.toDate?.() || allegato.uploadedAt
-      }))
-    }
-  } catch (e) {
-    console.warn('Errore nel caricamento allegati da Firestore:', e)
-    cantieriAttachments.value[cantiereId] = cantieriAttachments.value[cantiereId] || []
-  }
-}
-
-const saveAllegatoCantiere = async (cantiereId, allegatoData) => {
-  try {
-    const data = {
-      nome: allegatoData.name || allegatoData.nome,
-      url: allegatoData.url,
-      tipo: allegatoData.type || allegatoData.tipo,
-      dimensione: allegatoData.size || allegatoData.dimensione,
-      descrizione: allegatoData.description || allegatoData.descrizione || '',
-      categoria: allegatoData.category || allegatoData.categoria || 'generale'
-    }
-    
-    const result = await firestore.allegati.create(cantiereId, data)
-    if (result.success) {
-      // Aggiorna cache locale
-      await loadAllegatiCantiere(cantiereId)
-    }
-    return result
-  } catch (e) {
-    console.warn('Errore nel salvataggio allegato:', e)
-    return { success: false, error: e.message }
-  }
-}
-
-// ✅ Funzioni Firestore per storico progresso (già gestito da updateCantiereProgress)
-const loadProgressHistory = async (cantiereId) => {
-  try {
-    // Il progresso è già gestito automaticamente da updateCantiereProgress
-    // e salvato nella collezione cantieriProgress
-    cantieriProgressHistory.value[cantiereId] = cantieriProgressHistory.value[cantiereId] || []
-  } catch (e) {
-    console.warn('Errore nel caricamento storico progresso:', e)
-    cantieriProgressHistory.value[cantiereId] = []
-  }
-}
-
-// Computed
-const filteredCantieri = computed(() => {
-  let result = cantieri.value
-
-  if (searchTerm.value) {
-    result = result.filter(c => 
-      c.nome.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-      c.cliente.toLowerCase().includes(searchTerm.value.toLowerCase())
-    )
-  }
-
-  if (selectedStatus.value) {
-    result = result.filter(c => c.stato === selectedStatus.value)
-  }
-
-  if (selectedPriority.value) {
-    result = result.filter(c => c.priorita === selectedPriority.value)
-  }
-
-  return result
-})
-
-// Methods
-const getStatusColor = (stato) => {
-  const colors = {
-    'pianificato': 'bg-blue-100 text-blue-800',
-    'in-corso': 'bg-accent-100 text-accent-800',
-    'completato': 'bg-green-100 text-green-800',
-    'sospeso': 'bg-red-100 text-red-800'
-  }
-  return colors[stato] || 'bg-gray-100 text-gray-800'
-}
-
-const getStatusLabel = (stato) => {
-  const labels = {
-    'pianificato': 'Pianificato',
-    'in-corso': 'In Corso',
-    'completato': 'Completato',
-    'sospeso': 'Sospeso'
-  }
-  return labels[stato] || stato
-}
-
-const getPriorityColor = (priorita) => {
-  const colors = {
-    'alta': 'bg-red-100 text-red-800',
-    'media': 'bg-yellow-100 text-yellow-800',
-    'bassa': 'bg-gray-100 text-gray-800'
-  }
-  return colors[priorita] || 'bg-gray-100 text-gray-800'
-}
-
-const getMaterialStatusColor = (stato) => {
-  const colors = {
-    'pianificato': 'bg-blue-100 text-blue-800',
-    'ordinato': 'bg-yellow-100 text-yellow-800',
-    'in-uso': 'bg-accent-100 text-accent-800',
-    'utilizzato': 'bg-green-100 text-green-800',
-    'completato': 'bg-green-100 text-green-800',
-    'in-lavorazione': 'bg-blue-100 text-blue-800'
-  }
-  return colors[stato] || 'bg-gray-100 text-gray-800'
-}
-
-const getAvailabilityColor = (stato) => {
-  const colors = {
-    'disponibile': 'bg-green-100 text-green-800',
-    'ordinare': 'bg-yellow-100 text-yellow-800',
-    'mancante': 'bg-red-100 text-red-800'
-  }
-  return colors[stato] || 'bg-gray-100 text-gray-800'
-}
-
-const isScaduto = (scadenza) => {
-  return new Date(scadenza) < new Date()
-}
-
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('it-IT')
-}
-
-const viewCantiere = (cantiere) => {
-  selectedCantiere.value = cantiere
-  showDetailModal.value = true
-}
-
-const closeModal = () => {
-  showDetailModal.value = false
-  selectedCantiere.value = null
-}
-
-const editCantiere = (cantiere) => {
-  // Verifica che il cantiere sia valido prima di copiarlo
-  if (!cantiere || !cantiere.id || !cantiere.nome) {
-    const { error } = usePopup()
-    error('Errore: cantiere non valido per la modifica!', '❌ Errore Validazione')
-    return
-  }
-  
-  editingCantiere.value = { ...cantiere }
-  showEditModal.value = true
-}
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingCantiere.value = null
-}
-
-const saveCantiereChanges = async () => {
-  const { success, error } = usePopup()
-  
-  // Verifica che editingCantiere sia valido
-  if (!editingCantiere.value || !editingCantiere.value.id || !editingCantiere.value.nome) {
-    error('Errore: cantiere non valido per il salvataggio!', '❌ Errore Validazione')
-    return
-  }
-  
-  try {
-    // SALVA IL NOME PRIMA di chiamare l'API per evitare errori
-    const nomeCantiereAggiornato = editingCantiere.value.nome
-    
-    // Aggiorna usando il composable con validazione
-    await firestore.cantieri.update(editingCantiere.value.id, editingCantiere.value)
-    
-    // Ricarica i cantieri per aggiornare la lista
-    await firestore.cantieri.load()
-    
-    // Chiudi modal
-    closeEditModal()
-    
-    success(`Cantiere "${nomeCantiereAggiornato}" aggiornato con successo!`, '✅ Cantiere Aggiornato')
-  } catch (err) {
-    // L'errore è già gestito dal composable, ma possiamo aggiungere logica specifica
-    console.error('Errore aggiornamento cantiere:', err)
-  }
-}
-
-// Funzione per eliminare un cantiere
-const deleteCantiere = async (cantiere) => {
-  const { success, error } = usePopup()
-  
-  // Verifica che il cantiere sia valido
-  if (!cantiere || !cantiere.id) {
-    error('Errore: cantiere non valido!', '❌ Errore Validazione')
-    return
-  }
-
-  // Conferma eliminazione
-  const conferma = confirm(
-    `⚠️ ATTENZIONE: Sei sicuro di voler eliminare il cantiere "${cantiere.nome || 'Senza nome'}"?\n\n` +
-    `🔴 Questa operazione:\n` +
-    `• Eliminerà il cantiere definitivamente\n` +
-    `• Rimuoverà tutti i materiali associati\n` +
-    `• Cancellerà lo storico del progresso\n` +
-    `• Eliminerà tutti gli allegati\n\n` +
-    `❌ QUESTA AZIONE NON PUÒ ESSERE ANNULLATA!`
-  )
-  
-  if (!conferma) return
-  
-  try {
-    // Elimina usando il composable con gestione errori
-    await firestore.cantieri.delete(cantiere.id)
-    
-    // Ricarica i cantieri per aggiornare la lista
-    await firestore.cantieri.load()
-    
-    // Pulisci dati locali associati
-    delete cantieriAttachments.value[cantiere.id]
-    delete cantieriProgressHistory.value[cantiere.id]
-    
-    // ✅ Pulizia dati Firestore associati al cantiere eliminato
-    try {
-      // Elimina materiali del cantiere da Firestore (gestito automaticamente dalle FK)
-      // Elimina allegati del cantiere da Firestore (gestito automaticamente dalle FK) 
-      // Il progresso viene pulito automaticamente con l'eliminazione del cantiere
-      
-      console.log(`✅ Dati associati al cantiere ${cantiere.id} puliti automaticamente`)
-    } catch (e) {
-      console.warn('Avviso pulizia dati cantiere:', e)
-    }
-    
-    // Chiudi modal se è quello eliminato
-    if (selectedCantiere.value?.id === cantiere.id) {
-      closeModal()
-    }
-    
-    success(`Cantiere "${cantiere.nome || 'Senza nome'}" eliminato con successo`, '🗑️ Cantiere Eliminato')
-  } catch (err) {
-    // L'errore è già gestito dal composable
-    console.error('Errore eliminazione cantiere:', err)
-  }
-}
-
-const updateProgress = (cantiere) => {
-  // Verifica che il cantiere sia valido
-  if (!cantiere || !cantiere.id) {
-    const { error } = usePopup()
-    error('Errore: cantiere non valido!', '❌ Errore Validazione')
-    return
-  }
-
-  selectedCantiere.value = cantiere
-  
-  // Reset form con valori di default
-  progressUpdate.value = {
-    incremento: 10,
-    nota: '',
-    fase: '',
-    dataCompletamento: new Date().toISOString().split('T')[0]
-  }
-  
-  showProgressModal.value = true
-}
-
-const closeProgressModal = () => {
-  showProgressModal.value = false
-  selectedCantiere.value = null
-  progressUpdate.value = {
-    incremento: 10,
-    nota: '',
-    fase: '',
-    dataCompletamento: ''
-  }
-}
-
-const saveProgressUpdate = async () => {
-  const { success, error } = usePopup()
-  
-  // Verifica che selectedCantiere sia valido
-  if (!selectedCantiere.value || !selectedCantiere.value.id) {
-    error('Errore: cantiere non valido per aggiornamento progresso!', '❌ Errore Validazione')
-    return
-  }
-  
-  if (!progressUpdate.value.fase) {
-    error('Inserisci il nome della fase completata!')
-    return
-  }
-
-  if (!progressUpdate.value.dataCompletamento) {
-    error('Inserisci la data di completamento!')
-    return
-  }
-
-  try {
-    const nuovoProgresso = Math.min(selectedCantiere.value.progresso + progressUpdate.value.incremento, 100)
-    const progressoPrecedente = selectedCantiere.value.progresso
-  
-    // Aggiorna progresso usando il composable
-    await firestore.cantieri.updateProgress(selectedCantiere.value.id, {
-      nuovoProgresso,
-      progressoPrecedente,
-      fase: progressUpdate.value.fase,
-      nota: progressUpdate.value.nota,
-      dataCompletamento: progressUpdate.value.dataCompletamento,
-      incremento: progressUpdate.value.incremento
-    })
-    
-    // Ricarica i cantieri per aggiornare la lista
-    await firestore.cantieri.load()
-     
-    // Salva aggiornamento nello storico locale
-    saveProgressToHistory(selectedCantiere.value.id, {
-      ...progressUpdate.value,
-      progressoPrecedente,
-      nuovoProgresso,
-      timestamp: new Date().toISOString()
-    })
-
-    closeProgressModal()
-
-    // Messaggio di successo
-    if (nuovoProgresso === 100) {
-      success(`🎉 Cantiere completato al 100%! "${progressUpdate.value.fase}" è stata l'ultima fase.`, '✅ Progetto Completato')
-    } else {
-      success(`Progresso aggiornato a ${nuovoProgresso}% (+${progressUpdate.value.incremento}%)`, '📊 Progresso Aggiornato')
-    }
-  } catch (err) {
-    console.error('Errore aggiornamento progresso:', err)
-    error(`Errore nell'aggiornamento del progresso: ${err.message}`, '❌ Errore Aggiornamento')
-  }
-}
-
-// ✅ Il progresso viene salvato automaticamente in Firestore da updateProgress
-const saveProgressToHistory = (cantiereId, updateData) => {
-  // Mantieni cache locale per visualizzazione immediata
-  if (!cantieriProgressHistory.value[cantiereId]) {
-    cantieriProgressHistory.value[cantiereId] = []
-  }
-  
-  cantieriProgressHistory.value[cantiereId].unshift(updateData)
-  
-  // ✅ Non più necessario localStorage - tutto salvato in Firestore automaticamente
-  console.log('✅ Progresso salvato in Firestore automaticamente')
-}
-
-const getProgressHistory = (cantiereId) => {
-  if (!cantiereId) return []
-  return cantieriProgressHistory.value[cantiereId] || []
-}
-
-const viewMaterials = async (cantiere) => {
-  // Verifica che il cantiere sia valido
-  if (!cantiere || !cantiere.id) {
-    const { error } = usePopup()
-    error('Errore: cantiere non valido!', '❌ Errore Validazione')
-    return
-  }
-
-  selectedCantiere.value = cantiere
-  materialiCantiere.value = await getMaterialsByCantiere(cantiere.id)
-  showMaterialsModal.value = true
-}
-
-const closeMaterialsModal = () => {
-  showMaterialsModal.value = false
-  selectedCantiere.value = null
-  materialiCantiere.value = []
-}
-
-// ✅ Carica materiali cantiere da Firestore
-const getMaterialsByCantiere = async (cantiereId) => {
-  try {
-    const result = await firestore.materialiCantiere.load(cantiereId)
-    if (result.success && result.data) {
-      return result.data.map(materiale => ({
-        id: materiale.id,
-        nome: materiale.nome,
-        descrizione: materiale.descrizione,
-        codice: materiale.codice,
-        quantitaRichiesta: materiale.quantitaRichiesta,
-        quantitaUtilizzata: materiale.quantitaUtilizzata || 0,
-        unita: materiale.unita,
-        prezzoUnitario: materiale.prezzoUnitario,
-        stato: materiale.stato,
-        fornitoreId: materiale.fornitoreId,
-        fornitoreNome: materiale.fornitoreNome,
-        dataAcquisto: materiale.dataAcquisto,
-        note: materiale.note
-      }))
-    }
-    return []
-  } catch (e) {
-    console.warn('Errore nel caricamento materiali cantieri da Firestore:', e)
-    return []
-  }
-}
-
-const getTotalMaterialsValue = () => {
-  return materialiCantiere.value.reduce((total, materiale) => {
-    return total + (materiale.quantitaRichiesta * materiale.prezzoUnitario)
-  }, 0)
-}
-
-const getCompletedMaterials = () => {
-  return materialiCantiere.value.filter(m => m.stato === 'completato' || m.stato === 'utilizzato').length
-}
-
-
-
-const saveNewCantiere = async () => {
-  const { error, success } = useToast()
-  
-  if (!newCantiere.value.nome || !newCantiere.value.cliente || !newCantiere.value.valore) {
-    error('Compila tutti i campi obbligatori!')
-    return
-  }
-
-  try {
-  // Salvo il nome prima di resettare il form
-  const nomeCantiere = newCantiere.value.nome
-  
-    // Se è un nuovo cliente, lo aggiungo all'anagrafica Firestore
-  if (clientSelectionMode.value === 'new') {
-    const nuovoCliente = {
-      nome: newCantiere.value.cliente,
-      tipo: newCantiere.value.clienteTipo,
-      email: newCantiere.value.clienteEmail || '',
-      telefono: newCantiere.value.clienteTelefono || '',
-      indirizzo: newCantiere.value.clienteIndirizzo || '',
-      stato: 'attivo',
-      numeroProgetti: 1,
-      valoreTotale: newCantiere.value.valore,
-      ultimoContatto: new Date().toISOString().split('T')[0]
-    }
-    
-      await firestore.clienti.create(nuovoCliente)
-      
-      // Ricarica i clienti per aggiornare la lista
-      await firestore.clienti.load()
-      
-      console.log('✅ Nuovo cliente aggiunto all\'anagrafica Firestore:', nuovoCliente.nome)
-    }
-    
-    // Crea il cantiere in Firestore
-    const cantiereData = {
-    ...newCantiere.value,
-    progresso: 0,
-    team: [],
-    fasi: []
-  }
-  
-    await firestore.cantieri.create(cantiereData)
-    
-    // Ricarica i cantieri per aggiornare la lista
-    await firestore.cantieri.load()
-    
-    // Mostra toast di successo
-    const tipoClienteText = clientSelectionMode.value === 'new' ? 'nuovo cliente aggiunto' : 'cliente esistente'
-    success(`Cantiere "${nomeCantiere}" creato con successo! Cliente: ${newCantiere.value.cliente} (${tipoClienteText})`, '🏗️ Cantiere Creato')
-
-    // Reset form
-    newCantiere.value = {
-      nome: '',
-      cliente: '',
-      clienteTipo: 'privato',
-      clienteEmail: '',
-      clienteTelefono: '',
-      clienteIndirizzo: '',
-      indirizzo: '',
-      tipoLavoro: '',
-      valore: 0,
-      dataInizio: '',
-      scadenza: '',
-      stato: 'pianificato',
-      priorita: 'media'
-    }
-    
-    // Reset selezione cliente
-    clientSelectionMode.value = 'existing'
-    selectedClientFromList.value = ''
-
-    closeAddModal()
-  } catch (err) {
-    console.error('Errore creazione cantiere:', err)
-    error(`Errore nella creazione del cantiere: ${err.message}`, '❌ Errore Creazione')
-  }
-}
-
-const closeAddModal = () => {
-  showAddModal.value = false
-  // Reset completo del form
-  newCantiere.value = {
-    nome: '',
-    cliente: '',
-    clienteTipo: 'privato',
-    clienteEmail: '',
-    clienteTelefono: '',
-    clienteIndirizzo: '',
-    indirizzo: '',
-    tipoLavoro: '',
-    valore: 0,
-    dataInizio: '',
-    scadenza: '',
-    stato: 'pianificato',
-    priorita: 'media'
-  }
-  // Reset selezione cliente
-  clientSelectionMode.value = 'existing'
-  selectedClientFromList.value = ''
-}
-
-const manageTeam = (cantiere) => {
-  selectedCantiere.value = cantiere
-  showTeamModal.value = true
-}
-
-const getAvailableEmployees = () => {
-  return dipendentiDisponibili.value.filter(dipendente => 
-    !selectedCantiere.value?.team?.some(membro => membro.id === dipendente.id)
-  )
-}
-
-const calculateTeamHourlyCost = () => {
-  if (!selectedCantiere.value?.team?.length) return 0
-  return selectedCantiere.value.team.reduce((total, membro) => {
-    const dipendente = dipendentiDisponibili.value.find(d => d.id === membro.id)
-    return total + (dipendente?.pagaOraria || 25)
-  }, 0)
-}
-
-// Calcola il costo giornaliero della manodopera per un cantiere (8 ore lavorative)
-const calculateDailyCost = (cantiere) => {
-  if (!cantiere?.team?.length) return 0
-  const costoOrario = cantiere.team.reduce((total, membro) => {
-    const dipendente = dipendentiDisponibili.value.find(d => d.id === membro.id)
-    return total + (dipendente?.pagaOraria || 25)
-  }, 0)
-  return costoOrario * 8 // 8 ore lavorative giornaliere
-}
-
-// Calcola il costo mensile stimato della manodopera (26 giorni lavorativi - 6 giorni/settimana)
-const calculateMonthlyCost = (cantiere) => {
-  return calculateDailyCost(cantiere) * 26
-}
-
-// 💰 ===== NUOVE FUNZIONI SISTEMA COSTI CANTIERE =====
-
-// Calcola il costo totale dei materiali utilizzati (non solo richiesti)
-const getTotalMaterialsCost = async (cantiere) => {
-  if (!cantiere?.id) return 0
-  
-  try {
-    const materiali = await getMaterialsByCantiere(cantiere.id)
-    return materiali.reduce((total, materiale) => {
-      const quantitaUsata = materiale.quantitaUtilizzata || 0
-      return total + (quantitaUsata * materiale.prezzoUnitario)
-    }, 0)
-  } catch (error) {
-    console.error('Errore calcolo costi materiali:', error)
-    return 0
-  }
-}
-
-// Calcola il costo totale della manodopera dalle registrazioni del giornale
-const getTotalLaborCost = async (cantiere) => {
-  if (!cantiere?.id) return 0
-  
-  try {
-    const result = await firestoreStore.loadGiornaleCantiere(cantiere.id)
-    if (!result.success || !result.data) return 0
-    
-    const registrazioni = result.data
-    let costoTotale = 0
-    
-    for (const reg of registrazioni) {
-      // Calcola il costo per questa registrazione specifica
-      const costoGiornaliero = calculateDailyCostForDate(cantiere, reg.data, reg.team || [])
-      costoTotale += costoGiornaliero
-    }
-    
-    return costoTotale
-  } catch (error) {
-    console.error('Errore calcolo costi manodopera:', error)
-    return 0
-  }
-}
-
-// Calcola il costo giornaliero per una data specifica con team specifico
-const calculateDailyCostForDate = (cantiere, data, teamGiorno) => {
-  // Se non c'è team specifico per il giorno, usa il team del cantiere
-  const teamDaUsare = teamGiorno?.length > 0 ? teamGiorno : (cantiere.team || [])
-  
-  if (!teamDaUsare.length) return 0
-  
-  return teamDaUsare.reduce((total, membro) => {
-    // Trova il dipendente per ottenere la paga oraria
-    const dipendente = dipendentiDisponibili.value.find(d => 
-      d.id === membro.id || d.id === membro.dipendenteId
-    )
-    const pagaOraria = dipendente?.pagaOraria || 25
-    return total + (pagaOraria * 8) // 8 ore standard
-  }, 0)
-}
-
-// Calcola i costi totali del cantiere (materiali + manodopera)
-const getTotalCosts = async (cantiere) => {
-  if (!cantiere?.id) return 0
-  
-  const [costiMateriali, costiManodopera] = await Promise.all([
-    getTotalMaterialsCost(cantiere),
-    getTotalLaborCost(cantiere)
-  ])
-  
-  return costiMateriali + costiManodopera
-}
-
-// Calcola le statistiche sui costi del cantiere
-const getCostStatistics = async (cantiere) => {
-  if (!cantiere?.id) return {
-    costiMateriali: 0,
-    costiManodopera: 0,
-    costiTotali: 0,
-    giorniLavorativi: 0,
-    oreTotali: 0,
-    costoMedioGiorno: 0
-  }
-  
-  try {
-    const [costiMateriali, costiManodopera] = await Promise.all([
-      getTotalMaterialsCost(cantiere),
-      getTotalLaborCost(cantiere)
-    ])
-    
-    const result = await firestoreStore.loadGiornaleCantiere(cantiere.id)
-    const registrazioni = result.success ? result.data : []
-    
-    const giorniLavorativi = registrazioni.length
-    const oreTotali = registrazioni.reduce((sum, reg) => sum + (reg.oreTotali || 8), 0)
-    const costiTotali = costiMateriali + costiManodopera
-    const costoMedioGiorno = giorniLavorativi > 0 ? costiTotali / giorniLavorativi : 0
-    
-    return {
-      costiMateriali,
-      costiManodopera,
-      costiTotali,
-      giorniLavorativi,
-      oreTotali,
-      costoMedioGiorno
-    }
-  } catch (error) {
-    console.error('Errore calcolo statistiche costi:', error)
-    return {
-      costiMateriali: 0,
-      costiManodopera: 0,
-      costiTotali: 0,
-      giorniLavorativi: 0,
-      oreTotali: 0,
-      costoMedioGiorno: 0
-    }
-  }
-}
-
-// Aggiorna i costi accumulati nel documento cantiere
-const updateCantiereAccumulatedCosts = async (cantiereId) => {
-  try {
-    const cantiere = cantieri.value.find(c => c.id === cantiereId)
-    if (!cantiere) return
-    
-    const stats = await getCostStatistics(cantiere)
-    
-    const updateData = {
-      costiAccumulati: {
-        manodopera: stats.costiManodopera,
-        materiali: stats.costiMateriali,
-        totale: stats.costiTotali
-      },
-      statisticheCosti: {
-        giorniLavorativi: stats.giorniLavorativi,
-        oreTotaliLavorate: stats.oreTotali,
-        costoMedioGiorno: stats.costoMedioGiorno,
-        ultimoAggiornamento: new Date().toISOString()
-      }
-    }
-    
-    await firestore.cantieri.update(cantiereId, updateData)
-    
-    // Aggiorna anche la cache locale
-    const cantiereIndex = cantieri.value.findIndex(c => c.id === cantiereId)
-    if (cantiereIndex !== -1) {
-      cantieri.value[cantiereIndex] = { ...cantieri.value[cantiereIndex], ...updateData }
-    }
-    
-    console.log(`✅ Costi cantiere ${cantiere.nome} aggiornati:`, stats)
-  } catch (error) {
-    console.error('Errore aggiornamento costi accumulati:', error)
-  }
-}
-
-// Aggiorna manualmente i costi di un cantiere (funzione per il pulsante "Aggiorna")
-const refreshCantiereCosts = async (cantiere) => {
-  const { success, error } = usePopup()
-  
-  if (!cantiere?.id) {
-    error('Errore: cantiere non valido!', '❌ Errore')
-    return
-  }
-  
-  try {
-    await updateCantiereAccumulatedCosts(cantiere.id)
-    
-    // Ricarica i cantieri per aggiornare la vista
-    await firestore.cantieri.load()
-    
-    success(`Costi del cantiere "${cantiere.nome}" aggiornati!`, '💰 Costi Aggiornati')
-  } catch (error) {
-    console.error('Errore aggiornamento costi cantiere:', error)
-    error('Errore durante l\'aggiornamento dei costi', '❌ Errore')
-  }
-}
-
-// ===== FINE FUNZIONI SISTEMA COSTI CANTIERE =====
-
-const addMemberToTeam = (dipendente) => {
-  if (!selectedCantiere.value.team) {
-    selectedCantiere.value.team = []
-  }
-  
-  const newMember = {
-    id: dipendente.id,
-    nome: `${dipendente.nome} ${dipendente.cognome}`,
-    iniziali: dipendente.iniziali,
-    ruolo: getRuoloLabel(dipendente.ruolo)
-  }
-  
-  selectedCantiere.value.team.push(newMember)
-}
-
-const removeMemberFromTeam = (memberId) => {
-  if (selectedCantiere.value.team) {
-    selectedCantiere.value.team = selectedCantiere.value.team.filter(membro => membro.id !== memberId)
-  }
-}
-
-const saveTeamChanges = async () => {
-  const { success, error } = usePopup()
-  
-  // Verifica che selectedCantiere sia valido
-  if (!selectedCantiere.value || !selectedCantiere.value.id) {
-    error('Errore: cantiere non valido per l\'aggiornamento team!', '❌ Errore Validazione')
-    return
-  }
-  
-  // Salva il nome prima di potenziali modifiche
-  const nomeCantiereTeam = selectedCantiere.value.nome || 'Cantiere senza nome'
-  
-  try {
-    // Aggiorna usando il composable con validazione
-    await firestore.cantieri.update(selectedCantiere.value.id, selectedCantiere.value)
-    
-    // Ricarica i cantieri per aggiornare la lista
-    await firestore.cantieri.load()
-
-    // Aggiorna i dipendenti con i nuovi cantieri assegnati
-    updateEmployeeAssignments()
-
-    closeTeamModal()
-    success(`Team del cantiere "${nomeCantiereTeam}" aggiornato con successo!`, '👥 Team Aggiornato')
-  } catch (err) {
-    // L'errore è già gestito dal composable
-    console.error('Errore aggiornamento team:', err)
-  }
-}
-
-const updateEmployeeAssignments = () => {
-  // Verifica che selectedCantiere sia ancora valido
-  if (!selectedCantiere.value || !selectedCantiere.value.id) {
-    console.warn('⚠️ updateEmployeeAssignments: selectedCantiere non valido')
-    return
-  }
-  
-  const nomeCantiereAssegnazione = selectedCantiere.value.nome || 'Cantiere senza nome'
-  
-  // Aggiorna le assegnazioni dei dipendenti
-  dipendentiDisponibili.value.forEach(dipendente => {
-    const isAssigned = selectedCantiere.value.team?.some(membro => membro.id === dipendente.id)
-    if (isAssigned) {
-      dipendente.cantiereAttuale = nomeCantiereAssegnazione
-    } else if (dipendente.cantiereAttuale === nomeCantiereAssegnazione) {
-      dipendente.cantiereAttuale = null
-    }
-  })
-  
-  // ✅ Aggiorna assegnazioni dipendenti in Firestore
-  try {
-    // In futuro: aggiornare le assegnazioni dipendenti in Firestore
-    // Per ora manteniamo il comportamento esistente per compatibilità
-    console.log('✅ Assegnazioni dipendenti aggiornate (futuro: sincronizzazione Firestore)')
-    window.dispatchEvent(new CustomEvent('dipendenti-updated'))
-  } catch (e) {
-    console.warn('Avviso aggiornamento assegnazioni:', e)
-  }
-}
-
-const getRuoloLabel = (ruolo) => {
-  const labels = {
-    'capo-squadra': 'Capo Squadra',
-    'carpentiere': 'Carpentiere',
-    'operaio': 'Operaio Specializzato',
-    'amministrativo': 'Amministrativo'
-  }
-  return labels[ruolo] || ruolo
-}
-
-const closeTeamModal = () => {
-  showTeamModal.value = false
-  selectedCantiere.value = null
-}
-
-const manageAttachments = (cantiere) => {
-  selectedCantiere.value = cantiere
-  showAttachmentsModal.value = true
-}
-
-const closeAttachmentsModal = () => {
-  showAttachmentsModal.value = false
-  selectedCantiere.value = null
-}
-
-const getAttachments = () => {
-  if (!selectedCantiere.value || !selectedCantiere.value.id) return []
-  return cantieriAttachments.value[selectedCantiere.value.id] || []
-}
-
-
-const getFileTypeClass = (type) => {
-  const classes = {
-    'pdf': 'bg-red-500',
-    'doc': 'bg-blue-500',
-    'docx': 'bg-blue-600',
-    'xls': 'bg-green-500',
-    'xlsx': 'bg-green-600',
-    'jpg': 'bg-purple-500',
-    'jpeg': 'bg-purple-500',
-    'png': 'bg-indigo-500',
-    'txt': 'bg-gray-500'
-  }
-  return classes[type.toLowerCase()] || 'bg-gray-500'
-}
-
-const getFileTypeIcon = (type) => {
-  const icons = {
-    'pdf': 'PDF',
-    'doc': 'DOC',
-    'docx': 'DOC',
-    'xls': 'XLS',
-    'xlsx': 'XLS',
-    'jpg': 'JPG',
-    'jpeg': 'JPG',
-    'png': 'PNG',
-    'txt': 'TXT'
-  }
-  return icons[type.toLowerCase()] || 'FILE'
-}
-
-const formatFileSize = (bytes) => {
-  if (typeof bytes === 'string') return bytes
-  
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-const downloadFile = (file) => {
-  // Simula il download creando un link temporaneo
-  // In una vera implementazione, qui si farebbe una chiamata al server
-  const link = document.createElement('a')
-  link.href = file.url || '#'
-  link.download = file.name
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  
-  success("Download Avviato", `File "${file.name}" in download...`)
-}
-
-const deleteFile = async (file) => {
-  if (!selectedCantiere.value || !selectedCantiere.value.id) {
-    error("Errore Cantiere", "Cantiere non valido per questa operazione")
-    return
-  }
-  
-  if (confirm(`🗑️ Sei sicuro di voler eliminare "${file.name}"?`)) {
-    try {
-      // ✅ Elimina da Firestore
-      await firestore.allegati.delete(file.id)
-      
-      // Aggiorna cache locale
-      const cantiereId = selectedCantiere.value.id
-      if (cantieriAttachments.value[cantiereId]) {
-        cantieriAttachments.value[cantiereId] = cantieriAttachments.value[cantiereId].filter(f => f.id !== file.id)
-      }
-      
-      alert(`✅ File "${file.name}" eliminato con successo!`)
-    } catch (error) {
-      console.error('Errore eliminazione file:', error)
-      alert(`❌ Errore eliminazione file: ${error.message}`)
-    }
-  }
-}
-
-const handleFileUpload = async (event) => {
-  const files = Array.from(event.target.files)
-  if (!files.length) return
-  
-  if (!selectedCantiere.value || !selectedCantiere.value.id) {
-    alert('❌ Errore: cantiere non valido per upload!')
-    return
-  }
-  
-  const cantiereId = selectedCantiere.value.id
-  let uploadCount = 0
-  let errorCount = 0
-  
-  for (const file of files) {
-    try {
-      // Validazione dimensione (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`❌ File "${file.name}" troppo grande (max 10MB)`)
-        errorCount++
-        continue
-      }
-      
-      // Crea oggetto allegato per Firestore
-      const allegatoData = {
-        nome: file.name,
-        tipo: file.name.split('.').pop().toLowerCase(),
-        dimensione: file.size,
-        descrizione: '',
-        categoria: 'generale',
-        // Per ora usiamo un URL temporaneo - in futuro integreremo Firebase Storage
-        url: URL.createObjectURL(file)
-      }
-      
-      // ✅ Salva in Firestore
-      const result = await saveAllegatoCantiere(cantiereId, allegatoData)
-      
-      if (result.success) {
-        uploadCount++
-      } else {
-        console.error(`Errore upload ${file.name}:`, result.error)
-        errorCount++
-      }
-      
-    } catch (error) {
-      console.error(`Errore upload ${file.name}:`, error)
-      errorCount++
-    }
-  }
-  
-  // Reset input
-  event.target.value = ''
-  
-  if (uploadCount > 0) {
-    alert(`✅ ${uploadCount} file caricati con successo!${errorCount > 0 ? ` (${errorCount} errori)` : ''}`)
-  } else {
-    alert(`❌ Errore upload di tutti i file`)
-  }
-}
-
-const getCantiereAttachments = (cantiereId) => {
-  return cantieriAttachments.value[cantiereId] || []
-}
-
-// Funzioni gestione materiali cantiere
-const manageMaterials = () => {
-  showManageMaterialsModal.value = true
-}
-
-const closeManageMaterialsModal = () => {
-  showManageMaterialsModal.value = false
-}
-
-const addMaterialToCantiere = async () => {
-  // Ricarica i materiali del magazzino per avere i dati più aggiornati
-  try {
-    await firestoreStore.loadMateriali()
-  } catch (error) {
-    console.warn('Errore aggiornamento materiali magazzino:', error)
-  }
-  
-  // Reset form con valori default
-  newMaterial.value = {
-    nome: '',
-    descrizione: '',
-    codice: '',
-    quantitaRichiesta: 0,
-    unita: 'pz',
-    prezzoUnitario: 0,
-    stato: 'pianificato',
-    fornitoreId: null,
-    dataAcquisto: '',
-    note: ''
-  }
-  materialSelectionMode.value = 'existing' // Default a selezione da magazzino
-  selectedMaterialFromStock.value = ''
-  showAddMaterialModal.value = true
-}
-
-const closeAddMaterialModal = () => {
-  showAddMaterialModal.value = false
-}
-
-const editMaterialInCantiere = (materiale) => {
-  editingMaterial.value = { ...materiale }
-  showEditMaterialModal.value = true
-}
-
-const closeEditMaterialModal = () => {
-  showEditMaterialModal.value = false
-  editingMaterial.value = null
-}
-
-const saveMaterialToCantiere = async () => {
-  const { error, success } = useToast()
-  
-  // Validazione campi obbligatori
-  if (!newMaterial.value.nome || !newMaterial.value.quantitaRichiesta || !newMaterial.value.codice) {
-    error('Compila nome, codice e quantità richiesta!')
-    return
-  }
-
-  if (!newMaterial.value.fornitoreId) {
-    error('Seleziona un fornitore!')
-    return
-  }
-
-  const fornitoreSelected = fornitori.value.find(f => f.id == newMaterial.value.fornitoreId)
-  
-  const nuovoMateriale = {
-    id: `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-    codice: newMaterial.value.codice,
-    nome: newMaterial.value.nome,
-    descrizione: newMaterial.value.descrizione || '',
-    quantitaRichiesta: newMaterial.value.quantitaRichiesta,
-    quantitaUtilizzata: 0,
-    unita: newMaterial.value.unita || 'pz',
-    prezzoUnitario: newMaterial.value.prezzoUnitario || 0,
-    stato: newMaterial.value.stato,
-    fornitoreId: newMaterial.value.fornitoreId,
-    fornitoreNome: fornitoreSelected?.nome || '',
-    prezzoEffettivo: newMaterial.value.prezzoUnitario || 0,
-    dataAcquisto: newMaterial.value.dataAcquisto,
-    note: newMaterial.value.note,
-    // Metadati aggiuntivi
-    isFromStock: materialSelectionMode.value === 'existing',
-    originalStockId: materialSelectionMode.value === 'existing' ? selectedMaterialFromStock.value : null
-  }
-
-  // 🏗️ Gestione scorte magazzino
-  if (materialSelectionMode.value === 'existing' && selectedMaterialFromStock.value) {
-    console.log(`📦 Aggiornamento scorte per materiale ID: ${selectedMaterialFromStock.value}`)
-    try {
-      // Decrementa la quantità dal magazzino usando la nuova funzione
-      const updateResult = await firestoreStore.updateMaterialeQuantita(
-        selectedMaterialFromStock.value, 
-        -newMaterial.value.quantitaRichiesta,
-        `Allocato al cantiere: ${selectedCantiere.value.nome}`
-      )
-      
-      if (updateResult.success) {
-        console.log(`✅ Scorte magazzino aggiornate: -${newMaterial.value.quantitaRichiesta}`)
-      } else {
-        console.warn('⚠️ Errore aggiornamento scorte:', updateResult.error)
-        error('Materiale aggiunto al cantiere ma errore aggiornamento scorte magazzino')
-      }
-    } catch (stockError) {
-      console.error('❌ Errore gestione scorte:', stockError)
-      error('Materiale aggiunto al cantiere ma errore aggiornamento scorte magazzino')
-    }
-  }
-
-  // ✅ Aggiungi a materialiCantiere e salva in Firestore
-  materialiCantiere.value.push({ ...nuovoMateriale, isNew: true })
-  await saveMaterialiCantiereToStorage()
-  
-  // 💰 Aggiorna automaticamente i costi del cantiere
-  if (selectedCantiere.value?.id) {
-    await updateCantiereAccumulatedCosts(selectedCantiere.value.id)
-  }
-  
-  closeAddMaterialModal()
-  
-  const modeText = materialSelectionMode.value === 'existing' ? 'aggiunto dal magazzino' : 'creato e aggiunto'
-  success(`Materiale "${nuovoMateriale.nome}" ${modeText} al cantiere!`, '✅ Materiale Aggiunto')
-}
-
-const saveMaterialChanges = async () => {
-  if (!editingMaterial.value) return
-
-  const index = materialiCantiere.value.findIndex(m => m.id === editingMaterial.value.id)
-  if (index !== -1) {
-    const fornitoreSelected = fornitori.value.find(f => f.id == editingMaterial.value.fornitoreId)
-    editingMaterial.value.fornitoreNome = fornitoreSelected?.nome || ''
-    
-    // Auto-aggiornamento stato in base alla quantità utilizzata
-    const quantitaUtilizzata = editingMaterial.value.quantitaUtilizzata || 0
-    const quantitaRichiesta = editingMaterial.value.quantitaRichiesta || 0
-    
-    if (quantitaUtilizzata === 0) {
-      // Nessun utilizzo - mantieni stato originale se non è "utilizzato" o "completato"
-      if (editingMaterial.value.stato === 'utilizzato' || editingMaterial.value.stato === 'completato') {
-        editingMaterial.value.stato = 'ordinato'
-      }
-    } else if (quantitaUtilizzata >= quantitaRichiesta) {
-      // Completamente utilizzato
-      editingMaterial.value.stato = 'utilizzato'
-    } else if (quantitaUtilizzata > 0 && quantitaUtilizzata < quantitaRichiesta) {
-      // Parzialmente utilizzato
-      editingMaterial.value.stato = 'in-uso'
-    }
-    
-    // 📊 Gestione aggiornamento scorte per modifiche quantità utilizzate
-    const originalMaterial = materialiCantiere.value[index]
-    const oldQuantitaUtilizzata = originalMaterial.quantitaUtilizzata || 0
-    const newQuantitaUtilizzata = editingMaterial.value.quantitaUtilizzata || 0
-    const diffQuantitaUtilizzata = newQuantitaUtilizzata - oldQuantitaUtilizzata
-    
-    if (originalMaterial.isFromStock && originalMaterial.originalStockId && diffQuantitaUtilizzata !== 0) {
-      console.log(`📊 Aggiornamento utilizzo materiale: ${diffQuantitaUtilizzata}`)
-      try {
-        // Se l'utilizzo è aumentato, non cambiamo il magazzino (materiale già allocato)
-        // Se l'utilizzo è diminuito, potremmo restituire la differenza al magazzino
-        // Per ora loggiamo solo l'operazione
-        console.log(`📈 Utilizzo materiale ${originalMaterial.nome}: ${oldQuantitaUtilizzata} → ${newQuantitaUtilizzata}`)
-      } catch (error) {
-        console.error('❌ Errore aggiornamento utilizzo:', error)
-      }
-    }
-
-    // Preserva flag isNew e altri metadati durante l'update
-    materialiCantiere.value[index] = { 
-      ...editingMaterial.value,
-      isNew: originalMaterial.isNew,
-      isFromStock: originalMaterial.isFromStock,
-      originalStockId: originalMaterial.originalStockId
-    }
-    await saveMaterialiCantiereToStorage()
-    
-    // 💰 Aggiorna automaticamente i costi del cantiere dopo modifica materiale
-    if (selectedCantiere.value?.id) {
-      await updateCantiereAccumulatedCosts(selectedCantiere.value.id)
-    }
-  }
-  
-  const { success } = usePopup()
-  
-  // 💾 Salva i valori PRIMA di chiudere il modal (che imposta editingMaterial.value = null)
-  const quantitaUtilizzata = editingMaterial.value?.quantitaUtilizzata || 0
-  const quantitaRichiesta = editingMaterial.value?.quantitaRichiesta || 0
-  const nomeMateriale = editingMaterial.value?.nome || 'Materiale'
-  
-  closeEditMaterialModal()
-  
-  if (quantitaUtilizzata > 0) {
-    const percentualeUtilizzo = ((quantitaUtilizzata / quantitaRichiesta) * 100).toFixed(1)
-    success(`Materiale aggiornato! Utilizzo: ${quantitaUtilizzata}/${quantitaRichiesta} (${percentualeUtilizzo}%)`, '✅ Materiale Aggiornato')
-  } else {
-    success(`Materiale "${nomeMateriale}" aggiornato!`, '✅ Materiale Aggiornato')
-  }
-}
-
-
-
-// ✅ Salva materiali cantiere in Firestore invece di localStorage
-const saveMaterialiCantiereToStorage = async () => {
-  if (!selectedCantiere.value?.id) {
-    console.warn('❌ Cantiere non valido per salvataggio materiali')
-    return
-  }
-  
-  try {
-    // Sincronizza tutti i materiali locali con Firestore
-    for (const materiale of materialiCantiere.value) {
-      console.log(`🔧 Processando materiale: ID=${materiale.id}, isNew=${materiale.isNew}`)
-      
-      // 🛡️ Migliorata logica: considera isNew undefined come false (esistente)
-      if (materiale.id && (materiale.isNew === false || materiale.isNew === undefined)) {
-        // Materiale esistente - aggiorna
-        console.log(`📝 Aggiornamento materiale esistente: ${materiale.id} (isNew: ${materiale.isNew})`)
-        await firestore.materialiCantiere.update(materiale.id, materiale)
-        // Assicura che isNew sia settato correttamente
-        materiale.isNew = false
-      } else if (materiale.isNew === true || !materiale.id) {
-        // Nuovo materiale - crea
-        console.log(`➕ Creazione nuovo materiale: ${materiale.nome} (isNew: ${materiale.isNew})`)
-        const result = await firestore.materialiCantiere.create(selectedCantiere.value.id, materiale)
-        if (result.success && result.data) {
-          // Aggiorna ID locale con quello di Firestore
-          console.log(`✅ Materiale creato con ID: ${result.data.id}`)
-          materiale.id = result.data.id
-          materiale.isNew = false
-        }
-      } else {
-        console.warn(`⚠️ Materiale in stato ambiguo: ID=${materiale.id}, isNew=${materiale.isNew}`)
-      }
-    }
-    console.log('✅ Materiali cantiere sincronizzati con Firestore')
-  } catch (error) {
-    console.error('❌ Errore sincronizzazione materiali:', error)
-  }
-}
-
-const openFile = (file) => {
-  if (!file.url) {
-    alert('❌ File non disponibile per l\'apertura')
-    return
-  }
-
-  try {
-    // Apre il file in una nuova finestra/tab
-    const newWindow = window.open(file.url, '_blank')
-    
-    if (newWindow) {
-      // File aperto con successo
-      newWindow.focus()
-      
-      // Messaggio di feedback in base al tipo di file
-      const fileType = file.type.toLowerCase()
-      let message = `👁️ File "${file.name}" aperto in una nuova finestra`
-      
-      if (['pdf'].includes(fileType)) {
-        message += '\n📄 PDF - Visualizzazione diretta nel browser'
-      } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType)) {
-        message += '\n🖼️ Immagine - Visualizzazione diretta nel browser'
-      } else if (['txt', 'csv'].includes(fileType)) {
-        message += '\n📝 Testo - Visualizzazione diretta nel browser'
-      } else if (['doc', 'docx', 'xls', 'xlsx'].includes(fileType)) {
-        message += '\n📋 Documento Office - Potrebbe richiedere un\'applicazione esterna'
-      } else {
-        message += '\n📎 Il browser tenterà di aprire il file'
-      }
-      
-      console.log(message)
-    } else {
-      // Popup bloccato o errore
-      alert('⚠️ Impossibile aprire il file.\nVerifica che i popup non siano bloccati dal browser.')
-      
-      // Fallback: prova a creare un link temporaneo
-      const link = document.createElement('a')
-      link.href = file.url
-      link.target = '_blank'
-      link.rel = 'noopener noreferrer'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
-  } catch (error) {
-    console.error('Errore nell\'apertura del file:', error)
-    alert(`❌ Errore nell'apertura del file "${file.name}".\n\nDettagli: ${error.message}`)
-  }
-}
-
-// Funzione per caricare allegati materiali dal localStorage
-const loadMaterialAttachmentsFromStorage = () => {
-  const stored = localStorage.getItem('legnosystem_material_attachments')
-  
-  if (stored) {
-    try {
-      const data = JSON.parse(stored)
-      
-      // Se è un array (nuovo formato), converte in oggetto per uso interno
-      if (Array.isArray(data)) {
-        materialiAttachments.value = {}
-        data.forEach(attachment => {
-          // Mantiene il materialId come stringa per compatibilità con ID decimali
-          const materialId = String(attachment.materialId)
-          if (!materialiAttachments.value[materialId]) {
-            materialiAttachments.value[materialId] = []
-          }
-          materialiAttachments.value[materialId].push(attachment)
-        })
-      } else {
-        // Formato legacy (oggetto)
-        materialiAttachments.value = data
-      }
-    } catch (e) {
-      console.warn('Errore nel caricamento allegati materiali:', e)
-      materialiAttachments.value = {}
-    }
-  } else {
-    materialiAttachments.value = {}
-  }
-}
-
-// Funzione per salvare allegati materiali nel localStorage (formato compatibile con fornitori)
-const saveMaterialAttachmentsToStorage = () => {
-  try {
-    // Legge i dati esistenti dal localStorage
-    const stored = localStorage.getItem('legnosystem_material_attachments')
-    let existingAttachments = []
-    
-    if (stored) {
-      try {
-        existingAttachments = JSON.parse(stored)
-        if (!Array.isArray(existingAttachments)) {
-          existingAttachments = []
-        }
-      } catch (e) {
-        console.warn('Errore parsing allegati esistenti:', e)
-        existingAttachments = []
-      }
-    }
-    
-    // Converte i nuovi dati da formato oggetto a formato array
-    const newAttachmentsArray = []
-    Object.entries(materialiAttachments.value).forEach(([materialId, attachments]) => {
-      attachments.forEach(attachment => {
-        newAttachmentsArray.push({
-          ...attachment,
-          materialId: materialId // Mantiene come stringa per preservare i decimali
-        })
-      })
-    })
-    
-    // Merge: rimuove i vecchi allegati di questi materiali e aggiunge i nuovi
-    const materialIds = Object.keys(materialiAttachments.value) // Mantiene come stringa
-    const filteredExisting = existingAttachments.filter(att => !materialIds.includes(String(att.materialId)))
-    const mergedAttachments = [...filteredExisting, ...newAttachmentsArray]
-    
-    localStorage.setItem('legnosystem_material_attachments', JSON.stringify(mergedAttachments))
-  } catch (e) {
-    console.error('❌ Errore nel salvataggio allegati:', e)
-  }
-}
-
-const getMaterialAttachmentCount = (materiale) => {
-  if (!materialiAttachments.value || !materiale) return 0
-  
-  // Cerca sia con ID numerico che stringa per compatibilità
-  const materialIdStr = String(materiale.id)
-  const count = materialiAttachments.value[materialIdStr]?.length || materialiAttachments.value[materiale.id]?.length || 0
-  
-  return count
-}
-
-const manageMaterialAttachments = (materiale) => {
-  selectedMaterial.value = materiale
-  showMaterialAttachmentsModal.value = true
-}
-
-const closeMaterialAttachmentsModal = () => {
-  showMaterialAttachmentsModal.value = false
-  selectedMaterial.value = null
-}
-
-const addAttachmentToMaterial = (materialId) => {
-  const material = materialiCantiere.value.find(m => m.id === materialId)
-  if (!material) return
-
-  const newAttachment = {
-    id: `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-    name: `Attachment-${Date.now()}.pdf`,
-    size: 1024, // Simula una dimensione fissa
-    type: 'pdf',
-    uploadDate: new Date().toISOString().split('T')[0],
-    description: 'Nuovo allegato',
-    materialId: materialId,
-    url: URL.createObjectURL(new Blob([new Uint8Array(1024)], { type: 'application/pdf' }))
-  }
-
-  if (!materialiAttachments.value[materialId]) {
-    materialiAttachments.value[materialId] = []
-  }
-
-  materialiAttachments.value[materialId].push(newAttachment)
-  saveMaterialAttachmentsToStorage()
-
-  closeMaterialAttachmentsModal()
-  alert(`✅ Allegato aggiunto al materiale "${material.nome}"!`)
-}
-
-const removeAttachmentFromMaterial = (materialId, attachmentId) => {
-  if (confirm(`🗑️ Sei sicuro di voler eliminare questo allegato?`)) {
-    if (materialiAttachments.value[materialId]) {
-      materialiAttachments.value[materialId] = materialiAttachments.value[materialId].filter(a => a.id !== attachmentId)
-      saveMaterialAttachmentsToStorage()
-      alert(`✅ Allegato eliminato con successo!`)
-    }
-  }
-}
-
-// Nota: loadMaterialAttachmentsFromStorage() ora viene chiamato in onMounted
-
-const getMaterialAttachments = () => {
-  if (!selectedMaterial.value) return []
-  return materialiAttachments.value[selectedMaterial.value.id] || []
-}
-
-const getTotalMaterialAttachmentsSize = () => {
-  const totalBytes = getMaterialAttachments().reduce((total, attachment) => total + attachment.size, 0)
-  return formatFileSize(totalBytes)
-}
-
-const getLastUploadDate = () => {
-  const attachments = getMaterialAttachments()
-  if (attachments.length === 0) return 'N/A'
-  
-  const lastUpload = attachments.reduce((latest, attachment) => {
-    return new Date(attachment.uploadDate) > latest ? new Date(attachment.uploadDate) : latest
-  }, new Date(0))
-  
-  return lastUpload.toLocaleDateString('it-IT')
-}
-
-const getFornitoreById = (fornitoreId) => {
-  return fornitori.value.find(f => f.id === fornitoreId)
-}
-
-const openMaterialFile = (attachment) => {
-  if (!attachment.url) {
-    alert('❌ File non disponibile per l\'apertura')
-    return
-  }
-
-  try {
-    // Apre il file in una nuova finestra/tab
-    const newWindow = window.open(attachment.url, '_blank')
-    
-    if (newWindow) {
-      // File aperto con successo
-      newWindow.focus()
-      
-      // Messaggio di feedback in base al tipo di file
-      const fileType = attachment.type.toLowerCase()
-      let message = `👁️ File "${attachment.name}" aperto in una nuova finestra`
-      
-      if (['pdf'].includes(fileType)) {
-        message += '\n📄 PDF - Visualizzazione diretta nel browser'
-      } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileType)) {
-        message += '\n🖼️ Immagine - Visualizzazione diretta nel browser'
-      } else if (['txt', 'csv'].includes(fileType)) {
-        message += '\n📝 Testo - Visualizzazione diretta nel browser'
-      } else if (['doc', 'docx', 'xls', 'xlsx'].includes(fileType)) {
-        message += '\n📋 Documento Office - Potrebbe richiedere un\'applicazione esterna'
-      } else {
-        message += '\n📎 Il browser tenterà di aprire il file'
-      }
-      
-      console.log(message)
-    } else {
-      // Popup bloccato o errore
-      alert('⚠️ Impossibile aprire il file.\nVerifica che i popup non siano bloccati dal browser.')
-      
-      // Fallback: prova a creare un link temporaneo
-      const link = document.createElement('a')
-      link.href = attachment.url
-      link.target = '_blank'
-      link.rel = 'noopener noreferrer'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
-  } catch (error) {
-    console.error('Errore nell\'apertura del file:', error)
-    alert(`❌ Errore nell'apertura del file "${attachment.name}".\n\nDettagli: ${error.message}`)
-  }
-}
-
-const downloadMaterialFile = (attachment) => {
-  // Simula il download creando un link temporaneo
-  // In una vera implementazione, qui si farebbe una chiamata al server
-  const link = document.createElement('a')
-  link.href = attachment.url || '#'
-  link.download = attachment.name
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  
-  alert(`📥 Download di "${attachment.name}" avviato!`)
-}
-
-const deleteMaterialFile = (attachment) => {
-  if (confirm(`🗑️ Sei sicuro di voler eliminare "${attachment.name}"?`)) {
-    const materialId = selectedMaterial.value.id
-    if (materialiAttachments.value[materialId]) {
-      materialiAttachments.value[materialId] = materialiAttachments.value[materialId].filter(f => f.id !== attachment.id)
-      saveMaterialAttachmentsToStorage()
-      alert(`✅ File "${attachment.name}" eliminato con successo!`)
-    }
-  }
-}
-
-const handleMaterialFileUpload = async (event) => {
-  const files = Array.from(event.target.files)
-  if (!files.length || !selectedMaterial.value) return
-  
-  const materialId = selectedMaterial.value.id
-  const fornitore = getFornitoreById(selectedMaterial.value.fornitoreId)
-  
-  // Inizializza array allegati se non esiste
-  if (!materialiAttachments.value[materialId]) {
-    materialiAttachments.value[materialId] = []
-  }
-  
-  for (const file of files) {
-    // Validazione dimensione (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert(`❌ File "${file.name}" troppo grande (max 10MB)`)
-      continue
-    }
-    
-    // Determina categoria del file
-    const extension = file.name.split('.').pop().toLowerCase()
-    let category = 'Generale'
-    if (['pdf'].includes(extension)) category = 'Documento'
-    if (['jpg', 'jpeg', 'png'].includes(extension)) category = 'Foto'
-    if (['xls', 'xlsx'].includes(extension)) category = 'Fattura/DDT'
-    if (['doc', 'docx'].includes(extension)) category = 'Certificato'
-    
-    // Converte il file in Base64 per persistenza nel localStorage
-    const base64 = await new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target.result)
-      reader.readAsDataURL(file)
-    })
-    
-    // Crea oggetto allegato
-    const attachment = {
-      id: `temp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      name: file.name,
-      size: file.size,
-      type: extension,
-      uploadDate: new Date().toISOString().split('T')[0],
-      description: '',
-      category: category,
-      fornitore: fornitore?.nome || 'N/A',
-      materialId: materialId,
-      cantiereId: selectedCantiere.value.id,
-      // Salva il file come Base64 per persistenza
-      url: base64
-    }
-    
-    materialiAttachments.value[materialId].push(attachment)
-  }
-  
-  saveMaterialAttachmentsToStorage()
-  
-  // Reset input
-  event.target.value = ''
-  
-  alert(`✅ ${files.length} file caricati con successo per ${selectedMaterial.value.nome}!`)
-}
-
-const generateMaterialReport = () => {
-  if (!selectedMaterial.value) {
-    alert('❌ Nessun materiale selezionato')
-    return
-  }
-
-  const materiale = selectedMaterial.value
-  const fornitore = getFornitoreById(materiale.fornitoreId)
-  const allegati = getMaterialAttachments()
-  const cantiere = selectedCantiere.value
-
-  // Calcoli
-  const costoTotale = materiale.quantitaRichiesta * materiale.prezzoUnitario
-  const dataOggi = new Date().toLocaleDateString('it-IT')
-  
-  // Genera contenuto HTML del report
-  const reportHTML = `
-    <!DOCTYPE html>
-    <html lang="it">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Report Materiale - ${materiale.nome}</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-            .header { background: #2563eb; color: white; padding: 20px; border-radius: 8px; text-align: center; }
-            .section { margin: 20px 0; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-            .label { font-weight: bold; color: #6b7280; }
-            .value { color: #111827; }
-            .allegati { background: #f3f4f6; }
-            .footer { text-align: center; margin-top: 30px; color: #6b7280; font-size: 12px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-            th { background: #f9fafb; font-weight: bold; }
-            .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
-            .status-pianificato { background: #dbeafe; color: #1e40af; }
-            .status-ordinato { background: #fef3c7; color: #b45309; }
-            .status-in-uso { background: #d1fae5; color: #065f46; }
-            .status-completato { background: #dcfce7; color: #166534; }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <h1>📋 Report Materiale</h1>
-            <h2>${materiale.nome} (${materiale.codice})</h2>
-            <p>Generato il ${dataOggi} - Legnosystem.bio</p>
-        </div>
-
-        <div class="section">
-            <h3>🏗️ Informazioni Cantiere</h3>
-            <div class="grid">
-                <div><span class="label">Cantiere:</span> <span class="value">${cantiere.nome}</span></div>
-                <div><span class="label">Cliente:</span> <span class="value">${cantiere.cliente}</span></div>
-                <div><span class="label">Indirizzo:</span> <span class="value">${cantiere.indirizzo}</span></div>
-                <div><span class="label">Tipo Lavoro:</span> <span class="value">${cantiere.tipoLavoro}</span></div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h3>🧱 Dettagli Materiale</h3>
-            <div class="grid">
-                <div><span class="label">Nome:</span> <span class="value">${materiale.nome}</span></div>
-                <div><span class="label">Codice:</span> <span class="value">${materiale.codice}</span></div>
-                <div><span class="label">Descrizione:</span> <span class="value">${materiale.descrizione || 'N/A'}</span></div>
-                <div><span class="label">Stato:</span> <span class="status status-${materiale.stato}">${materiale.stato.toUpperCase()}</span></div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h3>📊 Quantità e Costi</h3>
-            <div class="grid">
-                <div><span class="label">Quantità Richiesta:</span> <span class="value">${materiale.quantitaRichiesta} ${materiale.unita}</span></div>
-                <div><span class="label">Quantità Utilizzata:</span> <span class="value">${materiale.quantitaUtilizzata || 0} ${materiale.unita}</span></div>
-                <div><span class="label">Prezzo Unitario:</span> <span class="value">€${materiale.prezzoUnitario.toFixed(2)}</span></div>
-                <div><span class="label">Costo Totale:</span> <span class="value"><strong>€${costoTotale.toFixed(2)}</strong></span></div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h3>🏭 Informazioni Fornitore</h3>
-            <div class="grid">
-                <div><span class="label">Fornitore:</span> <span class="value">${fornitore?.nome || 'N/A'}</span></div>
-                <div><span class="label">Telefono:</span> <span class="value">${fornitore?.telefono || 'N/A'}</span></div>
-                <div><span class="label">Email:</span> <span class="value">${fornitore?.email || 'N/A'}</span></div>
-                <div><span class="label">Data Acquisto:</span> <span class="value">${materiale.dataAcquisto || 'Da definire'}</span></div>
-            </div>
-        </div>
-
-        ${allegati.length > 0 ? `
-        <div class="section allegati">
-            <h3>📎 Allegati e Documentazione (${allegati.length})</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nome File</th>
-                        <th>Tipo</th>
-                        <th>Categoria</th>
-                        <th>Dimensione</th>
-                        <th>Data Upload</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${allegati.map(allegato => `
-                        <tr>
-                            <td>${allegato.name}</td>
-                            <td>${allegato.type.toUpperCase()}</td>
-                            <td>${allegato.category || 'Generale'}</td>
-                            <td>${formatFileSize(allegato.size)}</td>
-                            <td>${formatDate(allegato.uploadDate)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
-        ` : '<div class="section"><h3>📎 Allegati</h3><p>Nessun allegato presente per questo materiale.</p></div>'}
-
-        ${materiale.note ? `
-        <div class="section">
-            <h3>📝 Note</h3>
-            <p>${materiale.note}</p>
-        </div>
-        ` : ''}
-
-        <div class="section">
-            <h3>📈 Statistiche</h3>
-            <div class="grid">
-                <div><span class="label">Utilizzo:</span> <span class="value">${Math.round((materiale.quantitaUtilizzata || 0) / materiale.quantitaRichiesta * 100)}%</span></div>
-                <div><span class="label">Documenti Allegati:</span> <span class="value">${allegati.length}</span></div>
-                <div><span class="label">Dimensione Totale Allegati:</span> <span class="value">${getTotalMaterialAttachmentsSize()}</span></div>
-                <div><span class="label">Ultimo Aggiornamento:</span> <span class="value">${getLastUploadDate()}</span></div>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p><strong>Legnosystem.bio</strong> - Sistema di Gestione Cantieri</p>
-            <p>Report generato automaticamente il ${dataOggi}</p>
-            <p>Per informazioni: info@legnosystem.bio</p>
-        </div>
-    </body>
-    </html>
-  `
-
-  // Crea e scarica il file HTML
-  const blob = new Blob([reportHTML], { type: 'text/html' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `Report_Materiale_${materiale.codice}_${cantiere.nome.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.html`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-
-  alert(`📊 Report materiale "${materiale.nome}" generato e scaricato!\n\n📋 Include:\n• Dettagli tecnici completi\n• Informazioni fornitore\n• Lista allegati (${allegati.length})\n• Calcoli costi\n• Tracciabilità cantiere\n\n💾 File salvato come HTML visualizzabile in qualsiasi browser`)
-}
-
-const materialSelectionMode = ref('existing')
-const selectedMaterialFromStock = ref('')
-
-const getSelectedMaterialFromStock = () => {
-  return materialiMagazzino.value.find(materiale => materiale.id === selectedMaterialFromStock.value)
-}
-
-const fillMaterialFromStock = () => {
-  const selectedMaterial = getSelectedMaterialFromStock()
-  if (selectedMaterial) {
-    newMaterial.value = {
-      nome: selectedMaterial.nome,
-      descrizione: selectedMaterial.descrizione,
-      codice: selectedMaterial.codice,
-      unita: selectedMaterial.unita,
-      prezzoUnitario: selectedMaterial.prezzoUnitario,
-      categoria: selectedMaterial.categoria,
-      quantitaRichiesta: 1, // Default quantity
-      stato: 'pianificato',
-      note: ''
-    }
-  }
-}
-
-const clientSelectionMode = ref('existing')
-const selectedClientFromList = ref('')
-
-// Clienti da Firestore
-const availableClients = computed(() => firestoreStore.clienti)
-
-const getSelectedClient = () => {
-  return availableClients.value.find(cliente => cliente.id === selectedClientFromList.value)
-}
-
-const fillClientFromList = () => {
-  const selectedClient = getSelectedClient()
-  if (selectedClient) {
-    newCantiere.value.cliente = selectedClient.nome
-    newCantiere.value.clienteTipo = selectedClient.tipo
-    newCantiere.value.clienteEmail = selectedClient.email
-    newCantiere.value.clienteTelefono = selectedClient.telefono
-    newCantiere.value.clienteIndirizzo = selectedClient.indirizzo
-  }
-}
-
-const getTipoColor = (tipo) => {
-  const colors = {
-    'privato': 'bg-green-100 text-green-800',
-    'azienda': 'bg-blue-100 text-blue-800',
-    'ente-pubblico': 'bg-yellow-100 text-yellow-800'
-  }
-  return colors[tipo] || 'bg-gray-100 text-gray-800'
-}
-
-const getTipoLabel = (tipo) => {
-  const labels = {
-    'privato': '👤',
-    'azienda': '🏢',
-    'ente-pubblico': '🏛️'
-  }
-  return labels[tipo] || tipo
-}
-
-// Hook lifecycle per inizializzazione
-onMounted(async () => {
-  // Carica allegati materiali dal localStorage solo al mount del componente
-  loadMaterialAttachmentsFromStorage()
-  
-  // Carica tutti i dati da Firestore 
-  try {
-    // Carica tutti i dati necessari usando Promise.all per efficienza
-    await Promise.all([
-      firestoreStore.loadCantieri(),
-      firestoreStore.loadDipendenti(),
-      firestoreStore.loadMateriali(), // Assicura che i materiali siano disponibili per il dropdown
-      firestoreStore.loadFornitori(),
-      firestoreStore.loadClienti()
-    ])
-    console.log('✅ Dati cantieri caricati con successo')
-  } catch (error) {
-    console.error('❌ Errore nel caricamento dati Cantieri:', error)
-    const { error: showError } = usePopup()
-    showError('Errore durante il caricamento dei dati', '❌ Errore Caricamento')
-  }
-})
-
-const openDailyLog = (cantiere) => {
-  // Naviga alla vista del giornale di cantiere usando Vue Router
-  router.push({ 
-    name: 'giornale-cantiere', 
-    params: { id: cantiere.id }
-  })
-}
-
-
-
-const removeMaterialFromCantiere = async (materialId) => {
-  if (confirm('🗑️ Sei sicuro di voler rimuovere questo materiale dal cantiere?')) {
-    const index = materialiCantiere.value.findIndex(m => m.id === materialId)
-    if (index !== -1) {
-      const materialeRimosso = materialiCantiere.value[index]
-      
-      // 🔄 Gestione restituzione scorte al magazzino
-      if (materialeRimosso.isFromStock && materialeRimosso.originalStockId) {
-        console.log(`🔄 Restituzione scorte per materiale ID: ${materialeRimosso.originalStockId}`)
-        try {
-          const quantitaDaRestituire = materialeRimosso.quantitaRichiesta - (materialeRimosso.quantitaUtilizzata || 0)
-          
-          if (quantitaDaRestituire > 0) {
-            const updateResult = await firestoreStore.updateMaterialeQuantita(
-              materialeRimosso.originalStockId,
-              quantitaDaRestituire,
-              `Restituito da cantiere: ${selectedCantiere.value.nome}`
-            )
-            
-            if (updateResult.success) {
-              console.log(`✅ Scorte magazzino restituite: +${quantitaDaRestituire}`)
-            }
-          }
-        } catch (stockError) {
-          console.error('❌ Errore restituzione scorte:', stockError)
-        }
-      }
-      
-      // 🗑️ Elimina da Firestore se esistente
-      if (materialeRimosso.id && materialeRimosso.isNew === false) {
-        console.log(`🗑️ Eliminazione materiale da Firestore: ${materialeRimosso.id}`)
-        try {
-          await firestore.materialiCantiere.delete(materialeRimosso.id)
-          console.log(`✅ Materiale eliminato da Firestore`)
-        } catch (deleteError) {
-          console.error('❌ Errore eliminazione da Firestore:', deleteError)
-        }
-      }
-      
-      // Rimuovi dall'array locale
-      materialiCantiere.value.splice(index, 1)
-      
-      // ❌ NON chiamare saveMaterialiCantiereToStorage() - causerebbe ricreazione materiali rimanenti!
-      
-      alert(`✅ Materiale "${materialeRimosso.nome}" rimosso dal cantiere!`)
-    }
-  }
-}
-
-const getMargineColor = (cantiere) => {
-  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
-  if (margine > 0) return 'text-green-600'
-  if (margine < 0) return 'text-red-600'
-  return 'text-gray-600'
-}
-
-const getMarginePercent = (cantiere) => {
-  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
-  const percentuale = (margine / cantiere.valore) * 100
-  return percentuale.toFixed(1) + '%'
-}
-
-const getMarginePercentColor = (cantiere) => {
-  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
-  const percentuale = (margine / cantiere.valore) * 100
-  if (percentuale > 0) return 'text-green-600'
-  if (percentuale < 0) return 'text-red-600'
-  return 'text-gray-600'
-}
-
-const getPerformanceBarColor = (cantiere) => {
-  const percentuale = (cantiere.costiAccumulati?.totale || 0) / cantiere.valore * 100
-  if (percentuale > 100) return 'bg-red-600'
-  if (percentuale > 80) return 'bg-orange-500'
-  if (percentuale > 60) return 'bg-yellow-500'
-  return 'bg-green-500'
-}
-
-// Calcola manodopera giornaliera effettiva dai dati reali
-const getManodoperaGiornaliera = (cantiere) => {
-  const giorniLavorativi = cantiere.statisticheCosti?.giorniLavorativi || 0
-  const costoManodopera = cantiere.costiAccumulati?.manodopera || 0
-  
-  if (giorniLavorativi === 0) return 0
-  return Math.round(costoManodopera / giorniLavorativi)
-}
-
-
-</script> 
+<style>
+/* Stili specifici del componente */
+</style>
