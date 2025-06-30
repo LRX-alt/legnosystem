@@ -474,8 +474,9 @@ import {
   XMarkIcon
 } from '@heroicons/vue/24/outline'
 import { usePopup } from '@/composables/usePopup'
-import { firestore } from '@/firebase'
+import { db } from '@/config/firebase'
 import { increment } from 'firebase/firestore'
+import { useFirestoreStore } from '@/stores/firestore'
 
 // Popup system
 const { success, info, confirm, warning, select } = usePopup()
@@ -513,6 +514,9 @@ const stats = ref({
 
 // Dati mezzi - vuoto, da caricare da Firestore
 const mezzi = ref([])
+
+// Firestore store
+const firestoreStore = useFirestoreStore()
 
 // Computed
 const filteredMezzi = computed(() => {
@@ -689,7 +693,7 @@ const manageMaintenance = (mezzo) => {
 const assignToCantiere = async (mezzo) => {
   try {
     // Carica lista cantieri attivi
-    const cantieriResult = await firestore.cantieriOperations.load()
+    const cantieriResult = await firestoreStore.cantieriOperations.load()
     const cantieriAttivi = cantieriResult.data.filter(c => 
       ['pianificato', 'in-corso'].includes(c.stato)
     )
@@ -714,7 +718,7 @@ const assignToCantiere = async (mezzo) => {
     if (!cantiereId) return
 
     // Aggiorna il mezzo con l'assegnazione
-    const result = await firestore.mezziOperations.update(mezzo.id, {
+    const result = await firestoreStore.mezziOperations.update(mezzo.id, {
       cantiereId,
       statoOperativo: 'in-uso',
       dataAssegnazione: new Date().toISOString()
@@ -733,7 +737,7 @@ const assignToCantiere = async (mezzo) => {
       }
 
       // Aggiorna anche il cantiere
-      await firestore.cantieriOperations.update(cantiereId, {
+      await firestoreStore.cantieriOperations.update(cantiereId, {
         mezziAssegnati: increment(1)
       })
 
