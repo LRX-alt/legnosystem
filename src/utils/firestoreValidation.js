@@ -10,11 +10,11 @@ export const firestoreValidation = {
         errors.push('Nome cantiere obbligatorio')
       }
       
-      if (!data.cliente?.id) {
+      if (!data.cliente) {
         errors.push('Cliente obbligatorio')
       }
       
-      if (!data.data_inizio) {
+      if (!data.dataInizio) {
         errors.push('Data inizio obbligatoria')
       }
       
@@ -22,17 +22,25 @@ export const firestoreValidation = {
         errors.push('Data scadenza obbligatoria')
       }
       
+      if (!data.indirizzo?.trim()) {
+        errors.push('Indirizzo cantiere obbligatorio')
+      }
+
+      if (!data.tipoLavoro?.trim()) {
+        errors.push('Tipo lavoro obbligatorio')
+      }
+
+      if (!data.valore || isNaN(parseFloat(data.valore)) || parseFloat(data.valore) <= 0) {
+        errors.push('Valore cantiere deve essere un numero positivo')
+      }
+      
       // Validate date order
-      if (data.data_inizio && data.scadenza) {
-        const inizio = new Date(data.data_inizio)
+      if (data.dataInizio && data.scadenza) {
+        const inizio = new Date(data.dataInizio)
         const scadenza = new Date(data.scadenza)
         if (inizio >= scadenza) {
           errors.push('La data di scadenza deve essere successiva alla data di inizio')
         }
-      }
-      
-      if (data.budget && isNaN(parseFloat(data.budget))) {
-        errors.push('Budget deve essere un numero valido')
       }
       
       return {
@@ -41,12 +49,18 @@ export const firestoreValidation = {
         sanitizedData: errors.length === 0 ? {
           ...data,
           nome: data.nome.trim(),
-          descrizione: data.descrizione?.trim() || '',
-          budget: data.budget ? parseFloat(data.budget) : 0,
+          indirizzo: data.indirizzo.trim(),
+          tipoLavoro: data.tipoLavoro.trim(),
+          valore: parseFloat(data.valore),
           stato: data.stato || 'pianificato',
+          priorita: data.priorita || 'media',
           progresso: 0,
           team: data.team || [],
-          fasi: data.fasi || []
+          costiAccumulati: {
+            materiali: 0,
+            manodopera: 0,
+            totale: 0
+          }
         } : null
       }
     },
@@ -58,14 +72,23 @@ export const firestoreValidation = {
         errors.push('Nome cantiere non può essere vuoto')
       }
       
-      if (data.budget !== undefined && isNaN(parseFloat(data.budget))) {
-        errors.push('Budget deve essere un numero valido')
+      if (data.valore !== undefined && (isNaN(parseFloat(data.valore)) || parseFloat(data.valore) <= 0)) {
+        errors.push('Valore cantiere deve essere un numero positivo')
       }
       
       if (data.progresso !== undefined) {
         const prog = parseFloat(data.progresso)
         if (isNaN(prog) || prog < 0 || prog > 100) {
           errors.push('Progresso deve essere tra 0 e 100')
+        }
+      }
+      
+      // Validate date order if both dates are present
+      if (data.dataInizio && data.scadenza) {
+        const inizio = new Date(data.dataInizio)
+        const scadenza = new Date(data.scadenza)
+        if (inizio >= scadenza) {
+          errors.push('La data di scadenza deve essere successiva alla data di inizio')
         }
       }
       
@@ -77,22 +100,20 @@ export const firestoreValidation = {
         if (data[key] !== undefined) {
           switch (key) {
             case 'nome':
-              sanitizedData[key] = data[key]?.trim()
-              break
-            case 'descrizione':
-              sanitizedData[key] = data[key]?.trim() || ''
-              break
-            case 'budget':
-            case 'valore':
-              sanitizedData[key] = data[key] ? parseFloat(data[key]) : 0
-              break
-            case 'progresso':
-              sanitizedData[key] = data[key] ? parseFloat(data[key]) : data[key]
-              break
-            case 'cliente':
             case 'indirizzo':
             case 'tipoLavoro':
               sanitizedData[key] = data[key]?.trim()
+              break
+            case 'valore':
+              sanitizedData[key] = parseFloat(data[key])
+              break
+            case 'progresso':
+              sanitizedData[key] = parseFloat(data[key])
+              break
+            case 'cliente':
+            case 'team':
+            case 'costiAccumulati':
+              sanitizedData[key] = data[key]
               break
             default:
               sanitizedData[key] = data[key]
@@ -222,6 +243,96 @@ export const firestoreValidation = {
     }
   },
 
+  // 📦 Validazione Materiali Cantiere
+  materialeCantiere: {
+    create: (data) => {
+      const errors = []
+      
+      if (!data.materialeId) {
+        errors.push('ID materiale obbligatorio')
+      }
+      
+      if (!data.cantiereId) {
+        errors.push('ID cantiere obbligatorio')
+      }
+      
+      if (!data.quantita || isNaN(parseFloat(data.quantita)) || parseFloat(data.quantita) <= 0) {
+        errors.push('Quantità deve essere un numero positivo')
+      }
+      
+      if (!data.prezzoUnitario || isNaN(parseFloat(data.prezzoUnitario)) || parseFloat(data.prezzoUnitario) < 0) {
+        errors.push('Prezzo unitario deve essere un numero non negativo')
+      }
+      
+      if (!data.stato || !['pianificato', 'ordinato', 'in-uso', 'utilizzato', 'completato'].includes(data.stato)) {
+        errors.push('Stato non valido')
+      }
+      
+      return {
+        isValid: errors.length === 0,
+        errors,
+        sanitizedData: errors.length === 0 ? {
+          ...data,
+          quantita: parseFloat(data.quantita),
+          prezzoUnitario: parseFloat(data.prezzoUnitario),
+          costoTotale: parseFloat(data.quantita) * parseFloat(data.prezzoUnitario),
+          stato: data.stato,
+          note: data.note?.trim() || ''
+        } : null
+      }
+    },
+    
+    update: (data) => {
+      const errors = []
+      
+      if (data.quantita !== undefined) {
+        if (isNaN(parseFloat(data.quantita)) || parseFloat(data.quantita) <= 0) {
+          errors.push('Quantità deve essere un numero positivo')
+        }
+      }
+      
+      if (data.prezzoUnitario !== undefined) {
+        if (isNaN(parseFloat(data.prezzoUnitario)) || parseFloat(data.prezzoUnitario) < 0) {
+          errors.push('Prezzo unitario deve essere un numero non negativo')
+        }
+      }
+      
+      if (data.stato && !['pianificato', 'ordinato', 'in-uso', 'utilizzato', 'completato'].includes(data.stato)) {
+        errors.push('Stato non valido')
+      }
+      
+      const sanitizedData = {}
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined) {
+          switch (key) {
+            case 'quantita':
+            case 'prezzoUnitario':
+              sanitizedData[key] = parseFloat(data[key])
+              break
+            case 'note':
+              sanitizedData[key] = data[key]?.trim()
+              break
+            default:
+              sanitizedData[key] = data[key]
+          }
+        }
+      })
+      
+      // Calcola il costo totale se necessario
+      if (sanitizedData.quantita !== undefined || sanitizedData.prezzoUnitario !== undefined) {
+        sanitizedData.costoTotale = 
+          (sanitizedData.quantita || data.quantita) * 
+          (sanitizedData.prezzoUnitario || data.prezzoUnitario)
+      }
+      
+      return {
+        isValid: errors.length === 0,
+        errors,
+        sanitizedData: errors.length === 0 ? sanitizedData : null
+      }
+    }
+  },
+
   // 📎 Validazione Allegati
   allegato: {
     create: (data) => {
@@ -263,6 +374,203 @@ export const firestoreValidation = {
         } : null
       }
     }
+  },
+
+  // 📎 Validazione Allegati Materiali
+  allegatoMateriale: {
+    create: (data) => {
+      const errors = []
+      
+      if (!data.materialeId) {
+        errors.push('ID materiale obbligatorio')
+      }
+      
+      if (!data.nome?.trim()) {
+        errors.push('Nome file obbligatorio')
+      }
+      
+      if (!data.url?.trim()) {
+        errors.push('URL file obbligatorio')
+      }
+      
+      if (!data.tipo?.trim()) {
+        errors.push('Tipo file obbligatorio')
+      }
+      
+      // Validate file size (max 10MB)
+      if (data.dimensione && data.dimensione > 10 * 1024 * 1024) {
+        errors.push('File troppo grande (max 10MB)')
+      }
+      
+      // Validate file type
+      const allowedTypes = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'txt', 'dwg', 'dxf']
+      if (data.tipo && !allowedTypes.includes(data.tipo.toLowerCase())) {
+        errors.push(`Tipo file non supportato. Tipi consentiti: ${allowedTypes.join(', ')}`)
+      }
+      
+      // Validate file name length
+      if (data.nome && data.nome.length > 255) {
+        errors.push('Nome file troppo lungo (max 255 caratteri)')
+      }
+      
+      // Validate file name characters
+      const invalidChars = /[<>:"/\\|?*]/
+      if (data.nome && invalidChars.test(data.nome)) {
+        errors.push('Nome file contiene caratteri non validi')
+      }
+      
+      return {
+        isValid: errors.length === 0,
+        errors,
+        sanitizedData: errors.length === 0 ? {
+          ...data,
+          nome: data.nome.trim(),
+          url: data.url.trim(),
+          tipo: data.tipo.toLowerCase(),
+          descrizione: data.descrizione?.trim() || '',
+          dimensione: data.dimensione || 0,
+          dataCaricamento: new Date().toISOString(),
+          categoria: data.categoria?.trim() || 'generale'
+        } : null
+      }
+    },
+    
+    update: (data) => {
+      const errors = []
+      
+      if (data.nome !== undefined && !data.nome?.trim()) {
+        errors.push('Nome file non può essere vuoto')
+      }
+      
+      if (data.tipo) {
+        const allowedTypes = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'txt', 'dwg', 'dxf']
+        if (!allowedTypes.includes(data.tipo.toLowerCase())) {
+          errors.push(`Tipo file non supportato. Tipi consentiti: ${allowedTypes.join(', ')}`)
+        }
+      }
+      
+      if (data.nome && data.nome.length > 255) {
+        errors.push('Nome file troppo lungo (max 255 caratteri)')
+      }
+      
+      const invalidChars = /[<>:"/\\|?*]/
+      if (data.nome && invalidChars.test(data.nome)) {
+        errors.push('Nome file contiene caratteri non validi')
+      }
+      
+      const sanitizedData = {}
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined) {
+          switch (key) {
+            case 'nome':
+            case 'descrizione':
+            case 'categoria':
+              sanitizedData[key] = data[key]?.trim()
+              break
+            case 'tipo':
+              sanitizedData[key] = data[key].toLowerCase()
+              break
+            default:
+              sanitizedData[key] = data[key]
+          }
+        }
+      })
+      
+      return {
+        isValid: errors.length === 0,
+        errors,
+        sanitizedData: errors.length === 0 ? sanitizedData : null
+      }
+    }
+  },
+
+  // 🚛 Validazione Mezzi
+  mezzo: {
+    create: (data) => {
+      const errors = []
+      
+      if (!data.nome?.trim()) {
+        errors.push('Nome mezzo obbligatorio')
+      }
+      
+      if (!data.tipo?.trim()) {
+        errors.push('Tipo mezzo obbligatorio')
+      }
+      
+      if (!data.targa?.trim()) {
+        errors.push('Targa/Matricola obbligatoria')
+      }
+      
+      if (data.costoOrario !== undefined && (isNaN(parseFloat(data.costoOrario)) || parseFloat(data.costoOrario) < 0)) {
+        errors.push('Costo orario deve essere un numero non negativo')
+      }
+      
+      if (data.statoOperativo && !['disponibile', 'in-uso', 'manutenzione', 'fuori-servizio'].includes(data.statoOperativo)) {
+        errors.push('Stato operativo non valido')
+      }
+      
+      return {
+        isValid: errors.length === 0,
+        errors,
+        sanitizedData: errors.length === 0 ? {
+          ...data,
+          nome: data.nome.trim(),
+          tipo: data.tipo.trim(),
+          targa: data.targa.trim(),
+          costoOrario: data.costoOrario ? parseFloat(data.costoOrario) : 0,
+          statoOperativo: data.statoOperativo || 'disponibile',
+          note: data.note?.trim() || '',
+          manutenzioniProgrammate: data.manutenzioniProgrammate || [],
+          cantiereId: data.cantiereId || null,
+          dataUltimaRevisione: data.dataUltimaRevisione || null,
+          dataProssimaRevisione: data.dataProssimaRevisione || null
+        } : null
+      }
+    },
+    
+    update: (data) => {
+      const errors = []
+      
+      if (data.nome !== undefined && !data.nome?.trim()) {
+        errors.push('Nome mezzo non può essere vuoto')
+      }
+      
+      if (data.costoOrario !== undefined && (isNaN(parseFloat(data.costoOrario)) || parseFloat(data.costoOrario) < 0)) {
+        errors.push('Costo orario deve essere un numero non negativo')
+      }
+      
+      if (data.statoOperativo && !['disponibile', 'in-uso', 'manutenzione', 'fuori-servizio'].includes(data.statoOperativo)) {
+        errors.push('Stato operativo non valido')
+      }
+      
+      const sanitizedData = {}
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined) {
+          switch (key) {
+            case 'nome':
+            case 'tipo':
+            case 'targa':
+            case 'note':
+              sanitizedData[key] = data[key]?.trim()
+              break
+            case 'costoOrario':
+              sanitizedData[key] = parseFloat(data[key])
+              break
+            case 'manutenzioniProgrammate':
+              sanitizedData[key] = Array.isArray(data[key]) ? data[key] : []
+              break
+            default:
+              sanitizedData[key] = data[key]
+          }
+        }
+      })
+      
+      return {
+        isValid: errors.length === 0,
+        errors,
+        sanitizedData: errors.length === 0 ? sanitizedData : null
+      }
+    }
   }
 }
 
@@ -282,6 +590,131 @@ function sanitizePhone(phone) {
   if (!phone) return ''
   // Remove all non-digit characters except +
   return phone.replace(/[^\d\+]/g, '')
+}
+
+// 🔐 Validazione Sicurezza
+
+/**
+ * Valida un indirizzo email
+ * @param {string} email - L'indirizzo email da validare
+ * @returns {object} Risultato della validazione
+ */
+export const validateEmail = (email) => {
+  const errors = []
+  
+  if (!email?.trim()) {
+    errors.push('Email obbligatoria')
+    return { isValid: false, errors }
+  }
+  
+  // Regex per email valida
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+  if (!emailRegex.test(email)) {
+    errors.push('Formato email non valido')
+  }
+  
+  // Lista domini email aziendali consentiti
+  const allowedDomains = [
+    'legnosystem.bio',
+    'legnosystem.it',
+    'legnosystem.com',
+    // Aggiungi altri domini consentiti
+  ]
+  
+  const emailDomain = email.split('@')[1]?.toLowerCase()
+  if (!allowedDomains.includes(emailDomain)) {
+    errors.push('Usa un indirizzo email aziendale')
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  }
+}
+
+/**
+ * Valida una password
+ * @param {string} password - La password da validare
+ * @returns {object} Risultato della validazione
+ */
+export const validatePassword = (password) => {
+  const errors = []
+  
+  if (!password) {
+    errors.push('Password obbligatoria')
+    return { isValid: false, errors }
+  }
+  
+  // Lunghezza minima
+  if (password.length < 8) {
+    errors.push('La password deve essere di almeno 8 caratteri')
+  }
+  
+  // Deve contenere almeno un numero
+  if (!/\d/.test(password)) {
+    errors.push('La password deve contenere almeno un numero')
+  }
+  
+  // Deve contenere almeno una lettera maiuscola
+  if (!/[A-Z]/.test(password)) {
+    errors.push('La password deve contenere almeno una lettera maiuscola')
+  }
+  
+  // Deve contenere almeno una lettera minuscola
+  if (!/[a-z]/.test(password)) {
+    errors.push('La password deve contenere almeno una lettera minuscola')
+  }
+  
+  // Deve contenere almeno un carattere speciale
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    errors.push('La password deve contenere almeno un carattere speciale')
+  }
+  
+  // Controllo sequenze comuni
+  const commonSequences = ['123', 'abc', 'qwerty', 'password', 'admin']
+  if (commonSequences.some(seq => password.toLowerCase().includes(seq))) {
+    errors.push('La password non può contenere sequenze comuni')
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    strength: calculatePasswordStrength(password)
+  }
+}
+
+/**
+ * Calcola la forza di una password
+ * @param {string} password - La password da valutare
+ * @returns {number} Punteggio da 0 a 100
+ */
+const calculatePasswordStrength = (password) => {
+  let score = 0
+  
+  // Lunghezza (max 25 punti)
+  score += Math.min(25, password.length * 2)
+  
+  // Varietà caratteri (max 25 punti)
+  const charTypes = {
+    numbers: /\d/.test(password),
+    lower: /[a-z]/.test(password),
+    upper: /[A-Z]/.test(password),
+    special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+  }
+  score += Object.values(charTypes).filter(Boolean).length * 6.25
+  
+  // Complessità (max 25 punti)
+  const uniqueChars = new Set(password).size
+  score += Math.min(25, uniqueChars * 2)
+  
+  // Penalità per sequenze comuni (max -25 punti)
+  const commonSequences = ['123', 'abc', 'qwerty', 'password', 'admin']
+  const hasCommonSeq = commonSequences.some(seq => password.toLowerCase().includes(seq))
+  if (hasCommonSeq) {
+    score -= 25
+  }
+  
+  return Math.max(0, Math.min(100, score))
 }
 
 // 🛡️ Validation Wrapper

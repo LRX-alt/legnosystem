@@ -1,8 +1,140 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write;
+    // 🛡️ Funzioni di utilità
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.role;
+    }
+    
+    function getRoleLevel() {
+      let roles = {
+        'admin': 100,
+        'manager': 80,
+        'capo_cantiere': 60,
+        'amministrativo': 40,
+        'employee': 20,
+        'user': 10
+      };
+      return roles[getUserRole()];
+    }
+    
+    function hasRoleLevel(requiredLevel) {
+      return getRoleLevel() >= requiredLevel;
+    }
+    
+    function isAdmin() {
+      return getUserRole() == 'admin';
+    }
+    
+    function hasPermission(permission) {
+      let role = getUserRole();
+      let rolePermissions = {
+        'admin': ['*'],
+        'manager': [
+          'manage_cantieri',
+          'manage_clienti',
+          'manage_fornitori',
+          'manage_materiali',
+          'manage_dipendenti',
+          'view_analytics',
+          'view_financials'
+        ],
+        'capo_cantiere': [
+          'manage_cantieri',
+          'view_clienti',
+          'view_fornitori',
+          'view_materiali',
+          'view_dipendenti'
+        ],
+        'amministrativo': [
+          'view_cantieri',
+          'view_clienti',
+          'view_fornitori',
+          'manage_fatture',
+          'view_financials'
+        ],
+        'employee': [
+          'view_cantieri',
+          'view_materiali'
+        ],
+        'user': [
+          'view_profile'
+        ]
+      };
+      
+      return role == 'admin' || 
+        (rolePermissions[role] != null && rolePermissions[role].hasAny([permission, '*']));
+    }
+    
+    // 👥 Profili Utente
+    match /userProfiles/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || hasRoleLevel(80));
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+    }
+    
+    // 📋 Richieste di Registrazione
+    match /registrationRequests/{requestId} {
+      allow read: if isAuthenticated() && isAdmin();
+      allow create: if true; // Chiunque può richiedere la registrazione
+      allow update, delete: if isAuthenticated() && isAdmin();
+    }
+    
+    // 🏗️ Cantieri
+    match /cantieri/{cantiereId} {
+      allow read: if isAuthenticated() && hasPermission('view_cantieri');
+      allow write: if isAuthenticated() && hasPermission('manage_cantieri');
+      
+      // Allegati cantiere
+      match /allegati/{allegatoId} {
+        allow read: if isAuthenticated() && hasPermission('view_cantieri');
+        allow write: if isAuthenticated() && hasPermission('manage_cantieri');
+      }
+      
+      // Materiali cantiere
+      match /materiali/{materialeId} {
+        allow read: if isAuthenticated() && hasPermission('view_cantieri');
+        allow write: if isAuthenticated() && hasPermission('manage_cantieri');
+      }
+    }
+    
+    // 👥 Clienti
+    match /clienti/{clienteId} {
+      allow read: if isAuthenticated() && hasPermission('view_clienti');
+      allow write: if isAuthenticated() && hasPermission('manage_clienti');
+    }
+    
+    // 📦 Fornitori
+    match /fornitori/{fornitoreId} {
+      allow read: if isAuthenticated() && hasPermission('view_fornitori');
+      allow write: if isAuthenticated() && hasPermission('manage_fornitori');
+    }
+    
+    // 🛠️ Materiali
+    match /materiali/{materialeId} {
+      allow read: if isAuthenticated() && hasPermission('view_materiali');
+      allow write: if isAuthenticated() && hasPermission('manage_materiali');
+    }
+    
+    // 👷 Dipendenti
+    match /dipendenti/{dipendenteId} {
+      allow read: if isAuthenticated() && hasPermission('view_dipendenti');
+      allow write: if isAuthenticated() && hasPermission('manage_dipendenti');
+    }
+    
+    // 💰 Fatture
+    match /fatture/{fatturaId} {
+      allow read: if isAuthenticated() && hasPermission('view_fatture');
+      allow write: if isAuthenticated() && hasPermission('manage_fatture');
+    }
+    
+    // 📊 Analytics
+    match /analytics/{docId} {
+      allow read: if isAuthenticated() && hasPermission('view_analytics');
+      allow write: if false; // Solo tramite Cloud Functions
     }
   }
 } 

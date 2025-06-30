@@ -7,7 +7,9 @@ import {
   where, 
   orderBy as firestoreOrderBy, 
   limit,
-  getDocs
+  getDocs,
+  enableNetwork,
+  disableNetwork
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
 import { useToast } from '@/composables/useToast'
@@ -21,17 +23,53 @@ export const useFirestoreRealtime = () => {
   const activeListeners = ref(new Map())
   const connectionStatus = ref('connected')
   const lastSyncTime = ref(null)
+  const reconnectAttempts = ref(0)
+  const maxReconnectAttempts = 5
+  const reconnectDelay = 5000 // 5 secondi
   
   // Computed
   const isConnected = computed(() => connectionStatus.value === 'connected')
   const listenersCount = computed(() => activeListeners.value.size)
+  const canReconnect = computed(() => reconnectAttempts.value < maxReconnectAttempts)
 
   /**
-   * Crea listener per una collezione
+   * Gestisce la riconnessione automatica
+   */
+  const handleReconnect = async () => {
+    if (!canReconnect.value) {
+      console.error('❌ Numero massimo di tentativi di riconnessione raggiunto')
+      toast.error('Impossibile riconnettersi al server. Ricarica la pagina.')
+      return false
+    }
+
+    try {
+      reconnectAttempts.value++
+      console.log(`🔄 Tentativo di riconnessione ${reconnectAttempts.value}/${maxReconnectAttempts}...`)
+      
+      await enableNetwork(db)
+      connectionStatus.value = 'connected'
+      lastSyncTime.value = new Date()
+      console.log('✅ Riconnessione riuscita')
+      
+      // Reset tentativi dopo successo
+      reconnectAttempts.value = 0
+      return true
+    } catch (error) {
+      console.error('❌ Errore riconnessione:', error)
+      connectionStatus.value = 'error'
+      
+      // Ritenta dopo delay
+      setTimeout(handleReconnect, reconnectDelay)
+      return false
+    }
+  }
+
+  /**
+   * Crea listener per una collezione con gestione errori migliorata
    */
   const listenToCollection = (collectionName, options = {}) => {
     if (!authStore.isAuthenticated) {
-      console.warn('Utente non autenticato per listener real-time')
+      console.warn('⚠️ Utente non autenticato per listener real-time')
       return null
     }
 
@@ -41,7 +79,8 @@ export const useFirestoreRealtime = () => {
       limitTo = null,
       onData = () => {},
       onError = (error) => console.error('Errore listener:', error),
-      includeMetadata = true
+      includeMetadata = true,
+      enableReconnect = true
     } = options
 
     try {
@@ -62,8 +101,8 @@ export const useFirestoreRealtime = () => {
       if (limitTo) {
         q = query(q, limit(limitTo))
       }
-
-      // Crea listener
+      
+      // Crea listener con gestione errori migliorata
       const unsubscribe = onSnapshot(
         q,
         {
@@ -73,88 +112,41 @@ export const useFirestoreRealtime = () => {
           try {
             connectionStatus.value = 'connected'
             lastSyncTime.value = new Date()
+            reconnectAttempts.value = 0 // Reset tentativi dopo successo
 
-            const docs = []
-            const changes = {
-              added: [],
-              modified: [],
-              removed: []
-            }
+            const docs = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              _metadata: {
+                fromCache: doc.metadata.fromCache,
+                hasPendingWrites: doc.metadata.hasPendingWrites
+              }
+            }))
 
-            snapshot.docChanges().forEach(change => {
-              const docData = {
+            const changes = snapshot.docChanges().map(change => ({
+              type: change.type,
+              doc: {
                 id: change.doc.id,
-                ...change.doc.data(),
-                _metadata: {
-                  fromCache: change.doc.metadata.fromCache,
-                  hasPendingWrites: change.doc.metadata.hasPendingWrites
-                }
+                ...change.doc.data()
               }
+            }))
 
-              switch (change.type) {
-                case 'added':
-                  changes.added.push(docData)
-                  break
-                case 'modified':
-                  changes.modified.push(docData)
-                  break
-                case 'removed':
-                  changes.removed.push(docData)
-                  break
-              }
-            })
-
-            // Tutti i documenti
-            snapshot.forEach(doc => {
-              docs.push({
-                id: doc.id,
-                ...doc.data(),
-                _metadata: {
-                  fromCache: doc.metadata.fromCache,
-                  hasPendingWrites: doc.metadata.hasPendingWrites
-                }
-              })
-            })
-
-            // Callback con dati e cambiamenti
-            onData({
-              docs,
-              changes,
-              metadata: {
-                fromCache: snapshot.metadata.fromCache,
-                hasPendingWrites: snapshot.metadata.hasPendingWrites,
-                size: snapshot.size,
-                empty: snapshot.empty
-              }
-            })
-
-            // Note: Toast notifications removed to avoid spam on dashboard
+            onData({ docs, changes })
           } catch (error) {
-            console.error('Errore processamento snapshot:', error)
+            console.error(`❌ Errore processamento dati ${collectionName}:`, error)
             onError(error)
           }
         },
-        (error) => {
-          console.error(`Errore listener ${collectionName}:`, error)
+        async (error) => {
+          console.error(`❌ Errore listener ${collectionName}:`, error)
           connectionStatus.value = 'error'
           
-          let errorMessage = 'Errore connessione real-time'
-          switch (error.code) {
-            case 'permission-denied':
-              errorMessage = 'Permessi insufficienti per accedere ai dati'
-              break
-            case 'unavailable':
-              errorMessage = 'Servizio temporaneamente non disponibile'
-              connectionStatus.value = 'disconnected'
-              break
-            case 'unauthenticated':
-              errorMessage = 'Autenticazione richiesta'
-              break
-            default:
-              errorMessage = error.message
+          if (enableReconnect && error.code === 'unavailable') {
+            // Disabilita network e tenta riconnessione
+            await disableNetwork(db)
+            setTimeout(handleReconnect, reconnectDelay)
           }
           
-          toast.error(errorMessage, '❌ Errore Real-time')
           onError(error)
         }
       )
@@ -164,20 +156,19 @@ export const useFirestoreRealtime = () => {
       activeListeners.value.set(listenerId, {
         unsubscribe,
         collection: collectionName,
-        createdAt: new Date()
+        createdAt: new Date(),
+        options: { filters, orderBys, limitTo }
       })
 
-      console.log(`✅ Listener real-time attivo per ${collectionName}`)
       return {
         listenerId,
         unsubscribe: () => {
           unsubscribe()
           activeListeners.value.delete(listenerId)
-          console.log(`🔌 Listener ${collectionName} disconnesso`)
         }
       }
     } catch (error) {
-      console.error('Errore creazione listener:', error)
+      console.error('❌ Errore creazione listener:', error)
       onError(error)
       return null
     }
@@ -265,11 +256,16 @@ export const useFirestoreRealtime = () => {
   // Cantieri real-time
   const listenToCantieri = (onUpdate) => {
     return listenToCollection('cantieri', {
-      orderBys: [{ field: 'dataCreazione', direction: 'desc' }],
+      orderBys: [{ field: 'createdAt', direction: 'desc' }],
       onData: (result) => {
-        onUpdate(result.docs, result.changes)
+        if (result.docs && Array.isArray(result.docs)) {
+          onUpdate(result.docs, result.changes)
+        } else {
+          console.error('❌ Dati cantieri non validi:', result)
+        }
       },
       onError: (error) => {
+        console.error('❌ Errore listener cantieri:', error)
         toast.error(`Errore sincronizzazione cantieri: ${error.message}`)
       }
     })
@@ -358,40 +354,52 @@ export const useFirestoreRealtime = () => {
   /**
    * Gestione batch listeners per dashboard
    */
-  const startDashboardListeners = (onUpdates = {}) => {
-    const listeners = []
-
-    // Cantieri
-    if (onUpdates.cantieri) {
-      const listener = listenToCantieri(onUpdates.cantieri)
-      if (listener) listeners.push(listener)
-    }
-
-    // Clienti
-    if (onUpdates.clienti) {
-      const listener = listenToClienti(onUpdates.clienti)
-      if (listener) listeners.push(listener)
-    }
-
-    // Dipendenti (se autorizzato)
-    if (onUpdates.dipendenti && authStore.canManagePersonnel) {
-      const listener = listenToDipendenti(onUpdates.dipendenti)
-      if (listener) listeners.push(listener)
-    }
-
-    // Notifiche
-    if (onUpdates.notifications) {
-      const listener = listenToUserNotifications(onUpdates.notifications)
-      if (listener) listeners.push(listener)
-    }
-
-    console.log(`🔄 ${listeners.length} listeners dashboard attivati`)
+  const startDashboardListeners = (handlers) => {
+    const unsubscribers = []
     
-    return {
-      stopAll: () => {
-        listeners.forEach(listener => listener.unsubscribe())
-        console.log('🔌 Tutti i listeners dashboard disconnessi')
+    try {
+      // Cantieri listener
+      const unsubCantieri = onSnapshot(query(collection(db, 'cantieri')), (snapshot) => {
+        handlers.cantieri?.(snapshot.docs, snapshot.docChanges())
+        if (import.meta.env.DEV) {
+          console.log('✅ Listener real-time attivo per cantieri')
+        }
+      })
+      unsubscribers.push(unsubCantieri)
+
+      // Clienti listener
+      const unsubClienti = onSnapshot(query(collection(db, 'clienti')), (snapshot) => {
+        handlers.clienti?.(snapshot.docs, snapshot.docChanges())
+        if (import.meta.env.DEV) {
+          console.log('✅ Listener real-time attivo per clienti')
+        }
+      })
+      unsubscribers.push(unsubClienti)
+
+      // Dipendenti listener
+      const unsubDipendenti = onSnapshot(query(collection(db, 'dipendenti')), (snapshot) => {
+        handlers.dipendenti?.(snapshot.docs, snapshot.docChanges())
+        if (import.meta.env.DEV) {
+          console.log('✅ Listener real-time attivo per dipendenti')
+        }
+      })
+      unsubscribers.push(unsubDipendenti)
+
+      if (import.meta.env.DEV) {
+        console.log(`✅ ${unsubscribers.length} listeners dashboard attivati`)
       }
+
+      return {
+        stopAll: () => {
+          unsubscribers.forEach(unsub => unsub())
+          if (import.meta.env.DEV) {
+            console.log('🔌 Real-time sync disattivato')
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Errore attivazione real-time sync:', error)
+      throw error
     }
   }
 
@@ -425,28 +433,34 @@ export const useFirestoreRealtime = () => {
    * Test connessione real-time
    */
   const testRealtimeConnection = async () => {
+    if (!import.meta.env.DEV) {
+      return { success: true, message: 'Test skipped in production' }
+    }
+
     try {
-      // Test semplice: ascolta una collezione per 5 secondi
-      const testListener = listenToCollection('settings', {
-        limitTo: 1,
-        onData: (result) => {
-          console.log('✅ Connessione real-time funzionante:', result.metadata)
-        },
-        onError: (error) => {
-          console.error('❌ Test connessione real-time fallito:', error)
-        }
+      const testCollection = collection(db, 'test_realtime')
+      let testSuccess = false
+      
+      const unsubscribe = onSnapshot(testCollection, () => {
+        testSuccess = true
+        connectionStatus.value = 'connected'
+        lastSyncTime.value = new Date()
+      }, (error) => {
+        console.error('❌ Test realtime fallito:', error)
+        connectionStatus.value = 'error'
       })
 
-      setTimeout(() => {
-        if (testListener) {
-          testListener.unsubscribe()
-        }
-      }, 5000)
+      // Attendi risposta o timeout
+      await new Promise(resolve => setTimeout(resolve, 5000))
+      unsubscribe()
 
-      return true
+      return { 
+        success: testSuccess, 
+        message: testSuccess ? 'Real-time funziona!' : 'Test timeout' 
+      }
     } catch (error) {
-      console.error('❌ Test connessione real-time fallito:', error)
-      return false
+      console.error('❌ Test realtime fallito:', error)
+      return { success: false, error: error.message }
     }
   }
 
@@ -479,10 +493,13 @@ export const useFirestoreRealtime = () => {
     lastSyncTime,
     isConnected,
     listenersCount,
+    reconnectAttempts,
+    canReconnect,
 
     // Core methods
     listenToCollection,
     listenToDocument,
+    handleReconnect,
 
     // Business specific listeners
     listenToCantieri,

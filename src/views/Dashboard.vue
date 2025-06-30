@@ -106,7 +106,7 @@
         </div>
         
         <!-- Messaggio quando non ci sono cantieri -->
-        <div v-if="cantieri.length === 0" class="text-center py-8">
+        <div v-if="cantieriAttiviFormattati.length === 0" class="text-center py-8">
           <div class="mx-auto h-12 w-12 text-gray-400 flex items-center justify-center text-2xl">
             🏗️
           </div>
@@ -122,11 +122,11 @@
         
         <!-- Mobile: Stack Layout -->
         <div v-else class="block sm:hidden space-y-3">
-          <div v-for="cantiere in cantieri" :key="cantiere.id" class="p-3 bg-gray-50 rounded-lg">
+          <div v-for="cantiere in cantieriAttiviFormattati" :key="cantiere.id" class="p-3 bg-gray-50 rounded-lg">
             <div class="flex items-start justify-between mb-3">
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-gray-900 truncate">{{ cantiere.nome }}</p>
-                <p class="text-sm text-gray-600">{{ cantiere.cliente }}</p>
+                <p class="text-sm text-gray-600">{{ cantiere.dettagli }}</p>
               </div>
               <span class="text-xs text-gray-500 ml-2 flex-shrink-0">{{ cantiere.scadenza }}</span>
             </div>
@@ -141,10 +141,10 @@
 
         <!-- Desktop: Original Layout -->
         <div v-else class="hidden sm:block space-y-4">
-          <div v-for="cantiere in cantieri" :key="cantiere.id" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <div v-for="cantiere in cantieriAttiviFormattati" :key="cantiere.id" class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
             <div>
               <p class="font-medium text-gray-900">{{ cantiere.nome }}</p>
-              <p class="text-sm text-gray-600">{{ cantiere.cliente }}</p>
+              <p class="text-sm text-gray-600">{{ cantiere.dettagli }}</p>
             </div>
             <div class="text-right">
               <div class="flex items-center space-x-2">
@@ -302,16 +302,15 @@ const lastSync = ref(null)
 
 // KPI Data - Calcolati dinamicamente dai dati Firestore
 const kpis = computed(() => ({
-  cantieriAttivi: firestoreStore.cantieri.filter(c => c.stato === 'in_corso' || c.stato === 'pianificato' || c.stato === 'in-corso').length,
+  cantieriAttivi: firestoreStore.cantieriAttivi.length,
   valoreMagazzino: firestoreStore.materiali.reduce((total, m) => total + ((m.prezzoUnitario || 0) * (m.quantita || 0)), 0),
   oreLavorate: firestoreStore.dipendenti.reduce((total, d) => total + (d.ore_settimana || 0), 0),
   mezziDisponibili: firestoreStore.mezzi.filter(m => m.stato === 'disponibile').length
 }))
 
-// Cantieri attivi - Filtrati da Firestore (primi 3) - Include pianificati e in corso
+// Cantieri attivi - Filtrati da Firestore (primi 3)
 const cantieri = computed(() => 
-  firestoreStore.cantieri
-    .filter(c => c.stato === 'in_corso' || c.stato === 'pianificato' || c.stato === 'in-corso')
+  firestoreStore.cantieriAttivi
     .slice(0, 3)
     .map(c => ({
       id: c.id,
@@ -387,10 +386,9 @@ const calculateTrend = (entity) => {
 // Enhanced dashboard cards
 const enhancedKpis = computed(() => ({
   cantieriAttivi: {
-    value: firestoreStore.cantieri.filter(c => ['in_corso', 'pianificato', 'in-corso'].includes(c.stato)).length,
+    value: firestoreStore.cantieriAttivi.length,
     total: firestoreStore.cantieri.length,
-    valoreAttivo: firestoreStore.cantieri
-      .filter(c => ['in_corso', 'pianificato', 'in-corso'].includes(c.stato))
+    valoreAttivo: firestoreStore.cantieriAttivi
       .reduce((total, c) => total + (c.valore || 0), 0),
     trend: calculateTrend('cantieri')
   },
@@ -528,4 +526,59 @@ onMounted(async () => {
     stopRealtimeSync()
   })
 })
-</script> 
+
+const formatCantiereDetails = (cantiere) => {
+  if (!cantiere) return ''
+  
+  const details = []
+  if (cantiere.nome) details.push(cantiere.nome)
+  if (cantiere.cliente?.nome) details.push(`Cliente: ${cantiere.cliente.nome}`)
+  if (cantiere.indirizzo) details.push(`Sede: ${cantiere.indirizzo}`)
+  if (cantiere.tipoLavoro) details.push(`Tipo: ${cantiere.tipoLavoro}`)
+  
+  return details.join(' - ')
+}
+
+// Computed per i cantieri formattati
+const cantieriFormattati = computed(() => {
+  return firestoreStore.cantieri.map(cantiere => ({
+    ...cantiere,
+    dettagli: formatCantiereDetails(cantiere)
+  }))
+})
+
+// Cantieri attivi formattati
+const cantieriAttiviFormattati = computed(() => 
+  cantieriFormattati.value.filter(c => ['in-corso', 'pianificato'].includes(c.stato))
+)
+</script>
+
+<style scoped>
+.cantiere-card {
+  @apply bg-white rounded-lg shadow p-4 mb-4;
+}
+
+.cantiere-info h3 {
+  @apply text-lg font-semibold mb-1;
+}
+
+.cantiere-stats {
+  @apply flex justify-between mt-3 pt-3 border-t;
+}
+
+.stat {
+  @apply flex flex-col;
+}
+
+.stat .label {
+  @apply text-sm text-gray-500;
+}
+
+.stat .value {
+  @apply text-lg font-medium;
+}
+
+.empty-state {
+  @apply text-center py-8;
+}
+</style> 

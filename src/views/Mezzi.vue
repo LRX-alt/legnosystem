@@ -474,9 +474,11 @@ import {
   XMarkIcon
 } from '@heroicons/vue/24/outline'
 import { usePopup } from '@/composables/usePopup'
+import { firestore } from '@/firebase'
+import { increment } from 'firebase/firestore'
 
 // Popup system
-const { success, info, confirm } = usePopup()
+const { success, info, confirm, warning, select } = usePopup()
 
 // Stato reattivo
 const showDetailModal = ref(false)
@@ -684,8 +686,65 @@ const manageMaintenance = (mezzo) => {
   info('Funzionalità in Sviluppo', `Gestione manutenzioni per ${mezzo.nome} sarà disponibile a breve`)
 }
 
-const assignToCantiere = (mezzo) => {
-  info('Funzionalità in Sviluppo', `Assegnazione cantiere per ${mezzo.nome} sarà disponibile a breve`)
+const assignToCantiere = async (mezzo) => {
+  try {
+    // Carica lista cantieri attivi
+    const cantieriResult = await firestore.cantieriOperations.load()
+    const cantieriAttivi = cantieriResult.data.filter(c => 
+      ['pianificato', 'in-corso'].includes(c.stato)
+    )
+
+    if (cantieriAttivi.length === 0) {
+      popup.warning('Nessun Cantiere', 'Non ci sono cantieri attivi disponibili')
+      return
+    }
+
+    // Mostra dialog di selezione cantiere
+    const cantiereOptions = cantieriAttivi.map(c => ({
+      value: c.id,
+      label: `${c.nome} - ${c.indirizzo}`
+    }))
+
+    const { value: cantiereId } = await popup.select(
+      'Assegna a Cantiere',
+      'Seleziona il cantiere a cui assegnare il mezzo:',
+      cantiereOptions
+    )
+
+    if (!cantiereId) return
+
+    // Aggiorna il mezzo con l'assegnazione
+    const result = await firestore.mezziOperations.update(mezzo.id, {
+      cantiereId,
+      statoOperativo: 'in-uso',
+      dataAssegnazione: new Date().toISOString()
+    })
+
+    if (result.success) {
+      // Aggiorna lo stato locale
+      const index = mezzi.value.findIndex(m => m.id === mezzo.id)
+      if (index !== -1) {
+        mezzi.value[index] = {
+          ...mezzi.value[index],
+          cantiereId,
+          statoOperativo: 'in-uso',
+          dataAssegnazione: new Date().toISOString()
+        }
+      }
+
+      // Aggiorna anche il cantiere
+      await firestore.cantieriOperations.update(cantiereId, {
+        mezziAssegnati: increment(1)
+      })
+
+      popup.success('Mezzo Assegnato', `${mezzo.nome} è stato assegnato al cantiere con successo`)
+    } else {
+      throw new Error(result.error || 'Errore durante l\'assegnazione')
+    }
+  } catch (error) {
+    console.error('Errore assegnazione mezzo:', error)
+    popup.error('Errore', 'Impossibile assegnare il mezzo al cantiere')
+  }
 }
 
 const deleteMezzo = async (mezzo) => {

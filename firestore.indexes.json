@@ -29,9 +29,19 @@
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "cantieri_allegati",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cantiereId",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ]
@@ -45,11 +55,21 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "data",
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "mezzi",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cantiereId",
+          "order": "ASCENDING"
         },
         {
-          "fieldPath": "__name__",
+          "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
       ]

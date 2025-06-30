@@ -50,6 +50,20 @@
 
         <!-- Form -->
         <form @submit.prevent="handleRegister" class="p-8 space-y-5">
+          <!-- Validation Errors -->
+          <div v-if="validationErrors.length > 0" class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <span class="text-red-400">❌</span>
+              </div>
+              <div class="ml-3">
+                <p v-for="error in validationErrors" :key="error" class="text-sm text-red-700">
+                  {{ error }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Grid a 2 colonne per nome e email -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Nome -->
@@ -69,22 +83,24 @@
 
             <!-- Email -->
             <div class="space-y-2">
-              <label for="email" class="block text-sm font-semibold text-gray-700">Email aziendale</label>
+              <label for="email" class="block text-sm font-semibold text-gray-700">Email Aziendale</label>
               <input
                 id="email"
                 name="email"
                 type="email"
-                autocomplete="email"
                 required
                 v-model="form.email"
                 :disabled="loading"
-                class="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 text-gray-800 placeholder-gray-400 transition-all duration-200 disabled:opacity-50"
-                placeholder="nome@azienda.it"
+                :class="[
+                  'w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-green-200 text-gray-800 placeholder-gray-400 transition-all duration-200 disabled:opacity-50',
+                  emailValidation.isValid ? 'border-green-500' : 'border-gray-200'
+                ]"
+                placeholder="nome@legnosystem.bio"
               />
             </div>
           </div>
 
-          <!-- Password fields -->
+          <!-- Grid a 2 colonne per password -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Password -->
             <div class="space-y-2">
@@ -92,64 +108,62 @@
               <div class="relative">
                 <input
                   id="password"
-                  name="password"
                   :type="showPassword ? 'text' : 'password'"
-                  autocomplete="new-password"
                   required
                   v-model="form.password"
                   :disabled="loading"
-                  class="w-full px-3 py-2.5 pr-10 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 text-gray-800 placeholder-gray-400 transition-all duration-200 disabled:opacity-50"
-                  placeholder="Min. 6 caratteri"
+                  class="w-full px-3 py-2.5 border-2 border-gray-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 text-gray-800 placeholder-gray-400 transition-all duration-200 disabled:opacity-50"
+                  placeholder="••••••••"
                 />
                 <button
                   type="button"
                   @click="showPassword = !showPassword"
-                  :disabled="loading"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path v-if="showPassword" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                    <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"/>
-                  </svg>
+                  <span class="text-gray-500">👁️</span>
                 </button>
+              </div>
+              
+              <!-- Password Strength Indicator -->
+              <div v-if="form.password" class="mt-2">
+                <div class="h-1 w-full bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    class="h-full transition-all duration-300"
+                    :class="getPasswordStrengthColor"
+                    :style="{ width: `${passwordStrength}%` }"
+                  ></div>
+                </div>
+                <p class="text-xs mt-1" :class="getPasswordStrengthColor.replace('bg-', 'text-')">
+                  {{ getPasswordStrengthLabel }}
+                </p>
               </div>
             </div>
 
-            <!-- Confirm Password -->
+            <!-- Conferma Password -->
             <div class="space-y-2">
-              <label for="confirmPassword" class="block text-sm font-semibold text-gray-700">Conferma</label>
+              <label for="confirmPassword" class="block text-sm font-semibold text-gray-700">
+                Conferma Password
+              </label>
               <div class="relative">
                 <input
                   id="confirmPassword"
-                  name="confirmPassword"
                   :type="showConfirmPassword ? 'text' : 'password'"
-                  autocomplete="new-password"
                   required
                   v-model="form.confirmPassword"
                   :disabled="loading"
-                  class="w-full px-3 py-2.5 pr-10 border-2 rounded-lg text-gray-800 placeholder-gray-400 transition-all duration-200 disabled:opacity-50"
-                  :class="{ 
-                    'border-red-300 focus:border-red-500 focus:ring-red-200': form.confirmPassword && !passwordsMatch,
-                    'border-gray-200 focus:border-green-500 focus:ring-green-200': !form.confirmPassword || passwordsMatch
-                  }"
-                  placeholder="Ripeti password"
+                  :class="[
+                    'w-full px-3 py-2.5 border-2 rounded-lg focus:ring-2 focus:ring-green-200 text-gray-800 placeholder-gray-400 transition-all duration-200 disabled:opacity-50',
+                    passwordsMatch && form.confirmPassword ? 'border-green-500' : 'border-gray-200'
+                  ]"
+                  placeholder="••••••••"
                 />
                 <button
                   type="button"
                   @click="showConfirmPassword = !showConfirmPassword"
-                  :disabled="loading"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path v-if="showConfirmPassword" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                    <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"/>
-                  </svg>
+                  <span class="text-gray-500">👁️</span>
                 </button>
-              </div>
-              <!-- Error per password mismatch -->
-              <div v-if="form.confirmPassword && !passwordsMatch" class="text-xs text-red-600 flex items-center">
-                <span class="mr-1">⚠️</span>
-                Le password non corrispondono
               </div>
             </div>
           </div>
@@ -308,6 +322,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { validateEmail, validatePassword } from '@/utils/firestoreValidation'
 import logoLegnosystem from '@/assets/logo legnosystem.avif'
 
 // Emits
@@ -335,17 +350,31 @@ const form = ref({
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const loading = ref(false)
+const validationErrors = ref([])
+const passwordStrength = ref(0)
 
 // Computed
 const passwordsMatch = computed(() => {
   return form.value.password === form.value.confirmPassword
 })
 
+const emailValidation = computed(() => {
+  if (!form.value.email) return { isValid: false, errors: [] }
+  return validateEmail(form.value.email)
+})
+
+const passwordValidation = computed(() => {
+  if (!form.value.password) return { isValid: false, errors: [] }
+  const validation = validatePassword(form.value.password)
+  passwordStrength.value = validation.strength
+  return validation
+})
+
 const isFormValid = computed(() => {
   return (
     form.value.name.length > 0 &&
-    form.value.email.length > 0 &&
-    form.value.password.length >= 6 &&
+    emailValidation.value.isValid &&
+    passwordValidation.value.isValid &&
     passwordsMatch.value &&
     form.value.role.length > 0 &&
     form.value.acceptTerms
@@ -354,7 +383,26 @@ const isFormValid = computed(() => {
 
 // Methods
 const handleRegister = async () => {
-  if (!isFormValid.value) return
+  validationErrors.value = []
+  
+  // Validazione email
+  if (!emailValidation.value.isValid) {
+    validationErrors.value.push(...emailValidation.value.errors)
+  }
+  
+  // Validazione password
+  if (!passwordValidation.value.isValid) {
+    validationErrors.value.push(...passwordValidation.value.errors)
+  }
+  
+  // Validazione conferma password
+  if (!passwordsMatch.value) {
+    validationErrors.value.push('Le password non coincidono')
+  }
+  
+  if (validationErrors.value.length > 0 || !isFormValid.value) {
+    return
+  }
   
   loading.value = true
   
@@ -372,13 +420,31 @@ const handleRegister = async () => {
     
     if (result.success) {
       emit('register-success')
+    } else {
+      validationErrors.value.push(result.error)
     }
   } catch (error) {
     console.error('Errore richiesta registrazione:', error)
+    validationErrors.value.push(error.message)
   } finally {
     loading.value = false
   }
 }
+
+// Password strength indicator
+const getPasswordStrengthColor = computed(() => {
+  if (passwordStrength.value >= 80) return 'bg-green-500'
+  if (passwordStrength.value >= 60) return 'bg-yellow-500'
+  if (passwordStrength.value >= 40) return 'bg-orange-500'
+  return 'bg-red-500'
+})
+
+const getPasswordStrengthLabel = computed(() => {
+  if (passwordStrength.value >= 80) return 'Eccellente'
+  if (passwordStrength.value >= 60) return 'Buona'
+  if (passwordStrength.value >= 40) return 'Media'
+  return 'Debole'
+})
 </script>
 
 <style scoped>

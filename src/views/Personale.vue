@@ -128,6 +128,13 @@
         >
           Presenze
         </button>
+        <button
+          @click="activeTab = 'calendario'"
+          :class="activeTab === 'calendario' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+          class="whitespace-nowrap py-3 px-2 border-b-2 font-medium text-base"
+        >
+          Calendario
+        </button>
       </nav>
     </div>
 
@@ -500,6 +507,131 @@
           <div class="text-center">
             <p class="text-base text-primary-600">Ore Totali</p>
             <p class="text-2xl font-bold text-primary-600">{{ getRiepilogoPresenze().oreTotali }}h</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pulsanti Azioni -->
+      <div class="flex justify-between items-center mt-4">
+        <button @click="markAllPresent" 
+                class="btn-secondary">
+          Segna Tutti Presenti
+        </button>
+        
+        <button @click="saveAllPresenze"
+                class="btn-primary">
+          Salva Presenze
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab Content: Calendario -->
+    <div v-if="activeTab === 'calendario'" class="space-y-6">
+      <div class="bg-white rounded-lg shadow">
+        <!-- Header Calendario -->
+        <div class="px-6 py-4 border-b border-gray-200">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-medium text-gray-900">
+              {{ format(new Date(selectedDate), 'MMMM yyyy', { locale: it }) }}
+            </h3>
+            <div class="flex space-x-2">
+              <button @click="selectedDate = format(new Date(), 'yyyy-MM-dd')"
+                      class="btn-secondary text-sm">
+                Oggi
+              </button>
+              <input v-model="selectedDate" 
+                     type="month" 
+                     class="form-input text-sm"
+                     :max="format(new Date(), 'yyyy-MM')">
+            </div>
+          </div>
+        </div>
+        
+        <!-- Griglia Calendario -->
+        <div class="p-6">
+          <!-- Intestazione Giorni -->
+          <div class="grid grid-cols-7 gap-px mb-2 text-center text-xs font-medium text-gray-700">
+            <div>Dom</div>
+            <div>Lun</div>
+            <div>Mar</div>
+            <div>Mer</div>
+            <div>Gio</div>
+            <div>Ven</div>
+            <div>Sab</div>
+          </div>
+          
+          <!-- Settimane -->
+          <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <div v-for="(week, weekIndex) in calendarWeeks" 
+                 :key="weekIndex"
+                 class="grid grid-cols-7 divide-x divide-gray-200"
+                 :class="{'border-t': weekIndex > 0}">
+              
+              <!-- Giorni -->
+              <div v-for="day in week" 
+                   :key="day.dateStr"
+                   class="min-h-[120px] p-2"
+                   :class="{
+                     'bg-gray-50': day.isWeekend,
+                     'bg-primary-50': day.dateStr === selectedDate
+                   }">
+                
+                <!-- Numero Giorno -->
+                <div class="text-right">
+                  <span class="text-sm" :class="{
+                    'text-gray-400': day.isWeekend,
+                    'font-bold text-primary-600': day.dateStr === selectedDate,
+                    'text-gray-900': !day.isWeekend && day.dateStr !== selectedDate
+                  }">
+                    {{ format(day.date, 'd') }}
+                  </span>
+                </div>
+                
+                <!-- Statistiche Giorno -->
+                <div v-if="day.stats.dipendentiPresenti > 0" 
+                     class="mt-2 space-y-1 text-xs">
+                  <div class="flex items-center text-gray-600">
+                    <span class="font-medium">👥 {{ day.stats.dipendentiPresenti }}</span>
+                    <span class="mx-1">•</span>
+                    <span>{{ day.stats.oreTotali }}h</span>
+                  </div>
+                  <div class="text-green-600 font-medium">
+                    €{{ day.stats.costoTotale.toFixed(0) }}
+                  </div>
+                </div>
+                
+                <!-- Indicatore Giorno Vuoto -->
+                <div v-else-if="!day.isWeekend" 
+                     class="mt-2 text-xs text-gray-400">
+                  Nessuna registrazione
+                </div>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        
+        <!-- Footer con Totali -->
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+          <div class="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p class="text-sm text-gray-600">Giorni Lavorati</p>
+              <p class="text-lg font-semibold">
+                {{ calendarDays.value.filter(d => d.stats.dipendentiPresenti > 0).length }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Ore Totali</p>
+              <p class="text-lg font-semibold">
+                {{ calendarDays.value.reduce((sum, d) => sum + d.stats.oreTotali, 0) }}h
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-600">Costo Totale</p>
+              <p class="text-lg font-semibold text-green-600">
+                €{{ calendarDays.value.reduce((sum, d) => sum + d.stats.costoTotale, 0).toFixed(0) }}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -1027,6 +1159,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '../stores/firestore.js'
 import { usePopup } from '../composables/usePopup.js'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns'
+import { it } from 'date-fns/locale'
 
 // Firestore store
 const firestoreStore = useFirestoreStore()
@@ -1435,18 +1569,108 @@ const closeDetailModal = () => {
 }
 
 // Funzioni per gestione presenze
-const getPresenza = (dipendenteId) => {
+const getPresenza = async (dipendenteId) => {
   const key = `${selectedDate.value}-${dipendenteId}`
-  if (!presenze.value[key]) {
-    presenze.value[key] = {
-      entrata: '08:00',
-      uscita: '17:00',
-      pausa: 60,
-      stato: 'presente',
-      note: ''
+  
+  try {
+    // Prova a caricare da Firestore
+    const result = await firestoreStore.loadDocument('presenze', key)
+    
+    if (result.success && result.data) {
+      presenze.value[key] = result.data
+    } else if (!presenze.value[key]) {
+      // Se non esiste, crea nuovo record
+      presenze.value[key] = {
+        entrata: '08:00',
+        uscita: '17:00',
+        pausa: 60,
+        stato: 'presente',
+        note: '',
+        dipendenteId,
+        data: selectedDate.value,
+        createdAt: new Date().toISOString()
+      }
+    }
+  } catch (error) {
+    console.error('Errore caricamento presenza:', error)
+  }
+  
+  return presenze.value[key]
+}
+
+const savePresenza = async (dipendenteId) => {
+  const key = `${selectedDate.value}-${dipendenteId}`
+  const presenza = presenze.value[key]
+  
+  // Validazione base
+  if (!presenza.entrata || !presenza.uscita) {
+    error('Errore', 'Orario entrata e uscita obbligatori')
+    return false
+  }
+  
+  // Converti orari in minuti per confronto
+  const entrata = presenza.entrata.split(':').reduce((acc, time) => (60 * acc) + +time, 0)
+  const uscita = presenza.uscita.split(':').reduce((acc, time) => (60 * acc) + +time, 0)
+  
+  // Validazioni orari
+  if (entrata >= uscita) {
+    error('Errore', 'L\'orario di uscita deve essere successivo all\'entrata')
+    return false
+  }
+  
+  if (presenza.pausa < 0 || presenza.pausa > 120) {
+    error('Errore', 'La pausa deve essere tra 0 e 120 minuti')
+    return false
+  }
+  
+  // Controllo sovrapposizioni
+  const timesheetGiorno = timesheetDettagli.value.filter(t => 
+    t.dipendenteId === dipendenteId && 
+    t.data === selectedDate.value
+  )
+  
+  const oreTotali = calcolaOreTotali(dipendenteId)
+  const orePresenza = ((uscita - entrata) / 60) - (presenza.pausa / 60)
+  
+  if (Math.abs(oreTotali - orePresenza) > 0.5) {
+    const conferma = await confirm(
+      'Differenza Ore',
+      `Le ore di presenza (${orePresenza}h) non corrispondono alle ore registrate nei timesheet (${oreTotali}h). Continuare?`
+    )
+    if (!conferma) return false
+  }
+  
+  try {
+    // Salva in Firestore
+    const result = await firestoreStore.saveDocument('presenze', key, presenza)
+    
+    if (result.success) {
+      success('Presenza Salvata', `Presenza di ${selectedDate.value} salvata con successo`)
+      return true
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (error) {
+    console.error('Errore salvataggio presenza:', error)
+    error('Errore', `Impossibile salvare la presenza: ${error.message}`)
+    return false
+  }
+}
+
+// Funzione per salvare tutte le presenze del giorno
+const saveAllPresenze = async () => {
+  let tuttoOk = true
+  
+  for (const dipendente of dipendenti.value) {
+    if (!(await savePresenza(dipendente.id))) {
+      tuttoOk = false
+      break
     }
   }
-  return presenze.value[key]
+  
+  if (tuttoOk) {
+    success('Presenze Salvate', 'Tutte le presenze sono state salvate con successo!')
+  }
 }
 
 const calcolaOreTotali = (dipendenteId) => {
@@ -1542,5 +1766,45 @@ onMounted(async () => {
   
   // Carica tutti i timesheet da Firestore
   await loadTimesheet()
+})
+
+// Computed per il calendario
+const calendarDays = computed(() => {
+  const start = startOfMonth(new Date(selectedDate.value))
+  const end = endOfMonth(start)
+  
+  return eachDayOfInterval({ start, end }).map(date => {
+    const dateStr = format(date, 'yyyy-MM-dd')
+    const dayNum = getDay(date)
+    
+    // Trova tutti i timesheet per questo giorno
+    const timesheetGiorno = timesheetDettagli.value.filter(t => t.data === dateStr)
+    
+    // Calcola statistiche del giorno
+    const stats = {
+      dipendentiPresenti: new Set(timesheetGiorno.map(t => t.dipendenteId)).size,
+      oreTotali: timesheetGiorno.reduce((sum, t) => sum + (t.ore || 0), 0),
+      costoTotale: timesheetGiorno.reduce((sum, t) => sum + (t.costoTotale || 0), 0)
+    }
+    
+    return {
+      date,
+      dateStr,
+      dayNum,
+      isWeekend: dayNum === 0 || dayNum === 6,
+      stats
+    }
+  })
+})
+
+const calendarWeeks = computed(() => {
+  const days = [...calendarDays.value]
+  const weeks = []
+  
+  while (days.length) {
+    weeks.push(days.splice(0, 7))
+  }
+  
+  return weeks
 })
 </script> 

@@ -70,10 +70,8 @@ export const firestoreConfig = {
     // 🏗️ Gestione cantieri
     cantieri: 'cantieri',
     cantieriProgress: 'cantieriProgress',
-    cantieriAttachments: 'cantieriAttachments',
-    cantieri_allegati: 'cantieri_allegati',
-    materiali_cantieri: 'materiali_cantieri',
-    materiali_allegati: 'materiali_allegati',
+    cantieriAllegati: 'cantieri_allegati',
+    materialiCantieri: 'materiali_cantieri',
     
     // 👤 Gestione clienti
     clienti: 'clienti',
@@ -95,9 +93,9 @@ export const firestoreConfig = {
     
     // 🚚 Gestione fornitori e mezzi
     fornitori: 'fornitori',
-    fornitori_ordini: 'fornitori_ordini',
+    fornitoriOrdini: 'fornitori_ordini',
     mezzi: 'mezzi',
-    mezzi_manutenzione: 'mezzi_manutenzione',
+    mezziManutenzione: 'mezzi_manutenzione',
     
     // 📊 Analytics e reporting
     analytics: 'analytics',
@@ -143,6 +141,140 @@ export const storagePaths = {
   
   // 📁 Backup
   backups: 'backups/{date}'
+}
+
+// 👥 Configurazione ruoli e permessi
+export const rolesConfig = {
+  roles: {
+    admin: {
+      label: '🔧 Amministratore',
+      level: 100,
+      permissions: ['*'] // Tutti i permessi
+    },
+    manager: {
+      label: '👔 Manager',
+      level: 80,
+      permissions: [
+        'manage_cantieri',
+        'manage_clienti',
+        'manage_fornitori',
+        'manage_materiali',
+        'manage_dipendenti',
+        'view_analytics',
+        'view_financials'
+      ]
+    },
+    capo_cantiere: {
+      label: '👷‍♂️ Capo Cantiere',
+      level: 60,
+      permissions: [
+        'manage_cantieri',
+        'view_clienti',
+        'view_fornitori',
+        'view_materiali',
+        'view_dipendenti'
+      ]
+    },
+    amministrativo: {
+      label: '📋 Amministrativo',
+      level: 40,
+      permissions: [
+        'view_cantieri',
+        'view_clienti',
+        'view_fornitori',
+        'manage_fatture',
+        'view_financials'
+      ]
+    },
+    employee: {
+      label: '👷 Operaio',
+      level: 20,
+      permissions: [
+        'view_cantieri',
+        'view_materiali'
+      ]
+    },
+    user: {
+      label: '👤 Utente Base',
+      level: 10,
+      permissions: [
+        'view_profile'
+      ]
+    }
+  },
+  
+  // Definizione dettagliata dei permessi
+  permissions: {
+    // Cantieri
+    'manage_cantieri': {
+      label: 'Gestione Cantieri',
+      description: 'Permette di creare, modificare ed eliminare i cantieri'
+    },
+    'view_cantieri': {
+      label: 'Visualizza Cantieri',
+      description: 'Permette di visualizzare i cantieri'
+    },
+    
+    // Clienti
+    'manage_clienti': {
+      label: 'Gestione Clienti',
+      description: 'Permette di creare, modificare ed eliminare i clienti'
+    },
+    'view_clienti': {
+      label: 'Visualizza Clienti',
+      description: 'Permette di visualizzare i clienti'
+    },
+    
+    // Fornitori
+    'manage_fornitori': {
+      label: 'Gestione Fornitori',
+      description: 'Permette di creare, modificare ed eliminare i fornitori'
+    },
+    'view_fornitori': {
+      label: 'Visualizza Fornitori',
+      description: 'Permette di visualizzare i fornitori'
+    },
+    
+    // Materiali
+    'manage_materiali': {
+      label: 'Gestione Materiali',
+      description: 'Permette di creare, modificare ed eliminare i materiali'
+    },
+    'view_materiali': {
+      label: 'Visualizza Materiali',
+      description: 'Permette di visualizzare i materiali'
+    },
+    
+    // Dipendenti
+    'manage_dipendenti': {
+      label: 'Gestione Dipendenti',
+      description: 'Permette di gestire i dipendenti e le presenze'
+    },
+    'view_dipendenti': {
+      label: 'Visualizza Dipendenti',
+      description: 'Permette di visualizzare i dipendenti'
+    },
+    
+    // Fatturazione
+    'manage_fatture': {
+      label: 'Gestione Fatture',
+      description: 'Permette di creare e gestire le fatture'
+    },
+    'view_fatture': {
+      label: 'Visualizza Fatture',
+      description: 'Permette di visualizzare le fatture'
+    },
+    
+    // Analytics e Report
+    'view_analytics': {
+      label: 'Visualizza Analytics',
+      description: 'Permette di visualizzare le statistiche e i report'
+    },
+    'view_financials': {
+      label: 'Visualizza Dati Finanziari',
+      description: 'Permette di visualizzare i dati finanziari'
+    }
+  }
 }
 
 export default app 

@@ -414,12 +414,6 @@
               Modifica
             </button>
             <button 
-              @click="deleteCliente(selectedCliente.id)"
-              class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-            >
-              Elimina
-            </button>
-            <button 
               @click="showViewModal = false"
               class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
             >
@@ -540,21 +534,30 @@
             </div>
 
             <!-- Buttons -->
-            <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+            <div class="flex justify-between mt-6 pt-4 border-t border-gray-200">
               <button 
-                type="button" 
-                @click="showEditModal = false"
-                class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                type="button"
+                @click="deleteCliente(selectedCliente.id)"
+                class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
               >
-                Annulla
+                Elimina Cliente
               </button>
-              <button 
-                type="submit" 
-                :disabled="loading"
-                class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-50"
-              >
-                {{ loading ? 'Aggiornamento...' : 'Aggiorna Cliente' }}
-              </button>
+              <div class="flex space-x-3">
+                <button 
+                  type="button" 
+                  @click="showEditModal = false"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  Annulla
+                </button>
+                <button 
+                  type="submit" 
+                  :disabled="loading"
+                  class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {{ loading ? 'Aggiornamento...' : 'Aggiorna Cliente' }}
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -731,13 +734,18 @@ const deleteCliente = async (clienteId) => {
       // Rimuovi dalla lista locale
       clienti.value = clienti.value.filter(c => c.id !== clienteId)
       
-      success("Operazione Completata", "Cliente gestito con successo!")
+      // Chiudi tutti i modali
+      showViewModal.value = false
+      showEditModal.value = false
+      selectedCliente.value = null
+      
+      success("Operazione Completata", "Cliente eliminato con successo!")
     } else {
-      error("Errore Cliente", "Operazione fallita")
+      error("Errore Cliente", "Eliminazione fallita")
     }
-  } catch (error) {
-    console.error('Errore eliminazione cliente:', error)
-    error("Errore Cliente", "Operazione fallita")
+  } catch (err) {
+    console.error('Errore eliminazione cliente:', err)
+    error("Errore Cliente", "Eliminazione fallita")
   } finally {
     loading.value = false
   }

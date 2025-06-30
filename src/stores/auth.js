@@ -9,10 +9,13 @@ import {
   updatePassword,
   onAuthStateChanged,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
-import { auth, db, firestoreConfig } from '@/config/firebase'
+import { auth, db, firestoreConfig, rolesConfig } from '@/config/firebase'
 import { useToast } from '@/composables/useToast'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -24,24 +27,65 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(true)
   const isAuthenticated = ref(false)
   const authInitialized = ref(false)
+  const sessionTimeout = ref(null)
+  const sessionExpiryTime = 30 * 60 * 1000 // 30 minuti
 
   // 📊 Computed
   const userRole = computed(() => userProfile.value?.role || 'user')
   const userName = computed(() => userProfile.value?.displayName || user.value?.email || 'Utente')
+  const userRoleConfig = computed(() => rolesConfig.roles[userRole.value] || rolesConfig.roles.user)
+  const userPermissions = computed(() => {
+    const role = userRole.value
+    if (role === 'admin') return ['*']
+    return rolesConfig.roles[role]?.permissions || []
+  })
+
+  // Computed helpers per i permessi
   const isAdmin = computed(() => userRole.value === 'admin')
   const isManager = computed(() => ['admin', 'manager'].includes(userRole.value))
-  const canManageCantieri = computed(() => 
-    ['admin', 'manager', 'capo_cantiere'].includes(userRole.value)
-  )
-  const canManagePersonnel = computed(() =>
-    ['admin', 'manager'].includes(userRole.value)
-  )
-  const canViewFinancials = computed(() =>
-    ['admin', 'manager', 'amministrativo'].includes(userRole.value)
-  )
+  const canManageCantieri = computed(() => hasPermission('manage_cantieri'))
+  const canManagePersonnel = computed(() => hasPermission('manage_dipendenti'))
+  const canViewFinancials = computed(() => hasPermission('view_financials'))
 
-  // 🔧 Methods
-  
+  /**
+   * Verifica se l'utente ha un determinato permesso
+   */
+  const hasPermission = (permission) => {
+    if (!isAuthenticated.value) return false
+    if (userPermissions.value.includes('*')) return true
+    return userPermissions.value.includes(permission)
+  }
+
+  /**
+   * Verifica se l'utente ha il livello di ruolo richiesto
+   */
+  const hasRoleLevel = (requiredLevel) => {
+    const userLevel = userRoleConfig.value?.level || 0
+    return userLevel >= requiredLevel
+  }
+
+  /**
+   * Gestisce il timeout della sessione
+   */
+  const handleSessionTimeout = () => {
+    if (sessionTimeout.value) {
+      clearTimeout(sessionTimeout.value)
+    }
+    
+    if (isAuthenticated.value) {
+      sessionTimeout.value = setTimeout(async () => {
+        await logout('Sessione scaduta')
+      }, sessionExpiryTime)
+    }
+  }
+
+  /**
+   * Resetta il timer della sessione
+   */
+  const resetSessionTimer = () => {
+    handleSessionTimeout()
+  }
+
   /**
    * Inizializza il listener di autenticazione
    */
@@ -64,6 +108,7 @@ export const useAuthStore = defineStore('auth', () => {
           // Carica il profilo utente da Firestore
           await loadUserProfile(firebaseUser.uid)
           isAuthenticated.value = true
+          handleSessionTimeout()
         } else {
           user.value = null
           userProfile.value = null
@@ -113,9 +158,14 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * Login con email e password
    */
-  const login = async (email, password) => {
+  const login = async (email, password, remember = false) => {
     try {
       loading.value = true
+      
+      // Imposta la persistenza prima del login
+      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence)
+      
+      // Esegui il login
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       
       // Aggiorna ultimo login
@@ -126,6 +176,7 @@ export const useAuthStore = defineStore('auth', () => {
         })
       }
       
+      handleSessionTimeout()
       toast.success(`Benvenuto ${userProfile.value?.name || user.value.email}!`, '✅ Accesso Effettuato')
       return { success: true, user: userCredential.user }
     } catch (error) {
@@ -218,19 +269,20 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Logout utente
+   * Logout
    */
-  const logout = async () => {
+  const logout = async (message = 'Logout effettuato con successo') => {
     try {
       await signOut(auth)
-      user.value = null
-      userProfile.value = null
-      isAuthenticated.value = false
-      toast.success('Disconnessione effettuata', '👋 Arrivederci')
+      if (sessionTimeout.value) {
+        clearTimeout(sessionTimeout.value)
+        sessionTimeout.value = null
+      }
+      toast.success(message, '👋 Arrivederci')
       return { success: true }
     } catch (error) {
       console.error('Errore logout:', error)
-      toast.error(`Errore disconnessione: ${error.message}`)
+      toast.error('Errore durante il logout', '❌ Errore')
       return { success: false, error: error.message }
     }
   }
@@ -270,6 +322,29 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       loading.value = true
       
+      // Validazione email
+      const emailValidation = validateEmail(userData.email)
+      if (!emailValidation.isValid) {
+        throw new Error(emailValidation.errors.join(', '))
+      }
+      
+      // Rate limiting: controlla richieste recenti dallo stesso IP
+      const ipAddress = await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(data => data.ip)
+      const rateLimitWindow = 24 * 60 * 60 * 1000 // 24 ore
+      const maxRequestsPerWindow = 3
+      
+      const recentRequestsQuery = await getDocs(
+        query(
+          collection(db, firestoreConfig.collections.registrationRequests),
+          where('ipAddress', '==', ipAddress),
+          where('requestedAt', '>=', new Date(Date.now() - rateLimitWindow))
+        )
+      )
+      
+      if (recentRequestsQuery.size >= maxRequestsPerWindow) {
+        throw new Error('Hai raggiunto il limite di richieste di registrazione. Riprova tra 24 ore.')
+      }
+      
       // Verifica se l'email è già in uso o in attesa
       const existingRequestQuery = await getDocs(
         query(
@@ -291,10 +366,12 @@ export const useAuthStore = defineStore('auth', () => {
         phone: userData.phone || '',
         position: userData.position || '',
         requestedAt: serverTimestamp(),
-        status: 'pending', // pending, approved, rejected
+        status: 'pending',
         notes: '',
         processedBy: null,
-        processedAt: null
+        processedAt: null,
+        ipAddress: ipAddress,
+        userAgent: navigator.userAgent
       }
       
       await addDoc(collection(db, firestoreConfig.collections.registrationRequests), requestData)
@@ -509,54 +586,71 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Verifica permessi
-   */
-  const hasPermission = (permission) => {
-    if (!userProfile.value?.permissions) return false
-    return userProfile.value.permissions.includes(permission) || isAdmin.value
-  }
-
-  const canAccess = (resource) => {
-    const resourcePermissions = {
-      cantieri: ['view_cantieri', 'manage_cantieri'],
-      clienti: ['view_clienti', 'manage_clienti'],
-      fornitori: ['view_fornitori', 'manage_fornitori'],
-      materiali: ['view_materiali', 'manage_materiali'],
-      dipendenti: ['view_dipendenti', 'manage_dipendenti'],
-      preventivi: ['view_preventivi', 'manage_preventivi'],
-      fatture: ['view_fatture', 'manage_fatture'],
-      analytics: ['view_analytics'],
-      settings: ['manage_settings']
-    }
-    
-    const permissions = resourcePermissions[resource] || []
-    return permissions.some(permission => hasPermission(permission)) || isAdmin.value
-  }
-
-  /**
    * Crea profilo admin per il primo utente
+   * Questa funzione può essere chiamata solo se:
+   * 1. Non esistono altri admin nel sistema
+   * 2. L'utente corrente è autenticato
+   * 3. La richiesta proviene da un IP trusted
    */
   const createAdminProfile = async () => {
     if (!user.value) {
       throw new Error('Nessun utente autenticato')
     }
 
-    const adminProfile = {
-      role: 'admin',
-      name: 'Admin Legnosystem',
-      department: 'Amministrazione',
-      settings: {
-        theme: 'light',
-        notifications: true,
-        language: 'it'
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-
     try {
+      // Verifica se esistono già altri admin
+      const adminQuery = await getDocs(
+        query(
+          collection(db, firestoreConfig.collections.userProfiles),
+          where('role', '==', 'admin')
+        )
+      )
+      
+      if (!adminQuery.empty) {
+        throw new Error('Esiste già un amministratore nel sistema')
+      }
+      
+      // Verifica IP trusted
+      const ipAddress = await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(data => data.ip)
+      const trustedIPs = [
+        '127.0.0.1',
+        'localhost',
+        // Aggiungi altri IP fidati
+      ]
+      
+      if (!trustedIPs.includes(ipAddress)) {
+        throw new Error('Operazione non consentita da questo indirizzo IP')
+      }
+
+      const adminProfile = {
+        role: 'admin',
+        name: user.value.displayName || 'Admin Legnosystem',
+        email: user.value.email,
+        department: 'Amministrazione',
+        settings: {
+          theme: 'light',
+          notifications: true,
+          language: 'it'
+        },
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isActive: true,
+        loginCount: 0,
+        lastLoginAt: serverTimestamp()
+      }
+
       await setDoc(doc(db, firestoreConfig.collections.userProfiles, user.value.uid), adminProfile)
       userProfile.value = adminProfile
+      
+      // Log dell'operazione per audit
+      await addDoc(collection(db, 'audit_logs'), {
+        action: 'create_admin',
+        userId: user.value.uid,
+        timestamp: serverTimestamp(),
+        ipAddress: ipAddress,
+        userAgent: navigator.userAgent
+      })
+      
       console.log('✅ Profilo admin creato con successo!')
       return { success: true }
     } catch (err) {
@@ -576,6 +670,8 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     userRole,
     userName,
+    userRoleConfig,
+    userPermissions,
     isAdmin,
     isManager,
     canManageCantieri,
@@ -593,7 +689,8 @@ export const useAuthStore = defineStore('auth', () => {
     loadUserProfile,
     createAdminProfile,
     hasPermission,
-    canAccess,
+    hasRoleLevel,
+    resetSessionTimer,
     
     // Registration requests
     requestRegistration,

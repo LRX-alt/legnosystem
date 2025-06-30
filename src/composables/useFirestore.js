@@ -1,6 +1,8 @@
 import { useToast } from './useToast'
 import { useFirestoreStore } from '@/stores/firestore'
 import { validateAndSanitize } from '@/utils/firestoreValidation'
+import { serverTimestamp, writeBatch, doc, increment } from 'firebase/firestore'
+import { useAuthStore } from '@/stores/auth'
 
 // 🛡️ Helper per rimuovere campi undefined che causano errori Firestore
 const removeUndefinedFields = (obj) => {
@@ -16,6 +18,7 @@ const removeUndefinedFields = (obj) => {
 export const useFirestore = () => {
   const toast = useToast()
   const firestoreStore = useFirestoreStore()
+  const authStore = useAuthStore()
 
   // 🔄 Wrapper per operazioni con gestione errori unificata
   const withErrorHandling = async (operation, operationName = 'Operazione') => {
@@ -47,15 +50,57 @@ export const useFirestore = () => {
     },
 
     async create(data) {
-      // Validazione dati prima della creazione
+      // Validazione completa dei dati prima della creazione
       const validation = validateAndSanitize('cantiere', 'create', data)
       if (!validation.isValid) {
         toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 
+      // Verifica presenza cliente
+      if (!validation.sanitizedData.cliente?.id) {
+        toast.error('❌ Cliente mancante o non valido')
+        throw new Error('Cliente mancante o non valido')
+      }
+
+      // Verifica date
+      if (new Date(validation.sanitizedData.scadenza) <= new Date(validation.sanitizedData.dataInizio)) {
+        toast.error('❌ La data di scadenza deve essere successiva alla data di inizio')
+        throw new Error('Data scadenza non valida')
+      }
+
+      // Verifica valore cantiere
+      if (isNaN(parseFloat(validation.sanitizedData.valore)) || parseFloat(validation.sanitizedData.valore) <= 0) {
+        toast.error('❌ Il valore del cantiere deve essere un numero positivo')
+        throw new Error('Valore cantiere non valido')
+      }
+
+      // Ottieni l'utente corrente
+      const userId = authStore.user?.uid
+
+      if (!userId) {
+        toast.error('❌ Utente non autenticato')
+        throw new Error('Utente non autenticato')
+      }
+
+      // Aggiungi campi calcolati/default
+      const cantiereData = {
+        ...validation.sanitizedData,
+        stato: 'pianificato',
+        costiAccumulati: {
+          materiali: 0,
+          manodopera: 0,
+          totale: 0
+        },
+        progressoPercentuale: 0,
+        createdBy: userId,
+        updatedBy: userId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      }
+
       return withErrorHandling(
-        () => firestoreStore.createCantiere(validation.sanitizedData),
+        () => firestoreStore.createCantiere(cantiereData),
         'Creazione cantiere'
       )
     },
@@ -71,13 +116,35 @@ export const useFirestore = () => {
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 
+      // Verifica date se presenti
+      if (validation.sanitizedData.scadenza && validation.sanitizedData.dataInizio) {
+        if (new Date(validation.sanitizedData.scadenza) <= new Date(validation.sanitizedData.dataInizio)) {
+          toast.error('❌ La data di scadenza deve essere successiva alla data di inizio')
+          throw new Error('Data scadenza non valida')
+        }
+      }
+
+      // Aggiungi campo updatedBy
+      const updateData = {
+        ...validation.sanitizedData,
+        updatedBy: firestoreStore.currentUser?.uid,
+        updatedAt: serverTimestamp()
+      }
+
       return withErrorHandling(
-        () => firestoreStore.updateDocument('cantieri', id, validation.sanitizedData),
+        () => firestoreStore.updateDocument('cantieri', id, updateData),
         'Aggiornamento cantiere'
       )
     },
 
     async delete(id) {
+      // Verifica che il cantiere non abbia dipendenze
+      const hasDependencies = await firestoreStore.checkCantiereDependencies(id)
+      if (hasDependencies) {
+        toast.error('❌ Impossibile eliminare il cantiere: ci sono materiali o allegati associati')
+        throw new Error('Cantiere ha dipendenze')
+      }
+
       return withErrorHandling(
         () => firestoreStore.deleteDocument('cantieri', id),
         'Eliminazione cantiere'
@@ -85,6 +152,12 @@ export const useFirestore = () => {
     },
 
     async updateProgress(id, progressData) {
+      // Validazione dati progresso
+      if (!progressData.data || !progressData.descrizione) {
+        toast.error('❌ Data e descrizione sono obbligatori per aggiornare il progresso')
+        throw new Error('Dati progresso incompleti')
+      }
+
       return withErrorHandling(
         () => firestoreStore.updateCantiereProgress(id, progressData),
         'Aggiornamento progresso'
@@ -140,20 +213,89 @@ export const useFirestore = () => {
     },
 
     async create(cantiereId, data) {
+      // Validazione dati
+      const validation = validateAndSanitize('materialeCantiere', 'create', {
+        ...data,
+        cantiereId
+      })
+      
+      if (!validation.isValid) {
+        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
+      }
+
+      // Verifica disponibilità in magazzino
+      const materiale = await firestoreStore.getMateriale(data.materialeId)
+      if (!materiale || materiale.quantita < data.quantita) {
+        throw new Error('Quantità richiesta non disponibile in magazzino')
+      }
+
+      // Crea il materiale nel cantiere e aggiorna il magazzino
+      const batch = writeBatch(db)
+      
+      // Aggiorna quantità in magazzino
+      const materialeRef = doc(db, 'materiali', data.materialeId)
+      batch.update(materialeRef, {
+        quantita: increment(-data.quantita)
+      })
+
       return withErrorHandling(
-        () => firestoreStore.createMaterialeCantiere(cantiereId, data),
+        async () => {
+          const result = await firestoreStore.createMaterialeCantiere(cantiereId, validation.sanitizedData)
+          if (result.success) {
+            await batch.commit()
+          }
+          return result
+        },
         'Aggiunta materiale al cantiere'
       )
     },
 
     async update(id, data) {
+      // Validazione dati
+      const validation = validateAndSanitize('materialeCantiere', 'update', data)
+      if (!validation.isValid) {
+        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
+      }
+
+      // Se c'è una modifica della quantità, verifica disponibilità
+      if (validation.sanitizedData.quantita) {
+        const materiale = await firestoreStore.getMateriale(data.materialeId)
+        const materialeCantiere = await firestoreStore.getMaterialeCantiere(id)
+        
+        const deltaNecessario = validation.sanitizedData.quantita - materialeCantiere.quantita
+        if (deltaNecessario > 0 && materiale.quantita < deltaNecessario) {
+          throw new Error('Quantità aggiuntiva non disponibile in magazzino')
+        }
+
+        // Aggiorna magazzino se necessario
+        if (deltaNecessario !== 0) {
+          await firestoreStore.updateMaterialeQuantita(
+            data.materialeId,
+            -deltaNecessario,
+            'modifica_cantiere'
+          )
+        }
+      }
+
       return withErrorHandling(
-        () => firestoreStore.updateMaterialeCantiere(id, data),
+        () => firestoreStore.updateMaterialeCantiere(id, validation.sanitizedData),
         'Aggiornamento materiale cantiere'
       )
     },
 
     async delete(id) {
+      // Recupera il materiale cantiere prima della cancellazione
+      const materialeCantiere = await firestoreStore.getMaterialeCantiere(id)
+      
+      // Restituisci la quantità al magazzino
+      await firestoreStore.updateMaterialeQuantita(
+        materialeCantiere.materialeId,
+        materialeCantiere.quantita,
+        'restituzione_cantiere'
+      )
+
       return withErrorHandling(
         () => firestoreStore.deleteMaterialeCantiere(id),
         'Rimozione materiale dal cantiere'
@@ -195,9 +337,34 @@ export const useFirestore = () => {
     },
 
     async create(materialeId, data) {
+      // Validazione dati
+      const validation = validateAndSanitize('allegatoMateriale', 'create', {
+        ...data,
+        materialeId
+      })
+      
+      if (!validation.isValid) {
+        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
+      }
+
       return withErrorHandling(
-        () => firestoreStore.createAllegatoMateriale(materialeId, data),
+        () => firestoreStore.createAllegatoMateriale(materialeId, validation.sanitizedData),
         'Salvataggio allegato materiale'
+      )
+    },
+
+    async update(id, data) {
+      // Validazione dati
+      const validation = validateAndSanitize('allegatoMateriale', 'update', data)
+      if (!validation.isValid) {
+        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
+      }
+
+      return withErrorHandling(
+        () => firestoreStore.updateAllegatoMateriale(id, validation.sanitizedData),
+        'Aggiornamento allegato materiale'
       )
     },
 
@@ -271,6 +438,37 @@ export const useFirestore = () => {
     }
   }
 
+  // 🏭 Operazioni Fornitori con error handling
+  const fornitoriOperations = {
+    async load() {
+      return withErrorHandling(
+        () => firestoreStore.loadFornitori(),
+        'Caricamento fornitori'
+      )
+    },
+
+    async create(data) {
+      return withErrorHandling(
+        () => firestoreStore.createFornitore(data),
+        'Creazione fornitore'
+      )
+    },
+
+    async update(id, data) {
+      return withErrorHandling(
+        () => firestoreStore.updateDocument('fornitori', id, data),
+        'Aggiornamento fornitore'
+      )
+    },
+
+    async delete(id) {
+      return withErrorHandling(
+        () => firestoreStore.deleteDocument('fornitori', id),
+        'Eliminazione fornitore'
+      )
+    }
+  }
+
   // 🔄 Funzione per caricare tutti i dati
   const loadAllData = async () => {
     try {
@@ -294,14 +492,7 @@ export const useFirestore = () => {
     materialiOperations,
     materialiCantiereOperations,
     dipendentiOperations,
-    fornitoriOperations: {
-      async load() {
-        return withErrorHandling(
-          () => firestoreStore.loadFornitori(),
-          'Caricamento fornitori'
-        )
-      }
-    },
+    fornitoriOperations,
     allegatiOperations,
     allegatiMaterialiOperations,
     loadAllData,

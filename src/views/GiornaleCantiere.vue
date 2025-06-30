@@ -3,8 +3,17 @@
     <!-- Header Giornale -->
     <div class="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
       <div>
-        <h1 class="text-2xl font-display font-bold text-primary-800">Giornale di Cantiere</h1>
-        <p class="text-gray-600">{{ cantiere?.nome }} - {{ cantiere?.cliente }}</p>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-2xl font-display font-bold text-primary-800">Giornale di Cantiere</h1>
+          <span class="px-2 py-1 text-xs font-medium bg-primary-100 text-primary-700 rounded-full">
+            {{ cantiere?.stato || 'Non specificato' }}
+          </span>
+        </div>
+        <div class="mt-1 text-gray-600 flex items-center space-x-2">
+          <span class="font-medium">{{ cantiere?.nome }}</span>
+          <span class="text-gray-400">•</span>
+          <span>{{ cantiere?.indirizzo }}</span>
+        </div>
       </div>
       <div class="flex space-x-3">
         <button @click="newEntry" class="btn-primary">
@@ -15,7 +24,6 @@
           <DocumentArrowDownIcon class="w-5 h-5 mr-2" />
           Export PDF
         </button>
-
       </div>
     </div>
 
@@ -23,40 +31,123 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div class="card">
         <h3 class="font-semibold text-gray-900 mb-3">📋 Informazioni Generali</h3>
-        <div class="space-y-2 text-sm">
-          <div><span class="text-gray-600">Cantiere:</span> {{ cantiere?.nome }}</div>
-          <div><span class="text-gray-600">Cliente:</span> {{ cantiere?.cliente }}</div>
-          <div><span class="text-gray-600">Indirizzo:</span> {{ cantiere?.indirizzo }}</div>
-          <div><span class="text-gray-600">Responsabile:</span> {{ cantiere?.responsabile || 'Non assegnato' }}</div>
+        <div class="space-y-3">
+          <!-- Cliente -->
+          <div class="p-3 bg-gray-50 rounded-lg">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-medium text-lg">
+                {{ cantiere?.cliente?.nome?.[0]?.toUpperCase() || 'C' }}
+              </div>
+              <div>
+                <div class="text-sm font-medium text-gray-900">{{ cantiere?.cliente?.nome || 'Cliente non specificato' }}</div>
+                <div class="text-xs text-gray-500">{{ cantiere?.cliente?.email || 'Email non specificata' }}</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Dettagli Cantiere -->
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Responsabile</span>
+              <span class="font-medium">{{ cantiere?.responsabile || 'Non assegnato' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Data Inizio</span>
+              <span class="font-medium">{{ formatDate(cantiere?.dataInizio) || 'Non specificata' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Scadenza</span>
+              <span class="font-medium">{{ formatDate(cantiere?.scadenza) || 'Non specificata' }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600">Tipo Lavoro</span>
+              <span class="font-medium">{{ cantiere?.tipoLavoro || 'Non specificato' }}</span>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="mt-4">
+            <div class="flex justify-between text-sm mb-1">
+              <span class="text-gray-600">Avanzamento Lavori</span>
+              <span class="font-medium">{{ cantiere?.progresso || 0 }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" 
+                   :style="`width: ${cantiere?.progresso || 0}%`"></div>
+            </div>
+          </div>
         </div>
       </div>
       
       <div class="card">
-        <h3 class="font-semibold text-gray-900 mb-3">📊 Stato Avanzamento</h3>
-        <div class="space-y-2">
-          <div class="flex justify-between text-sm">
-            <span class="text-gray-600">Progresso</span>
-            <span class="font-medium">{{ cantiere?.progresso }}%</span>
+        <h3 class="font-semibold text-gray-900 mb-3">👥 Team Assegnato</h3>
+        <div v-if="cantiere?.team?.length" class="space-y-2">
+          <div v-for="membro in cantiere.team" :key="membro.id" 
+               class="p-2 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+            <div class="flex items-center space-x-3">
+              <span class="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-medium">
+                {{ membro.iniziali || membro.nome?.[0]?.toUpperCase() }}
+              </span>
+              <div class="flex-1">
+                <div class="text-sm font-medium text-gray-900">{{ membro.nome }}</div>
+                <div class="text-xs text-gray-500">{{ membro.ruolo || 'Ruolo non specificato' }}</div>
+              </div>
+              <div class="text-xs text-gray-500">
+                {{ membro.pagaOraria ? `€${membro.pagaOraria}/h` : '' }}
+              </div>
+            </div>
           </div>
-          <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-primary-500 h-2 rounded-full" :style="`width: ${cantiere?.progresso}%`"></div>
-          </div>
-          <div class="text-xs text-gray-500 mt-2">
-            Ultima modifica: {{ formatDate(today) }}
-          </div>
+        </div>
+        <div v-else class="text-sm text-gray-500 italic p-4 text-center bg-gray-50 rounded-lg">
+          <div class="text-4xl mb-2">👥</div>
+          Nessun membro del team assegnato
         </div>
       </div>
 
       <div class="card">
-        <h3 class="font-semibold text-gray-900 mb-3">👥 Team Presente</h3>
-        <div class="flex -space-x-2 mb-2">
-          <div v-for="membro in cantiere?.team?.slice(0, 4)" :key="membro.id" 
-               class="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white text-xs font-medium border-2 border-white">
-            {{ membro.iniziali }}
+        <h3 class="font-semibold text-gray-900 mb-3">📊 Statistiche</h3>
+        <div class="space-y-4">
+          <!-- Statistiche Temporali -->
+          <div class="bg-gray-50 p-3 rounded-lg">
+            <h4 class="text-xs font-medium text-gray-500 uppercase mb-2">Tempi</h4>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="text-2xl font-bold text-primary-600">{{ costiCantiere.giorniLavorativi }}</div>
+                <div class="text-xs text-gray-500">Giorni Lavorati</div>
+              </div>
+              <div>
+                <div class="text-2xl font-bold text-primary-600">{{ costiCantiere.oreTotali }}</div>
+                <div class="text-xs text-gray-500">Ore Totali</div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="text-xs text-gray-500">
-          {{ cantiere?.team?.length || 0 }} dipendenti assegnati
+
+          <!-- Statistiche Economiche -->
+          <div class="bg-gray-50 p-3 rounded-lg">
+            <h4 class="text-xs font-medium text-gray-500 uppercase mb-2">Costi</h4>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Manodopera</span>
+                <span class="font-medium">€{{ costiCantiere.manodopera?.toLocaleString() || '0' }}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-sm text-gray-600">Materiali</span>
+                <span class="font-medium">€{{ costiCantiere.materiali?.toLocaleString() || '0' }}</span>
+              </div>
+              <div class="h-px bg-gray-200 my-2"></div>
+              <div class="flex justify-between items-center font-medium">
+                <span class="text-sm text-gray-900">Totale</span>
+                <span class="text-primary-600">€{{ costiCantiere.totale?.toLocaleString() || '0' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Media Giornaliera -->
+          <div class="bg-gray-50 p-3 rounded-lg">
+            <h4 class="text-xs font-medium text-gray-500 uppercase mb-2">Media Giornaliera</h4>
+            <div class="text-2xl font-bold text-primary-600">€{{ costiCantiere.costoMedioGiorno?.toLocaleString() || '0' }}</div>
+            <div class="text-xs text-gray-500">per giorno lavorativo</div>
+          </div>
         </div>
       </div>
     </div>
@@ -122,7 +213,7 @@
         <div class="flex items-start justify-between mb-4">
           <div>
             <h3 class="font-semibold text-gray-900">{{ formatDate(entry.data) }}</h3>
-            <p class="text-sm text-gray-600">{{ entry.turno }} - {{ entry.responsabile }}</p>
+            <p class="text-sm text-gray-600">{{ entry.orarioInizio }} - {{ entry.orarioFine }} • {{ entry.responsabile }}</p>
           </div>
           <div class="flex space-x-2">
             <button @click="editEntry(entry)" class="text-gray-400 hover:text-gray-600">
@@ -223,28 +314,30 @@
           </div>
 
           <form @submit.prevent="saveEntry" class="space-y-6">
-            <!-- Data e Turno -->
+            <!-- Data e Orari -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Data</label>
                 <input v-model="entryForm.data" type="date" required class="form-input">
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Turno</label>
-                <select v-model="entryForm.turno" required class="form-select">
-                  <option value="mattino">Mattino (8:00-12:00)</option>
-                  <option value="pomeriggio">Pomeriggio (13:00-17:00)</option>
-                  <option value="giornata">Giornata intera</option>
-                </select>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Orario Inizio</label>
+                <input v-model="entryForm.orarioInizio" type="time" required class="form-input">
               </div>
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Responsabile</label>
-                <select v-model="entryForm.responsabile" required class="form-select">
-                  <option v-for="membro in cantiere?.team" :key="membro.id" :value="membro.nome">
-                    {{ membro.nome }}
-                  </option>
-                </select>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Orario Fine</label>
+                <input v-model="entryForm.orarioFine" type="time" required class="form-input">
               </div>
+            </div>
+
+            <!-- Responsabile -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Responsabile</label>
+              <select v-model="entryForm.responsabile" required class="form-select">
+                <option v-for="membro in cantiere?.team" :key="membro.id" :value="membro.nome">
+                  {{ membro.nome }}
+                </option>
+              </select>
             </div>
 
             <!-- Condizioni Meteo -->
@@ -296,13 +389,20 @@
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">⏰ Ore Totali Lavorate</label>
-                  <input v-model.number="entryForm.oreTotali" type="number" min="0.5" max="12" step="0.5" required class="form-input">
-                  <p class="text-xs text-gray-500 mt-1">Es: 4 ore, 8 ore, etc.</p>
+                  <input v-model.number="entryForm.oreTotali" type="number" min="0.5" max="12" step="0.5" required class="form-input"
+                         :class="{'border-orange-500': entryForm.oreTotali > 8}">
+                  <p v-if="entryForm.oreTotali > 8" class="text-xs text-orange-600 mt-1">
+                    Include {{ entryForm.oreTotali - 8 }}h di straordinario
+                  </p>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">👤 Numero Operatori</label>
-                  <input :value="entryForm.teamPresente.length" type="number" readonly class="form-input bg-gray-100">
-                  <p class="text-xs text-gray-500 mt-1">Calcolato automaticamente</p>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">💶 Costi Extra</label>
+                  <input v-model.number="entryForm.costiExtra"
+                         type="number"
+                         min="0"
+                         step="0.5"
+                         class="form-input"
+                         placeholder="Es: trasferte, bonus...">
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">💰 Costo Stimato Giornata</label>
@@ -371,6 +471,31 @@
               </div>
             </div>
 
+            <!-- Riepilogo Costi -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h4 class="text-lg font-medium text-gray-900 mb-4">💰 Riepilogo Costi</h4>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p class="text-sm text-gray-600">Costo Base</p>
+                  <p class="text-lg font-semibold">€{{ (calcolayCostoOrarioTeam() * Math.min(8, entryForm.oreTotali)).toFixed(2) }}</p>
+                </div>
+                <div v-if="entryForm.oreTotali > 8">
+                  <p class="text-sm text-gray-600">Straordinari</p>
+                  <p class="text-lg font-semibold text-orange-600">
+                    €{{ (calcolayCostoOrarioTeam() * 1.3 * (entryForm.oreTotali - 8)).toFixed(2) }}
+                  </p>
+                </div>
+                <div v-if="entryForm.costiExtra">
+                  <p class="text-sm text-gray-600">Extra</p>
+                  <p class="text-lg font-semibold text-blue-600">€{{ entryForm.costiExtra.toFixed(2) }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-600">Totale Giornata</p>
+                  <p class="text-xl font-bold text-green-600">€{{ calculateDayCost().toFixed(2) }}</p>
+                </div>
+              </div>
+            </div>
+
             <!-- Actions -->
             <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
               <button type="button" @click="closeEntryModal" class="w-full sm:w-auto btn-secondary py-3 text-base">
@@ -407,8 +532,6 @@ const route = useRoute()
 const firestoreStore = useFirestoreStore()
 const { success, error, warning, info, confirm } = usePopup()
 
-
-
 // Stato reattivo
 const cantiere = ref(null)
 const selectedDate = ref(new Date().toISOString().split('T')[0])
@@ -420,7 +543,8 @@ const today = new Date().toISOString().split('T')[0]
 // Form per nuova registrazione
 const entryForm = ref({
   data: new Date().toISOString().split('T')[0],
-  turno: 'giornata',
+  orarioInizio: '06:00',
+  orarioFine: '22:00',
   responsabile: '',
   meteo: {
     condizioni: 'sereno',
@@ -431,6 +555,7 @@ const entryForm = ref({
   note: '',
   problemiText: '',
   oreTotali: 8,
+  costiExtra: 0,
   team: [], // Team legacy per compatibilità
   teamPresente: [] // Nuovo array per il team specifico della giornata
 })
@@ -491,7 +616,8 @@ const newEntry = () => {
   editingEntry.value = null
   entryForm.value = {
     data: new Date().toISOString().split('T')[0],
-    turno: 'giornata',
+    orarioInizio: '06:00',
+    orarioFine: '22:00',
     responsabile: cantiere.value?.team?.[0]?.nome || '',
     meteo: {
       condizioni: 'sereno',
@@ -502,6 +628,7 @@ const newEntry = () => {
     note: '',
     problemiText: '',
     oreTotali: 8,
+    costiExtra: 0,
     team: [], // Legacy
     teamPresente: [] // Nuovo team specifico
   }
@@ -512,13 +639,15 @@ const editEntry = (entry) => {
   editingEntry.value = entry
   entryForm.value = {
     data: entry.data,
-    turno: entry.turno,
+    orarioInizio: entry.orarioInizio,
+    orarioFine: entry.orarioFine,
     responsabile: entry.responsabile,
     meteo: { ...entry.meteo },
     attivita: [...entry.attivita],
     note: entry.note,
     problemiText: entry.problemi.join('\n'),
     oreTotali: entry.oreTotali,
+    costiExtra: 0,
     team: [...(entry.team || [])], // Legacy
     teamPresente: [...(entry.teamPresente || entry.team || [])] // Nuovo team, fallback su legacy
   }
@@ -590,18 +719,47 @@ const getDipendentePagaOraria = (dipendenteId) => {
   }
 }
 
-// Calcola il costo orario del team presente
+// Calcola il costo orario del team presente con maggiorazioni
 const calcolayCostoOrarioTeam = () => {
   return entryForm.value.teamPresente.reduce((total, membro) => {
-    return total + membro.pagaOraria
+    let pagaOraria = membro.pagaOraria || 25
+    
+    // Applica maggiorazioni in base al turno e giorno
+    const data = new Date(entryForm.value.data)
+    const giorno = data.getDay() // 0 = domenica
+    
+    // Maggiorazione domenica/festivi (+50%)
+    if (giorno === 0) {
+      pagaOraria *= 1.5
+    }
+    
+    // Maggiorazione turno notturno (+25%)
+    if (entryForm.value.orarioInizio === '22:00' && entryForm.value.orarioFine === '06:00') {
+      pagaOraria *= 1.25
+    }
+    
+    // Maggiorazione straordinari (+30% dopo 8h)
+    const oreTotali = entryForm.value.oreTotali || 0
+    if (oreTotali > 8) {
+      const oreNormali = 8
+      const oreStraordinario = oreTotali - 8
+      return total + (pagaOraria * oreNormali) + (pagaOraria * 1.3 * oreStraordinario)
+    }
+    
+    return total + (pagaOraria * oreTotali)
   }, 0)
 }
 
 // Calcola il costo totale della giornata
 const calculateDayCost = () => {
-  const costoOrario = calcolayCostoOrarioTeam()
-  const ore = entryForm.value.oreTotali || 0
-  return costoOrario * ore
+  const costoTotale = calcolayCostoOrarioTeam()
+  
+  // Aggiungi costi extra se specificati
+  if (entryForm.value.costiExtra) {
+    return costoTotale + entryForm.value.costiExtra
+  }
+  
+  return costoTotale
 }
 
 // ===== FINE FUNZIONI GESTIONE TEAM PRESENTE =====
@@ -628,7 +786,7 @@ const syncTimesheetFromGiornale = async (entryData, registrazioneId = null) => {
         note: `Auto-generato da Giornale Cantiere - ${entryData.attivita?.[0] || 'Lavori generici'}`,
         costoOrario: membro.pagaOraria,
         costoTotale: orePerPersona * membro.pagaOraria,
-        turno: entryData.turno,
+        turno: entryData.orarioInizio + '-' + entryData.orarioFine,
         fonte: 'giornale_cantiere', // Per identificare l'origine del dato
         registrazioneGiornaleId: registrazioneId // Collega alla registrazione del giornale
       }
@@ -685,13 +843,15 @@ const saveEntry = async () => {
   try {
     const entryData = {
       data: entryForm.value.data,
-      turno: entryForm.value.turno,
+      orarioInizio: entryForm.value.orarioInizio,
+      orarioFine: entryForm.value.orarioFine,
       responsabile: entryForm.value.responsabile,
       meteo: { ...entryForm.value.meteo },
       attivita: entryForm.value.attivita.filter(a => a.trim()),
       note: entryForm.value.note,
       problemi: entryForm.value.problemiText.split('\n').filter(p => p.trim()),
       oreTotali: entryForm.value.oreTotali,
+      costiExtra: entryForm.value.costiExtra,
       team: entryForm.value.team, // Legacy per compatibilità
       teamPresente: entryForm.value.teamPresente, // Nuovo campo per team specifico
       costoGiornata: calculateDayCost(), // Calcola e salva il costo della giornata
@@ -929,7 +1089,7 @@ const exportPDF = () => {
         
         const dettagli = [
           `Data: ${formatDate(entry.data)}`,
-          `Turno: ${entry.turno}`,
+          `Turno: ${entry.orarioInizio} - ${entry.orarioFine}`,
           `Responsabile: ${entry.responsabile}`,
           `Ore Totali: ${entry.oreTotali}h`,
           `Operatori: ${entry.team?.length || 0}`,
@@ -1193,6 +1353,36 @@ const refreshCosts = async () => {
   await updateCostiCantiere()
   success('Costi Aggiornati', 'Calcoli costi cantiere completati!')
 }
+
+// Calcola le ore tra due orari
+const calculateHours = (startTime, endTime) => {
+  const [startHour, startMinute] = startTime.split(':').map(Number)
+  const [endHour, endMinute] = endTime.split(':').map(Number)
+  
+  let hours = endHour - startHour
+  let minutes = endMinute - startMinute
+  
+  // Se l'orario di fine è prima dell'orario di inizio, assumiamo che si tratti del giorno successivo
+  if (hours < 0) {
+    hours += 24
+  }
+  
+  // Aggiustiamo i minuti
+  if (minutes < 0) {
+    hours -= 1
+    minutes += 60
+  }
+  
+  // Convertiamo in ore decimali
+  return hours + (minutes / 60)
+}
+
+// Watch per aggiornare automaticamente le ore totali quando cambiano gli orari
+watch([() => entryForm.value.orarioInizio, () => entryForm.value.orarioFine], ([newStart, newEnd]) => {
+  if (newStart && newEnd) {
+    entryForm.value.oreTotali = calculateHours(newStart, newEnd)
+  }
+})
 
 // ===== FINE FUNZIONI GESTIONE COSTI =====
 </script>

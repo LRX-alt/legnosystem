@@ -62,7 +62,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
   
   // 📊 Computed
   const cantieriAttivi = computed(() => 
-    cantieri.value.filter(c => ['in-corso', 'pianificato'].includes(c.stato))
+    cantieri.value.filter(c => c.stato === 'in-corso' || c.stato === 'pianificato')
   )
   
   const cantieriCompletati = computed(() => 
@@ -760,36 +760,75 @@ export const useFirestoreStore = defineStore('firestore', () => {
    * Test connessione Firestore
    */
   const testFirestoreConnection = async () => {
-    loading.value = true
-    error.value = null
-    
+    if (!import.meta.env.DEV) {
+      return { success: true, message: 'Test skipped in production' }
+    }
+
     try {
       // Test scrittura
-      const testDoc = await addDoc(collection(db, 'test'), {
-        message: 'Test connessione Firestore',
+      const testRef = await addDoc(collection(db, 'test'), {
+        user: 'admin@legnosystem.bio',
         timestamp: serverTimestamp(),
-        user: useAuthStore().user?.email || 'anonymous'
+        message: 'Test connessione Firestore'
       })
-      
-      console.log('✅ Test scrittura Firestore OK - ID:', testDoc.id)
-      
+      console.log('✅ Test scrittura Firestore OK - ID:', testRef.id)
+
       // Test lettura
-      const testRead = await getDoc(testDoc)
-      if (testRead.exists()) {
-        console.log('✅ Test lettura Firestore OK - Dati:', testRead.data())
-      }
-      
-      // Pulizia - elimina documento di test
-      await deleteDoc(testDoc)
+      const testDoc = await getDoc(testRef)
+      console.log('✅ Test lettura Firestore OK - Dati:', testDoc.data())
+
+      // Test eliminazione
+      await deleteDoc(testRef)
       console.log('✅ Test eliminazione Firestore OK')
-      
+
       return { success: true, message: 'Firestore funziona correttamente!' }
+    } catch (error) {
+      console.error('❌ Test Firestore fallito:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Verifica se un cantiere ha dipendenze prima dell'eliminazione
+   */
+  const checkCantiereDependencies = async (cantiereId) => {
+    try {
+      // Verifica materiali associati
+      const materialiResult = await loadCollection('materiali_cantieri', [
+        { field: 'cantiereId', operator: '==', value: cantiereId }
+      ], 'createdAt')
+      if (materialiResult.success && materialiResult.data.length > 0) {
+        return true
+      }
+
+      // Verifica allegati associati
+      const allegatiResult = await loadCollection('cantieri_allegati', [
+        { field: 'cantiereId', operator: '==', value: cantiereId }
+      ], 'createdAt')
+      if (allegatiResult.success && allegatiResult.data.length > 0) {
+        return true
+      }
+
+      // Verifica registrazioni nel giornale
+      const giornaleResult = await loadCollection('giornale_cantiere', [
+        { field: 'cantiereId', operator: '==', value: cantiereId }
+      ], 'createdAt')
+      if (giornaleResult.success && giornaleResult.data.length > 0) {
+        return true
+      }
+
+      // Verifica mezzi assegnati
+      const mezziResult = await loadCollection('mezzi', [
+        { field: 'cantiereId', operator: '==', value: cantiereId }
+      ], 'createdAt')
+      if (mezziResult.success && mezziResult.data.length > 0) {
+        return true
+      }
+
+      return false
     } catch (err) {
-      console.error('❌ Errore test Firestore:', err)
-      error.value = err.message
-      return { success: false, error: err.message }
-    } finally {
-      loading.value = false
+      console.error('Errore verifica dipendenze cantiere:', err)
+      return true // In caso di errore, meglio prevenire che curare
     }
   }
 
@@ -871,6 +910,9 @@ export const useFirestoreStore = defineStore('firestore', () => {
     markNotificationAsRead,
     getAnalyticsData,
     migrateFromLocalStorage,
-    testFirestoreConnection
+    testFirestoreConnection,
+    
+    // Aggiungi checkCantiereDependencies agli export
+    checkCantiereDependencies
   }
 }) 

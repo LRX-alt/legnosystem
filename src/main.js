@@ -32,13 +32,16 @@ authStore.initializeAuth().then(() => {
     }
     console.log('🧪 Debug stores disponibili in window.debugStores')
     
-    // 🔧 TEST FIRESTORE CONNECTION
-    setTimeout(() => {
+    // Test connessione Firestore solo in development
+    if (import.meta.env.DEV) {
       console.log('🧪 Testando connessione Firestore...')
-      window.debugStores.firestore.testFirestoreConnection()
-        .then(result => console.log('✅ Firestore test:', result))
-        .catch(err => console.error('❌ Firestore test failed:', err))
-    }, 2000)
+      setTimeout(() => {
+        console.log('🧪 Testando connessione Firestore...')
+        window.debugStores.firestore.testFirestoreConnection()
+          .then(result => console.log('✅ Firestore test:', result))
+          .catch(err => console.error('❌ Firestore test failed:', err))
+      }, 2000)
+    }
   }
 }).catch((error) => {
   console.error('❌ Errore inizializzazione Firebase Auth:', error)

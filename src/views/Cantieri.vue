@@ -1,9 +1,11 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFirestore } from '@/composables/useFirestore'
+import { useFirestoreRealtime } from '@/composables/useFirestoreRealtime'
 import { usePopup } from '@/composables/usePopup'
 import { useToast } from '@/composables/useToast'
+import { useFirestoreStore } from '@/stores/firestore'
 import {
   PlusIcon,
   XMarkIcon,
@@ -24,9 +26,12 @@ const router = useRouter()
 const popup = usePopup()
 const { showToast } = useToast()
 const firestore = useFirestore()
+const firestoreRealtime = useFirestoreRealtime()
+const firestoreStore = useFirestoreStore()
 
 // Reactive state
 const cantieri = ref([])
+const unsubscribeCantieri = ref(null)
 const searchTerm = ref('')
 const selectedStatus = ref('')
 const selectedPriority = ref('')
@@ -77,16 +82,32 @@ const fornitori = ref([])
 const availableClients = ref([])
 
 // Computed properties
-const filteredCantieri = computed(() => {
-  return cantieri.value.filter(cantiere => {
-    const matchesSearch = cantiere.nome.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-                         getClienteNome(cantiere.cliente).toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-                         cantiere.indirizzo.toLowerCase().includes(searchTerm.value.toLowerCase())
-    
-    const matchesStatus = !selectedStatus.value || cantiere.stato === selectedStatus.value
-    const matchesPriority = !selectedPriority.value || cantiere.priorita === selectedPriority.value
-    
-    return matchesSearch && matchesStatus && matchesPriority
+const cantieriOrdinati = computed(() => {
+  return firestoreStore.cantieri
+    .slice() // Crea una copia per non modificare l'array originale
+    .sort((a, b) => {
+      // Ordina per data di creazione decrescente
+      const dateA = a.createdAt?.seconds || 0
+      const dateB = b.createdAt?.seconds || 0
+      return dateB - dateA
+    })
+})
+
+const cantieriVisibili = computed(() => {
+  return cantieriOrdinati.value.filter(cantiere => {
+    // Filtra per termine di ricerca
+    const matchSearch = !searchTerm.value || 
+      cantiere.nome?.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
+      cantiere.cliente?.nome?.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
+      cantiere.indirizzo?.toLowerCase().includes(searchTerm.value.toLowerCase())
+
+    // Filtra per stato
+    const matchStatus = !selectedStatus.value || cantiere.stato === selectedStatus.value
+
+    // Filtra per priorità
+    const matchPriority = !selectedPriority.value || cantiere.priorita === selectedPriority.value
+
+    return matchSearch && matchStatus && matchPriority
   })
 })
 
@@ -95,13 +116,13 @@ const stats = computed(() => {
   const inOneMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate())
   
   return {
-    attivi: cantieri.value.filter(c => c.stato === 'in-corso').length,
-    valoreTotale: cantieri.value.reduce((acc, c) => acc + (c.valore || 0), 0),
-    inScadenza: cantieri.value.filter(c => {
+    attivi: firestoreStore.cantieriAttivi.length,
+    valoreTotale: firestoreStore.cantieri.reduce((acc, c) => acc + (c.valore || 0), 0),
+    inScadenza: firestoreStore.cantieri.filter(c => {
       const scadenza = new Date(c.scadenza)
       return scadenza <= inOneMonth && c.stato !== 'completato'
     }).length,
-    completatiMese: cantieri.value.filter(c => {
+    completatiMese: firestoreStore.cantieri.filter(c => {
       const dataCompletamento = new Date(c.dataCompletamento)
       return dataCompletamento.getMonth() === now.getMonth() && 
              dataCompletamento.getFullYear() === now.getFullYear()
@@ -212,39 +233,130 @@ watch(clientSelectionMode, (newMode) => {
   }
 }, { immediate: true })
 
-// Hook lifecycle per inizializzazione
+// 🔄 Funzione per popolare i dati quando si seleziona un cliente esistente
+const fillClientFromList = () => {
+  const selectedClient = getSelectedClient()
+  if (selectedClient) {
+    // Aggiorna tutti i dati del cliente
+    newCantiere.value.cliente = {
+      id: selectedClient.id,
+      nome: selectedClient.nome,
+      tipo: selectedClient.tipo,
+      email: selectedClient.email,
+      telefono: selectedClient.telefono,
+      indirizzo: selectedClient.indirizzo
+    }
+    // Popola l'indirizzo del cantiere con quello del cliente
+    newCantiere.value.indirizzo = selectedClient.indirizzo || ''
+  }
+}
+
+// 💰 Helper per calcoli di margine e performance
+const getMargineColor = (cantiere) => {
+  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
+  const percentuale = (margine / cantiere.valore) * 100
+  
+  if (percentuale > 20) return 'text-green-600'
+  if (percentuale > 10) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
+const getMarginePercentColor = (cantiere) => {
+  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
+  const percentuale = (margine / cantiere.valore) * 100
+  
+  if (percentuale > 20) return 'text-green-500'
+  if (percentuale > 10) return 'text-yellow-500'
+  return 'text-red-500'
+}
+
+const getMarginePercent = (cantiere) => {
+  if (!cantiere.valore || cantiere.valore === 0) return '0%'
+  
+  const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
+  const percentuale = Math.round((margine / cantiere.valore) * 100)
+  
+  return `${percentuale}%`
+}
+
+const getPerformanceBarColor = (cantiere) => {
+  const percentualeSpesa = ((cantiere.costiAccumulati?.totale || 0) / cantiere.valore) * 100
+  
+  if (percentualeSpesa < 50) return 'bg-green-500'
+  if (percentualeSpesa < 80) return 'bg-yellow-500'
+  if (percentualeSpesa < 100) return 'bg-orange-500'
+  return 'bg-red-500'
+}
+
+const getManodoperaGiornaliera = (cantiere) => {
+  if (!cantiere.statisticheCosti?.giorniLavorativi || cantiere.statisticheCosti.giorniLavorativi === 0) {
+    return 0
+  }
+  
+  const costoManodopera = cantiere.costiAccumulati?.manodopera || 0
+  return Math.round(costoManodopera / cantiere.statisticheCosti.giorniLavorativi)
+}
+
+const calculateDailyCost = (cantiere) => {
+  // Stima teorica basata sul valore del cantiere e durata prevista
+  if (!cantiere.valore) return 0
+  
+  const dataInizio = new Date(cantiere.dataInizio)
+  const dataScadenza = new Date(cantiere.scadenza)
+  const giorniPrevisti = Math.max(1, Math.ceil((dataScadenza - dataInizio) / (1000 * 60 * 60 * 24)))
+  
+  // Assumiamo che il 60% del valore sia per manodopera
+  const costoManodoperaTeorico = cantiere.valore * 0.6
+  return Math.round(costoManodoperaTeorico / giorniPrevisti)
+}
+
+// 📅 Helper per date
+const isScaduto = (scadenza) => {
+  if (!scadenza) return false
+  const oggi = new Date()
+  const dataScadenza = new Date(scadenza)
+  return dataScadenza < oggi
+}
+
+const formatDate = (date) => {
+  if (!date) return 'Non definita'
+  return new Date(date).toLocaleDateString('it-IT', {
+    day: '2-digit',
+    month: '2-digit', 
+    year: 'numeric'
+  })
+}
+
+// 📎 Helper per allegati (placeholder per futura implementazione)
+const getCantiereAttachments = (cantiereId) => {
+  // Per ora restituisce array vuoto, da implementare con sistema allegati
+  return []
+}
+
+// Lifecycle hooks
 onMounted(async () => {
   try {
-    // Carica tutti i dati necessari usando Promise.all per efficienza
-    const [cantieriResult, dipendentiResult, materialiResult, fornitoriResult, clientiResult] = await Promise.all([
-      firestore.cantieriOperations.load(),
-      firestore.dipendentiOperations.load(),
-      firestore.materialiOperations.load(),
-      firestore.fornitoriOperations.load(),
-      firestore.clientiOperations.load()
-    ])
-    
-    // Aggiorna i refs con i dati caricati
-    if (cantieriResult?.success) {
-      cantieri.value = cantieriResult.data || []
+    // Imposta il listener real-time
+    const { unsubscribe } = firestoreRealtime.listenToCantieri((docs) => {
+      firestoreStore.cantieri = docs
+    })
+    unsubscribeCantieri.value = unsubscribe
+
+    // Carica i clienti disponibili
+    const clientiResult = await firestore.clientiOperations.load()
+    if (clientiResult.success) {
+      availableClients.value = clientiResult.data
     }
-    
-    if (clientiResult?.success) {
-      availableClients.value = clientiResult.data || []
-    }
-    
-    if (materialiResult?.success) {
-      materialiMagazzino.value = materialiResult.data || []
-    }
-    
-    if (fornitoriResult?.success) {
-      fornitori.value = fornitoriResult.data || []
-    }
-    
-    console.log('✅ Dati cantieri caricati con successo')
   } catch (error) {
-    console.error('❌ Errore nel caricamento dati Cantieri:', error)
-    popup.error('Errore Caricamento', 'Si è verificato un errore durante il caricamento dei dati')
+    console.error('Errore inizializzazione:', error)
+    popup.error('Errore', 'Errore durante il caricamento dei dati')
+  }
+})
+
+onUnmounted(() => {
+  // Rimuovi il listener quando il componente viene distrutto
+  if (unsubscribeCantieri.value) {
+    unsubscribeCantieri.value()
   }
 })
 
@@ -295,6 +407,259 @@ const closeEditMaterialModal = () => {
 
 const closeMaterialAttachmentsModal = () => {
   showMaterialAttachmentsModal.value = false
+}
+
+// 🔄 Funzioni di gestione cantieri
+const resetNewCantiere = () => {
+  newCantiere.value = {
+    nome: '',
+    cliente: {
+      id: '',
+      nome: ''
+    },
+    indirizzo: '',
+    tipoLavoro: '',
+    valore: 0,
+    dataInizio: '',
+    scadenza: '',
+    stato: 'pianificato',
+    priorita: 'media',
+    progresso: 0,
+    team: [],
+    costiAccumulati: {
+      materiali: 0,
+      manodopera: 0,
+      totale: 0
+    }
+  }
+  clientSelectionMode.value = 'existing'
+  selectedClientFromList.value = ''
+}
+
+const refreshCantiereCosts = async (cantiere) => {
+  try {
+    // Calcola i costi dei materiali
+    const materialiResult = await firestore.materialiCantiereOperations.load(cantiere.id)
+    const costoMateriali = materialiResult.data.reduce((acc, mat) => 
+      acc + (mat.prezzoUnitario * mat.quantita), 0)
+
+    // Calcola i costi della manodopera dal timesheet
+    const timesheetResult = await firestore.timesheetOperations.getCantiereTimesheet(cantiere.id)
+    const costoManodopera = timesheetResult.data.reduce((acc, entry) => 
+      acc + (entry.oreLavorate * entry.costoOrario), 0)
+
+    // Aggiorna i costi accumulati
+    const costiAccumulati = {
+      materiali: costoMateriali,
+      manodopera: costoManodopera,
+      totale: costoMateriali + costoManodopera
+    }
+
+    // Aggiorna il cantiere
+    const result = await firestore.cantieriOperations.update(cantiere.id, {
+      costiAccumulati,
+      updatedAt: new Date().toISOString()
+    })
+
+    if (result.success) {
+      // Aggiorna il cantiere nella lista locale
+      const index = cantieri.value.findIndex(c => c.id === cantiere.id)
+      if (index !== -1) {
+        cantieri.value[index] = {
+          ...cantieri.value[index],
+          costiAccumulati
+        }
+      }
+      showToast('Costi aggiornati con successo', 'success')
+    } else {
+      throw new Error(result.error || 'Errore durante l\'aggiornamento dei costi')
+    }
+  } catch (error) {
+    console.error('Errore aggiornamento costi:', error)
+    popup.error('Errore', 'Impossibile aggiornare i costi del cantiere')
+  }
+}
+
+const showCantiereDetail = (cantiere) => {
+  selectedCantiere.value = { ...cantiere }
+  showDetailModal.value = true
+}
+
+const editCantiere = (cantiere) => {
+  editingCantiere.value = { ...cantiere }
+  showEditModal.value = true
+}
+
+const updateProgress = (cantiere) => {
+  selectedCantiere.value = cantiere
+  showProgressModal.value = true
+}
+
+const viewMaterials = (cantiere) => {
+  selectedCantiere.value = cantiere
+  showManageMaterialsModal.value = true
+}
+
+const manageAttachments = (cantiere) => {
+  selectedCantiere.value = cantiere
+  showAttachmentsModal.value = true
+}
+
+const manageTeam = (cantiere) => {
+  selectedCantiere.value = cantiere
+  showTeamModal.value = true
+}
+
+const openDailyLog = (cantiere) => {
+  // Naviga al giornale di cantiere
+  router.push({
+    name: 'giornale-cantiere',
+    params: { id: cantiere.id }
+  })
+}
+
+const deleteCantiere = async (cantiere) => {
+  try {
+    // Chiedi conferma prima di procedere
+    const confirmed = await popup.confirm(
+      'Elimina Cantiere',
+      `Sei sicuro di voler eliminare il cantiere "${cantiere.nome}"? Questa azione non può essere annullata.`
+    )
+
+    if (!confirmed) return
+
+    // Mostra loading state
+    popup.info('Eliminazione in corso...', 'Verifica dipendenze e eliminazione cantiere')
+
+    try {
+      const result = await firestore.cantieriOperations.delete(cantiere.id)
+      
+      if (result.success) {
+        // Mostra conferma
+        popup.success('Cantiere Eliminato', `Il cantiere "${cantiere.nome}" è stato eliminato con successo`)
+        
+        // Chiudi eventuali modali aperti
+        if (showDetailModal.value && selectedCantiere.value?.id === cantiere.id) {
+          closeDetailModal()
+        }
+      }
+    } catch (error) {
+      if (error.message.includes('dipendenze')) {
+        popup.error(
+          'Impossibile Eliminare',
+          'Il cantiere ha materiali, allegati o altre dipendenze associate. Rimuovi prima tutte le dipendenze.'
+        )
+      } else {
+        popup.error('Errore Eliminazione', error.message || 'Si è verificato un errore durante l\'eliminazione del cantiere')
+      }
+      console.error('Errore eliminazione cantiere:', error)
+    }
+  } catch (error) {
+    console.error('Errore generale eliminazione:', error)
+    popup.error('Errore', 'Si è verificato un errore imprevisto')
+  }
+}
+
+const addCantiere = async () => {
+  try {
+    // Validazione base
+    if (!newCantiere.value.nome || !newCantiere.value.valore) {
+      popup.error('Campi Mancanti', 'Nome e valore sono obbligatori')
+      return
+    }
+
+    // Prepara i dati del cliente
+    let clienteData
+    if (clientSelectionMode.value === 'existing') {
+      const clienteSelezionato = availableClients.value.find(c => c.id === selectedClientFromList.value)
+      if (!clienteSelezionato) {
+        popup.error('Cliente Mancante', 'Seleziona un cliente dalla lista')
+        return
+      }
+      clienteData = {
+        id: clienteSelezionato.id,
+        nome: clienteSelezionato.nome,
+        email: clienteSelezionato.email
+      }
+    } else if (clientSelectionMode.value === 'new') {
+      // Crea nuovo cliente
+      if (!newCantiere.value.cliente.nome) {
+        popup.error('Cliente Mancante', 'Inserisci il nome del cliente')
+        return
+      }
+
+      const nuovoCliente = {
+        nome: newCantiere.value.cliente.nome,
+        tipo: newCantiere.value.clienteTipo || 'privato',
+        email: newCantiere.value.clienteEmail || '',
+        telefono: newCantiere.value.clienteTelefono || '',
+        indirizzo: newCantiere.value.clienteIndirizzo || '',
+        stato: 'attivo'
+      }
+
+      // Crea il cliente in Firestore
+      const clienteResult = await firestore.clientiOperations.create(nuovoCliente)
+      if (!clienteResult.success) {
+        throw new Error('Errore durante la creazione del cliente')
+      }
+
+      clienteData = {
+        id: clienteResult.id,
+        nome: nuovoCliente.nome,
+        email: nuovoCliente.email
+      }
+    }
+
+    // Crea il cantiere con i dati del cliente
+    const cantiereData = {
+      ...newCantiere.value,
+      cliente: clienteData
+    }
+
+    // Crea il cantiere in Firestore
+    const result = await firestore.cantieriOperations.create(cantiereData)
+    
+    if (result.success) {
+      popup.success('Successo', 'Cantiere creato con successo')
+      closeAddModal()
+    } else {
+      throw new Error('Errore durante la creazione del cantiere')
+    }
+  } catch (error) {
+    console.error('Errore creazione cantiere:', error)
+    popup.error('Errore', error.message || 'Errore durante la creazione del cantiere')
+  }
+}
+
+const saveCantiere = async () => {
+  try {
+    if (!editingCantiere.value.nome || !editingCantiere.value.valore) {
+      popup.error('Campi Mancanti', 'Nome e valore sono obbligatori')
+      return
+    }
+
+    const result = await firestore.cantieriOperations.update(editingCantiere.value.id, editingCantiere.value)
+    
+    if (result.success) {
+      const index = cantieri.value.findIndex(c => c.id === editingCantiere.value.id)
+      if (index !== -1) {
+        cantieri.value[index] = { ...editingCantiere.value }
+      }
+      closeEditModal()
+      popup.success('Cantiere Aggiornato', `"${editingCantiere.value.nome}" è stato aggiornato con successo`)
+    } else {
+      throw new Error(result.error || 'Errore durante l\'aggiornamento')
+    }
+  } catch (error) {
+    console.error('Errore aggiornamento cantiere:', error)
+    popup.error('Errore Aggiornamento', 'Si è verificato un errore durante l\'aggiornamento del cantiere')
+  }
+}
+
+// 🚪 Helper per chiudere i modali generici
+const closeModal = () => {
+  showDetailModal.value = false
+  selectedCantiere.value = null
 }
 </script>
 
@@ -395,7 +760,7 @@ const closeMaterialAttachmentsModal = () => {
     </div>
 
     <!-- Empty State -->
-    <div v-if="filteredCantieri.length === 0" class="text-center py-12">
+    <div v-if="cantieriVisibili.length === 0" class="text-center py-12">
       <div class="mx-auto h-24 w-24 text-gray-400 flex items-center justify-center text-4xl mb-4">
         🏗️
       </div>
@@ -411,7 +776,7 @@ const closeMaterialAttachmentsModal = () => {
 
     <!-- Grid Cantieri -->
     <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      <div v-for="cantiere in filteredCantieri" :key="cantiere.id" class="card hover:shadow-md transition-shadow duration-200">
+      <div v-for="cantiere in cantieriVisibili" :key="cantiere.id" class="card hover:shadow-md transition-shadow duration-200">
         <!-- Header Card -->
         <div class="flex items-start justify-between mb-4">
           <div class="flex-1">
@@ -572,7 +937,7 @@ const closeMaterialAttachmentsModal = () => {
 
         <!-- Azioni -->
         <div class="flex items-center justify-between pt-4 border-t border-gray-200">
-          <button @click="viewCantiere(cantiere)" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
+          <button @click="showCantiereDetail(cantiere)" class="text-primary-600 hover:text-primary-700 text-sm font-medium">
             Visualizza
           </button>
           <div class="flex space-x-2">
@@ -937,7 +1302,7 @@ const closeMaterialAttachmentsModal = () => {
               <h3 class="text-xl font-semibold text-gray-900">Materiali Cantiere</h3>
               <p class="text-sm text-gray-600 mt-1">{{ selectedCantiere?.nome }} - {{ selectedCantiere?.cliente }}</p>
             </div>
-            <button @click="closeMaterialsModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
+            <button @click="closeManageMaterialsModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
               <XMarkIcon class="w-6 h-6" />
             </button>
           </div>
@@ -1242,7 +1607,7 @@ const closeMaterialAttachmentsModal = () => {
             </button>
           </div>
           
-          <form v-if="newCantiere" @submit.prevent="saveNewCantiere" class="space-y-6">
+          <form v-if="newCantiere" @submit.prevent="addCantiere" class="space-y-6">
             <!-- Nome Cantiere -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Nome Cantiere</label>
