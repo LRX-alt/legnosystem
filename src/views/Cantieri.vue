@@ -6,6 +6,8 @@ import { useFirestoreRealtime } from '@/composables/useFirestoreRealtime'
 import { usePopup } from '@/composables/usePopup'
 import { useToast } from '@/composables/useToast'
 import { useFirestoreStore } from '@/stores/firestore'
+import { db } from '@/config/firebase'
+import { doc, getDoc, runTransaction } from 'firebase/firestore'
 import {
   PlusIcon,
   XMarkIcon,
@@ -297,17 +299,14 @@ const getManodoperaGiornaliera = (cantiere) => {
   return Math.round(costoManodopera / cantiere.statisticheCosti.giorniLavorativi)
 }
 
-const calculateDailyCost = (cantiere) => {
-  // Stima teorica basata sul valore del cantiere e durata prevista
-  if (!cantiere.valore) return 0
+const calculateActualDailyCost = (cantiere) => {
+  // Calcolo basato sui costi accumulati e giorni lavorati
+  if (!cantiere?.costiAccumulati?.manodopera || !cantiere?.statisticheCosti?.giorniLavorativi) {
+    return 0
+  }
   
-  const dataInizio = new Date(cantiere.dataInizio)
-  const dataScadenza = new Date(cantiere.scadenza)
-  const giorniPrevisti = Math.max(1, Math.ceil((dataScadenza - dataInizio) / (1000 * 60 * 60 * 24)))
-  
-  // Assumiamo che il 60% del valore sia per manodopera
-  const costoManodoperaTeorico = cantiere.valore * 0.6
-  return Math.round(costoManodoperaTeorico / giorniPrevisti)
+  const costoManodopera = cantiere.costiAccumulati.manodopera
+  return Math.round(costoManodopera / cantiere.statisticheCosti.giorniLavorativi)
 }
 
 // 📅 Helper per date
@@ -333,7 +332,35 @@ const getCantiereAttachments = (cantiereId) => {
   return []
 }
 
-// Lifecycle hooks
+// Test connessione Firebase
+const testFirebaseConnection = async () => {
+  try {
+    console.log('🧪 Testing Firebase connection...')
+    console.log('Firebase config:', {
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
+    })
+    
+    // Test Firestore
+    const testDoc = await getDoc(doc(db, 'cantieri', 'test'))
+    console.log('✅ Firestore read test:', testDoc.exists())
+    
+    return true
+  } catch (error) {
+    console.error('❌ Firebase connection test failed:', error)
+    throw error
+  }
+}
+
+// Esegui test all'avvio del componente
+onMounted(async () => {
+  try {
+    await testFirebaseConnection()
+  } catch (error) {
+    popup.error('Errore Connessione', 'Impossibile connettersi a Firebase. Verifica la configurazione.')
+  }
+})
+
 onMounted(async () => {
   try {
     // Imposta il listener real-time
@@ -382,6 +409,7 @@ const closeProgressModal = () => {
 
 const closeTeamModal = () => {
   showTeamModal.value = false
+  selectedCantiere.value = null
 }
 
 const closeAttachmentsModal = () => {
@@ -661,6 +689,302 @@ const closeModal = () => {
   showDetailModal.value = false
   selectedCantiere.value = null
 }
+
+// Computed per i dipendenti disponibili
+const getAvailableEmployees = () => {
+  // Se non ci sono dipendenti caricati, ritorna array vuoto
+  if (!firestoreStore.dipendenti) return []
+  
+  // Filtra i dipendenti attivi che non sono già nel team del cantiere
+  return firestoreStore.dipendenti.filter(dipendente => {
+    // Verifica che il dipendente sia attivo
+    const isActive = dipendente.stato === 'attivo'
+    
+    // Verifica che non sia già nel team
+    const notInTeam = !selectedCantiere.value?.team?.some(membro => membro.id === dipendente.id)
+    
+    // Verifica che non sia assegnato ad altri cantieri
+    // Se cantiereAttuale è null o uguale al cantiere corrente, è disponibile
+    const isAvailable = !dipendente.cantiereAttuale || dipendente.cantiereAttuale === selectedCantiere.value?.nome
+    
+    return isActive && notInTeam && isAvailable
+  }).map(dipendente => ({
+    ...dipendente,
+    iniziali: getIniziali(dipendente.nome, dipendente.cognome)
+  }))
+}
+
+// Helper per le etichette dei ruoli
+const getRuoloLabel = (ruolo) => {
+  const labels = {
+    'operaio': 'Operaio',
+    'caposquadra': 'Caposquadra',
+    'tecnico': 'Tecnico',
+    'amministrativo': 'Amministrativo'
+  }
+  return labels[ruolo] || ruolo
+}
+
+// Funzioni di gestione del team
+const addMemberToTeam = async (dipendente) => {
+  try {
+    // Verifica se il dipendente è già nel team
+    if (selectedCantiere.value.team?.some(m => m.id === dipendente.id)) {
+      popup.warning('Attenzione', 'Questo dipendente è già nel team.')
+      return
+    }
+
+    // Prepara il nuovo membro
+    const nuovoMembro = {
+      id: dipendente.id,
+      nome: dipendente.nome,
+      cognome: dipendente.cognome,
+      ruolo: dipendente.ruolo,
+      pagaOraria: dipendente.pagaOraria
+    }
+
+    // Aggiorna il cantiere
+    const cantiereUpdate = {
+      team: [...(selectedCantiere.value.team || []), nuovoMembro]
+    }
+
+    // Aggiorna il dipendente
+    const dipendenteUpdate = {
+      cantiereAttuale: selectedCantiere.value.nome
+    }
+
+    // Esegui gli aggiornamenti in modo atomico usando la transazione di Firebase
+    const cantiereRef = doc(db, 'cantieri', selectedCantiere.value.id)
+    const dipendenteRef = doc(db, 'dipendenti', dipendente.id)
+
+    await runTransaction(db, async (transaction) => {
+      // Verifica che i documenti esistano
+      const cantiereDoc = await transaction.get(cantiereRef)
+      const dipendenteDoc = await transaction.get(dipendenteRef)
+
+      if (!cantiereDoc.exists()) {
+        throw new Error('Il cantiere non esiste più')
+      }
+      if (!dipendenteDoc.exists()) {
+        throw new Error('Il dipendente non esiste più')
+      }
+
+      // Aggiorna il cantiere
+      transaction.update(cantiereRef, cantiereUpdate)
+
+      // Aggiorna il dipendente
+      transaction.update(dipendenteRef, dipendenteUpdate)
+    })
+
+    // Aggiorna lo stato locale
+    selectedCantiere.value.team = cantiereUpdate.team
+    
+    popup.success('Membro Aggiunto', `${dipendente.nome} ${dipendente.cognome} è stato aggiunto al team.`)
+  } catch (error) {
+    console.error('Errore aggiunta membro al team:', error)
+    popup.error('Errore', `Impossibile aggiungere il membro al team: ${error.message}`)
+  }
+}
+
+const removeMemberFromTeam = async (membroId) => {
+  try {
+    // Trova il membro nel team
+    const membro = selectedCantiere.value.team?.find(m => m.id === membroId)
+    if (!membro) {
+      popup.error('Errore', 'Membro non trovato nel team.')
+      return
+    }
+
+    // Prepara gli aggiornamenti
+    const cantiereUpdate = {
+      team: selectedCantiere.value.team.filter(m => m.id !== membroId)
+    }
+
+    const dipendenteUpdate = {
+      cantiereAttuale: null
+    }
+
+    // Esegui gli aggiornamenti in modo atomico usando la transazione di Firebase
+    const cantiereRef = doc(db, 'cantieri', selectedCantiere.value.id)
+    const dipendenteRef = doc(db, 'dipendenti', membroId)
+
+    await runTransaction(db, async (transaction) => {
+      // Verifica che i documenti esistano
+      const cantiereDoc = await transaction.get(cantiereRef)
+      const dipendenteDoc = await transaction.get(dipendenteRef)
+
+      if (!cantiereDoc.exists()) {
+        throw new Error('Il cantiere non esiste più')
+      }
+      if (!dipendenteDoc.exists()) {
+        throw new Error('Il dipendente non esiste più')
+      }
+
+      // Aggiorna il cantiere
+      transaction.update(cantiereRef, cantiereUpdate)
+
+      // Aggiorna il dipendente
+      transaction.update(dipendenteRef, dipendenteUpdate)
+    })
+
+    // Aggiorna lo stato locale
+    selectedCantiere.value.team = cantiereUpdate.team
+    
+    popup.success('Membro Rimosso', `${membro.nome} ${membro.cognome} è stato rimosso dal team.`)
+  } catch (error) {
+    console.error('Errore rimozione membro dal team:', error)
+    popup.error('Errore', `Impossibile rimuovere il membro dal team: ${error.message}`)
+  }
+}
+
+// Funzione per aprire il modal di gestione team
+const openTeamModal = async (cantiere) => {
+  try {
+    selectedCantiere.value = cantiere
+    
+    // Carica i dipendenti se non sono già stati caricati
+    if (!firestoreStore.dipendenti.length) {
+      await firestoreStore.loadDipendenti()
+    }
+    
+    // Aggiunge le iniziali ai membri del team esistente
+    if (selectedCantiere.value?.team) {
+      selectedCantiere.value.team = selectedCantiere.value.team.map(membro => ({
+        ...membro,
+        iniziali: getIniziali(membro.nome, membro.cognome)
+      }))
+    }
+    
+    showTeamModal.value = true
+  } catch (error) {
+    console.error('Errore apertura modal team:', error)
+    popup.error('Errore', `Impossibile aprire la gestione team: ${error.message}`)
+  }
+}
+
+// Funzioni per il calcolo dei costi
+const calculateTeamHourlyCost = () => {
+  if (!selectedCantiere.value?.team?.length) return 0
+  return selectedCantiere.value.team.reduce((acc, membro) => acc + (membro.pagaOraria || 0), 0)
+}
+
+const calculateTeamDailyCost = (cantiere) => {
+  if (!cantiere?.team?.length) return 0
+  const costoOrario = cantiere.team.reduce((acc, membro) => acc + (membro.pagaOraria || 0), 0)
+  return costoOrario * 8 // 8 ore lavorative al giorno
+}
+
+const calculateMonthlyCost = (cantiere) => {
+  if (!cantiere?.team?.length) return 0
+  const costoGiornaliero = calculateTeamDailyCost(cantiere)
+  return costoGiornaliero * 26 // 26 giorni lavorativi al mese [[memory:1910188113861248821]]
+}
+
+const saveTeamChanges = async () => {
+  try {
+    // Aggiorna i costi accumulati del cantiere
+    const costoGiornaliero = calculateTeamDailyCost(selectedCantiere.value)
+    const costoMensile = calculateMonthlyCost(selectedCantiere.value)
+    
+    await firestoreStore.updateDoc('cantieri', selectedCantiere.value.id, {
+      team: selectedCantiere.value.team,
+      costiAccumulati: {
+        ...selectedCantiere.value.costiAccumulati,
+        manodopera: costoMensile
+      }
+    })
+    
+    popup.success('Team Aggiornato', 'Le modifiche al team sono state salvate con successo.')
+    closeTeamModal()
+  } catch (error) {
+    console.error('Errore salvataggio team:', error)
+    popup.error('Errore', `Impossibile salvare le modifiche al team: ${error.message}`)
+  }
+}
+
+// ... existing code ...
+
+// Helper per le iniziali
+const getIniziali = (nome, cognome) => {
+  if (!nome || !cognome) return '??'
+  return `${nome[0]}${cognome[0]}`.toUpperCase()
+}
+
+// Helper per il fornitore
+const getFornitoreById = (id) => {
+  return fornitori.value.find(f => f.id === id)
+}
+
+// Helper per gli allegati
+const getAttachments = () => {
+  return selectedCantiere.value?.allegati || []
+}
+
+const getMaterialAttachments = () => {
+  return selectedMaterial.value?.allegati || []
+}
+
+const getFileTypeClass = (type) => {
+  const classes = {
+    'pdf': 'bg-red-500',
+    'doc': 'bg-blue-500',
+    'xls': 'bg-green-500',
+    'jpg': 'bg-purple-500',
+    'png': 'bg-purple-500',
+    'txt': 'bg-gray-500'
+  }
+  return classes[type] || 'bg-gray-500'
+}
+
+const getFileTypeIcon = (type) => {
+  const icons = {
+    'pdf': 'PDF',
+    'doc': 'DOC',
+    'xls': 'XLS',
+    'jpg': 'IMG',
+    'png': 'IMG',
+    'txt': 'TXT'
+  }
+  return icons[type] || '???'
+}
+
+const formatFileSize = (size) => {
+  if (!size) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  while (size >= 1024 && i < units.length - 1) {
+    size /= 1024
+    i++
+  }
+  return `${Math.round(size * 100) / 100} ${units[i]}`
+}
+
+const getTotalMaterialAttachmentsSize = () => {
+  const attachments = getMaterialAttachments()
+  if (!attachments.length) return '0 B'
+  const totalSize = attachments.reduce((acc, att) => acc + (att.size || 0), 0)
+  return formatFileSize(totalSize)
+}
+
+const getLastUploadDate = () => {
+  const attachments = getMaterialAttachments()
+  if (!attachments.length) return 'N/A'
+  const dates = attachments.map(att => new Date(att.uploadDate))
+  const lastDate = new Date(Math.max(...dates))
+  return formatDate(lastDate)
+}
+
+const getMaterialStatusColor = (stato) => {
+  const colors = {
+    'ordinato': 'bg-blue-100 text-blue-800',
+    'consegnato': 'bg-green-100 text-green-800',
+    'in-attesa': 'bg-yellow-100 text-yellow-800',
+    'annullato': 'bg-red-100 text-red-800'
+  }
+  return colors[stato] || 'bg-gray-100 text-gray-800'
+}
+
+// ... existing code ...
 </script>
 
 <template>
@@ -898,7 +1222,7 @@ const closeModal = () => {
                 (effettiva)
               </span>
               <span v-else class="text-xs text-gray-500 ml-1">
-                €{{ calculateDailyCost(cantiere).toLocaleString() }} (teorica)
+                €{{ calculateActualDailyCost(cantiere).toLocaleString() }} (teorica)
               </span>
             </span>
           </div>
@@ -1045,7 +1369,7 @@ const closeModal = () => {
                   </div>
                   <div class="flex justify-between min-w-0">
                     <span class="text-gray-600 flex-shrink-0">Manodopera/giorno:</span> 
-                    <span class="font-medium truncate ml-2 text-orange-600">€{{ calculateDailyCost(selectedCantiere).toLocaleString() }}</span>
+                    <span class="font-medium truncate ml-2 text-orange-600">€{{ calculateTeamDailyCost(selectedCantiere).toLocaleString() }}</span>
                   </div>
                   <div class="flex justify-between min-w-0">
                     <span class="text-gray-600 flex-shrink-0">Data Inizio:</span> 
@@ -1102,7 +1426,7 @@ const closeModal = () => {
                   <div><span class="text-gray-600">Indirizzo:</span> {{ selectedCantiere.indirizzo }}</div>
                   <div><span class="text-gray-600">Tipo Lavoro:</span> {{ selectedCantiere.tipoLavoro }}</div>
                   <div><span class="text-gray-600">Valore:</span> €{{ selectedCantiere.valore ? selectedCantiere.valore.toLocaleString() : '0' }}</div>
-                  <div><span class="text-gray-600">Manodopera/giorno:</span> <span class="text-orange-600 font-medium">€{{ calculateDailyCost(selectedCantiere).toLocaleString() }}</span></div>
+                  <div><span class="text-gray-600">Manodopera/giorno:</span> <span class="text-orange-600 font-medium">€{{ calculateTeamDailyCost(selectedCantiere).toLocaleString() }}</span></div>
                   <div><span class="text-gray-600">Data Inizio:</span> {{ formatDate(selectedCantiere.dataInizio) }}</div>
                   <div><span class="text-gray-600">Scadenza:</span> {{ formatDate(selectedCantiere.scadenza) }}</div>
                 </div>
@@ -1863,8 +2187,12 @@ const closeModal = () => {
                 <UsersIcon class="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h3 class="text-xl font-semibold text-gray-900">👥 Gestione Team</h3>
-                <p class="text-sm text-gray-600 mt-1">{{ selectedCantiere?.nome }} - {{ selectedCantiere?.cliente }}</p>
+                <h3 class="text-xl font-semibold text-gray-900">Gestione Team</h3>
+                <p class="text-sm text-gray-600 mt-1">
+                  <span class="font-medium">{{ selectedCantiere?.nome }}</span>
+                  <span v-if="selectedCantiere?.cliente" class="text-gray-400"> • </span>
+                  <span class="text-gray-500">{{ typeof selectedCantiere?.cliente === 'object' ? selectedCantiere?.cliente?.nome : selectedCantiere?.cliente }}</span>
+                </p>
               </div>
             </div>
             <button @click="closeTeamModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2"
@@ -1949,7 +2277,7 @@ const closeModal = () => {
                 </div>
                 <div>
                   <p class="text-sm text-primary-600">Costo Giornaliero</p>
-                  <p class="text-2xl font-bold text-orange-600">€{{ calculateDailyCost(selectedCantiere) }}/giorno</p>
+                  <p class="text-2xl font-bold text-orange-600">€{{ calculateTeamDailyCost(selectedCantiere) }}/giorno</p>
                 </div>
               </div>
               

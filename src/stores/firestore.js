@@ -859,60 +859,75 @@ export const useFirestoreStore = defineStore('firestore', () => {
     dipendentiAttivi,
     materialiScorta,
     
-    // Metodi Generici
+    // Methods
     createDocument,
     updateDocument,
     deleteDocument,
     loadCollection,
     subscribeToCollection,
     
-    // Metodi Specifici
+    // Cantieri
     loadCantieri,
     createCantiere,
     updateCantiereProgress,
+    
+    // Clienti
     loadClienti,
     createCliente,
+    
+    // Materiali
     loadMateriali,
     createMateriale,
     updateMaterialeQuantita,
+    
+    // Personale
     loadDipendenti,
     createDipendente,
     registraTimesheet,
+    
+    // Fornitori
     loadFornitori,
     createFornitore,
+    
+    // Mezzi
     loadMezzi,
     
-    // Nuovi metodi per Materiali Cantieri
+    // Materiali Cantiere
     loadMaterialiCantiere,
     createMaterialeCantiere,
     updateMaterialeCantiere,
     deleteMaterialeCantiere,
     
-    // Nuovi metodi per Allegati
+    // Allegati
     loadAllegatiCantiere,
     createAllegatoCantiere,
     deleteAllegatoCantiere,
-    
-    // Nuovi metodi per Allegati Materiali
     loadAllegatiMateriale,
     createAllegatoMateriale,
     deleteAllegatoMateriale,
     
-    // Nuovi metodi per Giornale Cantiere
+    // Giornale Cantiere
     loadGiornaleCantiere,
     createRegistrazioneGiornale,
     updateRegistrazioneGiornale,
     deleteRegistrazioneGiornale,
     
-    // Notifiche e Utils
+    // Notifiche
     loadNotifications,
     createNotification,
     markNotificationAsRead,
+    
+    // Analytics
     getAnalyticsData,
+    
+    // Migrazione
     migrateFromLocalStorage,
+    
+    // Test
     testFirestoreConnection,
     
-    // Aggiungi checkCantiereDependencies agli export
-    checkCantiereDependencies
+    // Utility
+    checkCantiereDependencies,
+    sanitizeFirestoreData
   }
 }) 
