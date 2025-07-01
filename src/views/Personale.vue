@@ -7,9 +7,6 @@
         <p class="text-gray-600 text-base">Dipendenti e timesheet - Legnosystem.bio</p>
       </div>
       <div class="flex space-x-3">
-        <button v-if="dipendenti.length > 0" @click="clearAllData" class="btn-danger text-base font-medium" title="Pulisci tutti i dati di esempio">
-          🗑️ Pulisci Dati
-        </button>
         <button @click="showTimesheetModal = true" class="btn-secondary text-base font-medium">
           <ClockIcon class="w-5 h-5 mr-2" />
           Registra Ore
@@ -208,6 +205,11 @@
                     title="Visualizza planning e calendario">
               <CalendarDaysIcon class="w-5 h-5" />
             </button>
+            <button @click="deleteDipendente(dipendente)"
+                    class="text-red-400 hover:text-red-600"
+                    title="Elimina dipendente">
+              <TrashIcon class="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
@@ -355,7 +357,7 @@
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Entrata</p>
                 <input
-                  v-model="getPresenza(dipendente.id).entrata"
+                  v-model="getPresenzaComputed(dipendente.id).entrata"
                   type="time"
                   class="w-28 px-3 py-2 border border-gray-300 rounded text-base focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -365,7 +367,7 @@
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Uscita</p>
                 <input
-                  v-model="getPresenza(dipendente.id).uscita"
+                  v-model="getPresenzaComputed(dipendente.id).uscita"
                   type="time"
                   class="w-28 px-3 py-2 border border-gray-300 rounded text-base focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -375,7 +377,7 @@
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Pausa (min)</p>
                 <input
-                  v-model.number="getPresenza(dipendente.id).pausa"
+                  v-model.number="getPresenzaComputed(dipendente.id).pausa"
                   type="number"
                   min="0"
                   max="120"
@@ -395,7 +397,7 @@
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Stato</p>
                 <select
-                  v-model="getPresenza(dipendente.id).stato"
+                  v-model="getPresenzaComputed(dipendente.id).stato"
                   class="w-32 px-3 py-2 border border-gray-300 rounded text-base focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="presente">Presente</option>
@@ -433,7 +435,7 @@
               <div>
                 <label class="block text-sm text-gray-500 mb-1">Entrata</label>
                 <input
-                  v-model="getPresenza(dipendente.id).entrata"
+                  v-model="getPresenzaComputed(dipendente.id).entrata"
                   type="time"
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -441,7 +443,7 @@
               <div>
                 <label class="block text-sm text-gray-500 mb-1">Uscita</label>
                 <input
-                  v-model="getPresenza(dipendente.id).uscita"
+                  v-model="getPresenzaComputed(dipendente.id).uscita"
                   type="time"
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -449,7 +451,7 @@
               <div>
                 <label class="block text-sm text-gray-500 mb-1">Pausa (min)</label>
                 <input
-                  v-model.number="getPresenza(dipendente.id).pausa"
+                  v-model.number="getPresenzaComputed(dipendente.id).pausa"
                   type="number"
                   min="0"
                   max="120"
@@ -459,7 +461,7 @@
               <div>
                 <label class="block text-sm text-gray-500 mb-1">Stato</label>
                 <select
-                  v-model="getPresenza(dipendente.id).stato"
+                  v-model="getPresenzaComputed(dipendente.id).stato"
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="presente">Presente</option>
@@ -475,7 +477,7 @@
           <!-- Note presenza -->
           <div class="px-4 pb-4">
             <input
-              v-model="getPresenza(dipendente.id).note"
+              v-model="getPresenzaComputed(dipendente.id).note"
               type="text"
               placeholder="Note presenza..."
               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
@@ -617,19 +619,19 @@
             <div>
               <p class="text-sm text-gray-600">Giorni Lavorati</p>
               <p class="text-lg font-semibold">
-                {{ calendarDays.value.filter(d => d.stats.dipendentiPresenti > 0).length }}
+                {{ calendarDays.filter(d => d.stats.dipendentiPresenti > 0).length }}
               </p>
             </div>
             <div>
               <p class="text-sm text-gray-600">Ore Totali</p>
               <p class="text-lg font-semibold">
-                {{ calendarDays.value.reduce((sum, d) => sum + d.stats.oreTotali, 0) }}h
+                {{ calendarDays.reduce((sum, d) => sum + d.stats.oreTotali, 0) }}h
               </p>
             </div>
             <div>
               <p class="text-sm text-gray-600">Costo Totale</p>
               <p class="text-lg font-semibold text-green-600">
-                €{{ calendarDays.value.reduce((sum, d) => sum + d.stats.costoTotale, 0).toFixed(0) }}
+                €{{ calendarDays.reduce((sum, d) => sum + d.stats.costoTotale, 0).toFixed(0) }}
               </p>
             </div>
           </div>
@@ -637,7 +639,7 @@
       </div>
     </div>
 
-    <!-- Modal Registrazione Ore - Mobile Optimized -->
+    <!-- Modal Registrazione Ore -->
     <div v-if="showTimesheetModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeTimesheetModal">
       <div class="relative top-4 mx-auto border w-full max-w-md shadow-lg rounded-md bg-white" @click.stop>
         <div class="p-6">
@@ -664,6 +666,18 @@
             <div>
               <label class="block text-base font-medium text-gray-700 mb-2">Data</label>
               <input v-model="newTimesheet.data" type="date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-base font-medium text-gray-700 mb-2">Orario Inizio</label>
+                <input v-model="newTimesheet.orarioInizio" type="time" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+              </div>
+              
+              <div>
+                <label class="block text-base font-medium text-gray-700 mb-2">Orario Fine</label>
+                <input v-model="newTimesheet.orarioFine" type="time" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+              </div>
             </div>
             
             <div>
@@ -1081,12 +1095,19 @@
               <div class="card">
                 <h5 class="font-semibold text-gray-900 mb-4">📍 Assegnazioni Cantieri</h5>
                 <div class="space-y-3">
-                  <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div v-if="selectedDipendente?.cantiereAttuale" class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                     <div>
-                      <p class="font-medium text-green-900">{{ selectedDipendente?.cantiereAttuale || 'Nessun cantiere' }}</p>
+                      <p class="font-medium text-green-900">{{ selectedDipendente.cantiereAttuale }}</p>
                       <p class="text-sm text-green-600">Cantiere principale</p>
                     </div>
                     <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">Attivo</span>
+                  </div>
+                  <div v-else class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div>
+                      <p class="font-medium text-gray-900">Non assegnato</p>
+                      <p class="text-sm text-gray-600">Dipendente disponibile per assegnazione</p>
+                    </div>
+                    <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm font-medium">Disponibile</span>
                   </div>
                   <div class="text-center text-gray-500 py-4">
                     <p class="text-sm">Altre assegnazioni verranno visualizzate qui</p>
@@ -1155,7 +1176,8 @@ import {
   CalendarDaysIcon,
   CurrencyEuroIcon,
   PencilIcon,
-  XMarkIcon
+  XMarkIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '../stores/firestore.js'
 import { usePopup } from '../composables/usePopup.js'
@@ -1233,7 +1255,9 @@ const newTimesheet = ref({
   data: new Date().toISOString().split('T')[0],
   ore: '',
   cantiere: '',
-  note: ''
+  note: '',
+  orarioInizio: '08:00',
+  orarioFine: '17:00'
 })
 
 // Dipendente in modifica
@@ -1301,23 +1325,46 @@ const loadTimesheet = async (dipendenteId = null) => {
 // Aggiorna le ore settimanali dei dipendenti basandosi sui timesheet
 const updateDipendentiOreFromTimesheet = () => {
   const now = new Date()
-  const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 1)) // Lunedì
+  // Imposta l'inizio della settimana a Lunedì
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1))
+  startOfWeek.setHours(0, 0, 0, 0)
+  
+  // Imposta la fine della settimana a Sabato
   const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 6) // Sabato (6 giorni lavorativi)
+  endOfWeek.setDate(startOfWeek.getDate() + 5) // +5 per arrivare a Sabato
+  endOfWeek.setHours(23, 59, 59, 999)
   
   dipendenti.value.forEach(dipendente => {
-    // Calcola ore della settimana corrente per questo dipendente
-    const oreSettimana = timesheetDettagli.value
-      .filter(t => {
-        const dataTimesheet = new Date(t.data)
-        return t.dipendenteId === dipendente.id && 
-               dataTimesheet >= startOfWeek && 
-               dataTimesheet <= endOfWeek
-      })
-      .reduce((total, t) => total + (t.ore || 0), 0)
+    // Filtra i timesheet per questa settimana
+    const timesheetSettimana = timesheetDettagli.value.filter(t => {
+      const dataTimesheet = new Date(t.data)
+      return t.dipendenteId === dipendente.id && 
+             dataTimesheet >= startOfWeek && 
+             dataTimesheet <= endOfWeek
+    })
+
+    // Raggruppa per data per controllo ore giornaliere
+    const orePerGiorno = {}
+    timesheetSettimana.forEach(t => {
+      if (!orePerGiorno[t.data]) {
+        orePerGiorno[t.data] = 0
+      }
+      orePerGiorno[t.data] += t.ore
+    })
+
+    // Controlla limiti ore giornaliere
+    Object.entries(orePerGiorno).forEach(([data, ore]) => {
+      if (ore > 12) {
+        console.warn(`⚠️ Il dipendente ${dipendente.nome} ha registrato ${ore}h il ${data} (max 12h)`)
+      }
+    })
     
-    // Aggiorna ore settimanali
-    dipendente.oreTotaliSettimana = oreSettimana
+    // Calcola ore settimanali totali
+    const oreSettimana = timesheetSettimana.reduce((total, t) => total + (t.ore || 0), 0)
+    
+    // Aggiorna il dipendente
+    dipendente.oreTotaliSettimana = Math.round(oreSettimana * 2) / 2 // Arrotonda a 0.5
   })
 }
 
@@ -1402,17 +1449,58 @@ const saveDipendente = async () => {
   }
 }
 
-const saveTimesheet = async () => {
-  if (!newTimesheet.value.dipendenteId || !newTimesheet.value.ore || !newTimesheet.value.cantiere) {
-    error('Campi Mancanti', 'Compila tutti i campi obbligatori!')
-    return
+// Funzioni di validazione timesheet
+const validateTimesheet = async (timesheetData) => {
+  // Controllo base campi obbligatori
+  if (!timesheetData.dipendenteId || !timesheetData.ore || !timesheetData.cantiere) {
+    throw new Error('Compila tutti i campi obbligatori!')
   }
 
+  // Controllo ore massime giornaliere
+  if (timesheetData.ore > 12) {
+    throw new Error('Non è possibile registrare più di 12 ore giornaliere')
+  }
+
+  // Controllo sovrapposizioni
+  const timesheetGiorno = timesheetDettagli.value.filter(t => 
+    t.dipendenteId === timesheetData.dipendenteId && 
+    t.data === timesheetData.data
+  )
+
+  // Calcola ore totali già registrate per quel giorno
+  const oreTotaliGiorno = timesheetGiorno.reduce((total, t) => total + t.ore, 0)
+  if (oreTotaliGiorno + timesheetData.ore > 12) {
+    throw new Error(`Il dipendente ha già registrato ${oreTotaliGiorno}h in questa data. Non può superare 12h totali.`)
+  }
+
+  // Controllo sovrapposizione orari se specificati
+  if (timesheetData.orarioInizio && timesheetData.orarioFine) {
+    const inizio = new Date(`${timesheetData.data}T${timesheetData.orarioInizio}`)
+    const fine = new Date(`${timesheetData.data}T${timesheetData.orarioFine}`)
+
+    // Verifica sovrapposizioni con altri timesheet
+    const sovrapposizioni = timesheetGiorno.filter(t => {
+      if (!t.orarioInizio || !t.orarioFine) return false
+      const tInizio = new Date(`${t.data}T${t.orarioInizio}`)
+      const tFine = new Date(`${t.data}T${t.orarioFine}`)
+      return (inizio < tFine && fine > tInizio)
+    })
+
+    if (sovrapposizioni.length > 0) {
+      throw new Error(`Sovrapposizione orari con altre registrazioni: ${
+        sovrapposizioni.map(t => `${t.cantiere} (${t.orarioInizio}-${t.orarioFine})`).join(', ')
+      }`)
+    }
+  }
+
+  return true
+}
+
+const saveTimesheet = async () => {
   try {
     const dipendente = dipendenti.value.find(d => d.id === newTimesheet.value.dipendenteId)
     if (!dipendente) {
-      error('Errore', 'Dipendente non trovato!')
-      return
+      throw new Error('Dipendente non trovato!')
     }
 
     const timesheetData = {
@@ -1420,13 +1508,17 @@ const saveTimesheet = async () => {
       data: newTimesheet.value.data,
       cantiere: newTimesheet.value.cantiere,
       ore: parseFloat(newTimesheet.value.ore),
+      orarioInizio: newTimesheet.value.orarioInizio,
+      orarioFine: newTimesheet.value.orarioFine,
       note: newTimesheet.value.note,
       costoOrario: dipendente.pagaOraria || 25,
       costoTotale: parseFloat(newTimesheet.value.ore) * (dipendente.pagaOraria || 25),
-      fonte: 'manuale', // Per distinguere da quelli auto-generati dal giornale
-      turno: 'giornaliero',
+      fonte: 'manuale',
       createdAt: new Date().toISOString()
     }
+
+    // Valida il timesheet
+    await validateTimesheet(timesheetData)
 
     // Salva in Firestore
     const result = await firestoreStore.registraTimesheet(timesheetData)
@@ -1442,7 +1534,7 @@ const saveTimesheet = async () => {
     }
   } catch (err) {
     console.error('Errore salvataggio timesheet:', err)
-    error('Errore Salvataggio', `Impossibile salvare il timesheet: ${err.message}`)
+    error('Errore Salvataggio', err.message)
   }
 }
 
@@ -1559,7 +1651,9 @@ const closeTimesheetModal = () => {
     data: new Date().toISOString().split('T')[0],
     ore: '',
     cantiere: '',
-    note: ''
+    note: '',
+    orarioInizio: '08:00',
+    orarioFine: '17:00'
   }
 }
 
@@ -1573,29 +1667,49 @@ const getPresenza = async (dipendenteId) => {
   const key = `${selectedDate.value}-${dipendenteId}`
   
   try {
-    // Prova a caricare da Firestore
-    const result = await firestoreStore.loadDocument('presenze', key)
+    // Se la presenza è già in memoria, la restituiamo
+    if (presenze.value[key]) {
+      return presenze.value[key]
+    }
+
+    // Proviamo a caricare la presenza da Firestore
+    const result = await firestoreStore.getDocument('presenze', key)
     
     if (result.success && result.data) {
+      // Se trovata in Firestore, la salviamo in memoria e la restituiamo
       presenze.value[key] = result.data
-    } else if (!presenze.value[key]) {
-      // Se non esiste, crea nuovo record
-      presenze.value[key] = {
-        entrata: '08:00',
-        uscita: '17:00',
-        pausa: 60,
-        stato: 'presente',
-        note: '',
-        dipendenteId,
-        data: selectedDate.value,
-        createdAt: new Date().toISOString()
-      }
+      return presenze.value[key]
     }
+
+    // Se non trovata, creiamo un nuovo record di default
+    presenze.value[key] = {
+      entrata: '08:00',
+      uscita: '17:00',
+      pausa: 60,
+      stato: 'presente',
+      note: '',
+      dipendenteId,
+      data: selectedDate.value,
+      oreTotali: 0,
+      createdAt: new Date().toISOString()
+    }
+
+    return presenze.value[key]
   } catch (error) {
     console.error('Errore caricamento presenza:', error)
+    // Restituiamo un record di default in caso di errore
+    return {
+      entrata: '08:00',
+      uscita: '17:00',
+      pausa: 60,
+      stato: 'presente',
+      note: '',
+      dipendenteId,
+      data: selectedDate.value,
+      oreTotali: 0,
+      createdAt: new Date().toISOString()
+    }
   }
-  
-  return presenze.value[key]
 }
 
 const savePresenza = async (dipendenteId) => {
@@ -1623,36 +1737,52 @@ const savePresenza = async (dipendenteId) => {
     return false
   }
   
-  // Controllo sovrapposizioni
-  const timesheetGiorno = timesheetDettagli.value.filter(t => 
-    t.dipendenteId === dipendenteId && 
-    t.data === selectedDate.value
-  )
-  
-  const oreTotali = calcolaOreTotali(dipendenteId)
-  const orePresenza = ((uscita - entrata) / 60) - (presenza.pausa / 60)
-  
-  if (Math.abs(oreTotali - orePresenza) > 0.5) {
-    const conferma = await confirm(
-      'Differenza Ore',
-      `Le ore di presenza (${orePresenza}h) non corrispondono alle ore registrate nei timesheet (${oreTotali}h). Continuare?`
-    )
-    if (!conferma) return false
-  }
-  
   try {
-    // Salva in Firestore
-    const result = await firestoreStore.saveDocument('presenze', key, presenza)
+    // Salva la presenza in Firestore
+    const presenzaResult = await firestoreStore.createDocument('presenze', {
+      ...presenza,
+      id: key,
+      updatedAt: new Date().toISOString()
+    })
     
-    if (result.success) {
-      success('Presenza Salvata', `Presenza di ${selectedDate.value} salvata con successo`)
-      return true
+    if (presenzaResult.success) {
+      // Calcola le ore effettive considerando la pausa
+      const oreEffettive = ((uscita - entrata) / 60) - (presenza.pausa / 60)
+      
+      // Crea il timesheet corrispondente
+      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
+      const timesheetData = {
+        dipendenteId: dipendenteId,
+        data: selectedDate.value,
+        cantiere: dipendente?.cantiereAttuale || 'Non Assegnato',
+        ore: oreEffettive,
+        orarioInizio: presenza.entrata,
+        orarioFine: presenza.uscita,
+        note: presenza.note || 'Generato da registro presenze',
+        costoOrario: dipendente?.pagaOraria || 25,
+        costoTotale: oreEffettive * (dipendente?.pagaOraria || 25),
+        fonte: 'presenze',
+        presenzaId: key,
+        createdAt: new Date().toISOString()
+      }
+
+      // Salva il timesheet in Firestore
+      const timesheetResult = await firestoreStore.registraTimesheet(timesheetData)
+      
+      if (timesheetResult.success) {
+        // Ricarica i timesheet
+        await loadTimesheet()
+        success('Presenza Salvata', `Presenza e timesheet di ${selectedDate.value} salvati con successo`)
+        return true
+      } else {
+        throw new Error(timesheetResult.error || 'Errore salvataggio timesheet')
+      }
     } else {
-      throw new Error(result.error || 'Errore sconosciuto')
+      throw new Error(presenzaResult.error || 'Errore sconosciuto')
     }
   } catch (error) {
-    console.error('Errore salvataggio presenza:', error)
-    error('Errore', `Impossibile salvare la presenza: ${error.message}`)
+    console.error('Errore salvataggio presenza/timesheet:', error)
+    error('Errore', `Impossibile salvare: ${error.message}`)
     return false
   }
 }
@@ -1662,7 +1792,8 @@ const saveAllPresenze = async () => {
   let tuttoOk = true
   
   for (const dipendente of dipendenti.value) {
-    if (!(await savePresenza(dipendente.id))) {
+    const presenza = getPresenzaComputed(dipendente.id)
+    if (!(await savePresenza(dipendente.id, presenza))) {
       tuttoOk = false
       break
     }
@@ -1686,7 +1817,7 @@ const calcolaOreTotali = (dipendenteId) => {
 
 const markAllPresent = () => {
   dipendenti.value.forEach(dipendente => {
-    const presenza = getPresenza(dipendente.id)
+    const presenza = getPresenzaComputed(dipendente.id)
     presenza.stato = 'presente'
     presenza.entrata = '08:00'
     presenza.uscita = '17:00'
@@ -1703,7 +1834,7 @@ const getRiepilogoPresenze = () => {
   let oreTotali = 0
   
   dipendenti.value.forEach(dipendente => {
-    const presenza = getPresenza(dipendente.id)
+    const presenza = getPresenzaComputed(dipendente.id)
     switch (presenza.stato) {
       case 'presente':
         presenti++
@@ -1729,31 +1860,6 @@ const getRiepilogoPresenze = () => {
 const closeScheduleModal = () => {
   showScheduleModal.value = false
   selectedDipendente.value = null
-}
-
-// Funzione per pulire tutti i dati di esempio
-const clearAllData = async () => {
-  const confirmed = await confirm('Eliminare Tutti i Dati', 'Sei sicuro di voler eliminare TUTTI i dipendenti e i dati? Questa operazione non può essere annullata.')
-  if (confirmed) {
-    // Pulisci tutti i dati
-    dipendenti.value = []
-    timesheetData.value = []
-    timesheetDettagli.value = []
-    presenze.value = {}
-    
-    // Reset statistiche
-    stats.value = {
-      dipendentiAttivi: 0,
-      oreSettimana: 0,
-      presentiOggi: 0,
-      costoOrarioMedio: 0
-    }
-    
-    // Pulisci localStorage
-    localStorage.removeItem('legnosystem_dipendenti')
-    
-    success('Dati Eliminati', 'Tutti i dati sono stati eliminati! La pagina è ora pulita.')
-  }
 }
 
 // Inizializzazione del componente
@@ -1807,4 +1913,50 @@ const calendarWeeks = computed(() => {
   
   return weeks
 })
+
+const deleteDipendente = async (dipendente) => {
+  const confirmed = await confirm('Eliminare Dipendente', `Sei sicuro di voler eliminare ${dipendente.nome} ${dipendente.cognome}? Questa operazione non può essere annullata.`)
+  if (confirmed) {
+    try {
+      const result = await firestoreStore.deleteDocument('dipendenti', dipendente.id)
+      
+      if (result.success) {
+        // Ricarica dipendenti
+        await loadDipendenti()
+        success('Dipendente Eliminato', `${dipendente.nome} ${dipendente.cognome} eliminato con successo!`)
+      } else {
+        throw new Error(result.error || 'Errore sconosciuto')
+      }
+    } catch (err) {
+      console.error('Errore eliminazione dipendente:', err)
+      error('Errore Eliminazione', `Impossibile eliminare il dipendente: ${err.message}`)
+    }
+  }
+}
+
+// Computed per le presenze
+const presenzeComputed = computed(() => {
+  const result = {}
+  dipendenti.value.forEach(dipendente => {
+    const key = `${selectedDate.value}-${dipendente.id}`
+    result[key] = presenze.value[key] || {
+      entrata: '08:00',
+      uscita: '17:00',
+      pausa: 60,
+      stato: 'presente',
+      note: '',
+      dipendenteId: dipendente.id,
+      data: selectedDate.value,
+      oreTotali: 0,
+      createdAt: new Date().toISOString()
+    }
+  })
+  return result
+})
+
+// Funzione per ottenere la presenza dal computed
+const getPresenzaComputed = (dipendenteId) => {
+  const key = `${selectedDate.value}-${dipendenteId}`
+  return presenzeComputed.value[key]
+}
 </script> 

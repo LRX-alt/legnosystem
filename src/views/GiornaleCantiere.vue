@@ -772,6 +772,11 @@ const syncTimesheetFromGiornale = async (entryData, registrazioneId = null) => {
   }
 
   try {
+    // Se è una modifica, prima elimina i vecchi timesheet e presenze
+    if (registrazioneId) {
+      await deleteTimesheetByRegistrazione(registrazioneId)
+    }
+
     // Calcola le ore per ogni dipendente (dividi le ore totali per il numero di persone)
     const orePerPersona = entryData.oreTotali / entryData.teamPresente.length
 
@@ -783,29 +788,55 @@ const syncTimesheetFromGiornale = async (entryData, registrazioneId = null) => {
         cantiere: cantiere.value.nome,
         cantiereId: cantiere.value.id,
         ore: orePerPersona,
+        orarioInizio: entryData.orarioInizio || '08:00',
+        orarioFine: entryData.orarioFine || '17:00',
         note: `Auto-generato da Giornale Cantiere - ${entryData.attivita?.[0] || 'Lavori generici'}`,
         costoOrario: membro.pagaOraria,
         costoTotale: orePerPersona * membro.pagaOraria,
-        turno: entryData.orarioInizio + '-' + entryData.orarioFine,
-        fonte: 'giornale_cantiere', // Per identificare l'origine del dato
-        registrazioneGiornaleId: registrazioneId // Collega alla registrazione del giornale
+        fonte: 'giornale_cantiere',
+        registrazioneGiornaleId: registrazioneId
       }
 
-      // Salva in Firestore
+      // Salva timesheet in Firestore
       const result = await firestoreStore.registraTimesheet(timesheetData)
       
       if (result.success) {
-        console.log(`✅ Timesheet creato per ${membro.nome}: ${orePerPersona}h su ${cantiere.value.nome}`)
+        console.log(`✅ Timesheet creato/aggiornato per ${membro.nome}: ${orePerPersona}h su ${cantiere.value.nome}`)
+        
+        // Crea/aggiorna la presenza con gli stessi orari del timesheet
+        const presenzaData = {
+          id: `${entryData.data}-${membro.id}`,
+          dipendenteId: membro.id,
+          data: entryData.data,
+          entrata: timesheetData.orarioInizio,
+          uscita: timesheetData.orarioFine,
+          pausa: 60, // Default 1 ora di pausa
+          stato: 'presente',
+          note: `Auto-generato da Giornale Cantiere - ${cantiere.value.nome}`,
+          fonte: 'giornale_cantiere',
+          registrazioneGiornaleId: registrazioneId,
+          oreTotali: orePerPersona,
+          updatedAt: new Date().toISOString()
+        }
+
+        // Salva presenza in Firestore
+        const presenzaResult = await firestoreStore.createDocument('presenze', presenzaData)
+
+        if (presenzaResult.success) {
+          console.log(`✅ Presenza creata/aggiornata per ${membro.nome} il ${entryData.data}`)
+        } else {
+          console.error(`❌ Errore creazione presenza per ${membro.nome}:`, presenzaResult.error)
+        }
       } else {
         console.error(`❌ Errore creazione timesheet per ${membro.nome}:`, result.error)
       }
     }
 
-    // 🎯 Aggiorna le ore settimanali dei dipendenti
+    // Aggiorna le ore settimanali dei dipendenti
     await updateDipendentiOreSettimanali(entryData.teamPresente, orePerPersona)
 
   } catch (error) {
-    console.error('Errore sincronizzazione timesheet:', error)
+    console.error('Errore sincronizzazione timesheet/presenze:', error)
   }
 }
 
@@ -942,14 +973,14 @@ const deleteEntry = async (entryId) => {
   }
 }
 
-// 🗑️ Elimina i timesheet associati a una registrazione del giornale
+// 🗑️ Elimina i timesheet e le presenze associati a una registrazione del giornale
 const deleteTimesheetByRegistrazione = async (registrazioneId) => {
   try {
     // Carica tutti i timesheet per trovare quelli associati a questa registrazione
-    const result = await firestoreStore.loadCollection('timesheet')
+    const timesheetResult = await firestoreStore.loadCollection('timesheet')
     
-    if (result.success) {
-      const timesheetAssociati = result.data.filter(t => 
+    if (timesheetResult.success) {
+      const timesheetAssociati = timesheetResult.data.filter(t => 
         t.registrazioneGiornaleId === registrazioneId || 
         t.fonte === 'giornale_cantiere'
       )
@@ -962,8 +993,26 @@ const deleteTimesheetByRegistrazione = async (registrazioneId) => {
       
       console.log(`✅ Eliminati ${timesheetAssociati.length} timesheet associati alla registrazione`)
     }
+
+    // Carica tutte le presenze per trovare quelle associate a questa registrazione
+    const presenzeResult = await firestoreStore.loadCollection('presenze')
+    
+    if (presenzeResult.success) {
+      const presenzeAssociate = presenzeResult.data.filter(p => 
+        p.registrazioneGiornaleId === registrazioneId || 
+        p.fonte === 'giornale_cantiere'
+      )
+      
+      // Elimina ogni presenza associata
+      for (const presenza of presenzeAssociate) {
+        await firestoreStore.deleteDocument('presenze', presenza.id)
+        console.log(`🗑️ Presenza eliminata: ${presenza.id}`)
+      }
+      
+      console.log(`✅ Eliminate ${presenzeAssociate.length} presenze associate alla registrazione`)
+    }
   } catch (error) {
-    console.error('Errore eliminazione timesheet associati:', error)
+    console.error('Errore eliminazione timesheet e presenze associati:', error)
   }
 }
 
