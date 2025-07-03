@@ -345,8 +345,8 @@ const attivitaRecenti = computed(() => {
     activities.push({
       id: `cantiere-${cantiere.id}`,
       descrizione: `Aggiornamento cantiere: ${cantiere.nome}`,
-      dettaglio: `Cliente: ${cantiere.cliente}`,
-    tempo: '2 ore fa',
+      dettaglio: `Cliente: ${cantiere.cliente?.nome || 'Non specificato'}`,
+      tempo: '2 ore fa',
       icon: '🏗️',
       iconBg: 'bg-blue-500'
     })
@@ -358,9 +358,9 @@ const attivitaRecenti = computed(() => {
       id: 'materiali-update',
       descrizione: 'Aggiornamento inventario materiali',
       dettaglio: `${firestoreStore.materiali.length} materiali in magazzino`,
-    tempo: '4 ore fa',
+      tempo: '4 ore fa',
       icon: '📦',
-    iconBg: 'bg-green-500'
+      iconBg: 'bg-green-500'
     })
   }
   
@@ -506,6 +506,12 @@ onMounted(async () => {
   // Aggiorna ogni minuto
   const timeInterval = setInterval(updateTime, 60000)
   
+  // 🔧 IMPORTANTE: Registra lifecycle hooks PRIMA delle operazioni async
+  onUnmounted(() => {
+    clearInterval(timeInterval)
+    stopRealtimeSync()
+  })
+  
   // Carica dati dashboard
   await loadDashboardData()
   
@@ -518,12 +524,6 @@ onMounted(async () => {
   await analytics.trackPageView('/dashboard', {
     user_role: authStore.userProfile?.role,
     widgets_enabled: realtimeActive.value
-  })
-  
-  // Cleanup interval on unmount
-  onUnmounted(() => {
-    clearInterval(timeInterval)
-    stopRealtimeSync()
   })
 })
 

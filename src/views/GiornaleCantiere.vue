@@ -318,22 +318,22 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Data</label>
-                <input v-model="entryForm.data" type="date" required class="form-input">
+                <input v-model="newEntryData.data" type="date" required class="form-input">
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Orario Inizio</label>
-                <input v-model="entryForm.orarioInizio" type="time" required class="form-input">
+                <input v-model="newEntryData.orarioInizio" type="time" required class="form-input">
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Orario Fine</label>
-                <input v-model="entryForm.orarioFine" type="time" required class="form-input">
+                <input v-model="newEntryData.orarioFine" type="time" required class="form-input">
               </div>
             </div>
 
             <!-- Responsabile -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Responsabile</label>
-              <select v-model="entryForm.responsabile" required class="form-select">
+              <select v-model="newEntryData.responsabile" required class="form-select">
                 <option v-for="membro in cantiere?.team" :key="membro.id" :value="membro.nome">
                   {{ membro.nome }}
                 </option>
@@ -346,7 +346,7 @@
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">Condizioni</label>
-                  <select v-model="entryForm.meteo.condizioni" class="form-select">
+                  <select v-model="newEntryData.meteo.condizioni" class="form-select">
                     <option value="sereno">☀️ Sereno</option>
                     <option value="nuvoloso">☁️ Nuvoloso</option>
                     <option value="pioggia">🌧️ Pioggia</option>
@@ -356,11 +356,11 @@
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">Temperatura (°C)</label>
-                  <input v-model.number="entryForm.meteo.temperatura" type="number" class="form-input">
+                  <input v-model.number="newEntryData.meteo.temperatura" type="number" class="form-input">
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">Note Meteo</label>
-                  <input v-model="entryForm.meteo.note" type="text" placeholder="Es: vento forte" class="form-input">
+                  <input v-model="newEntryData.meteo.note" type="text" placeholder="Es: vento forte" class="form-input">
                 </div>
               </div>
             </div>
@@ -369,8 +369,8 @@
             <div>
               <h4 class="text-lg font-medium text-gray-900 mb-4">🔨 Attività Svolte</h4>
               <div class="space-y-3">
-                <div v-for="(attivita, index) in entryForm.attivita" :key="index" class="flex items-center space-x-3">
-                  <input v-model="entryForm.attivita[index]" type="text" placeholder="Descrivi l'attività svolta" class="flex-1 form-input">
+                <div v-for="(attivita, index) in newEntryData.attivita" :key="index" class="flex items-center space-x-3">
+                  <input v-model="newEntryData.attivita[index]" type="text" placeholder="Descrivi l'attività svolta" class="flex-1 form-input">
                   <button type="button" @click="removeAttivita(index)" class="text-red-600 hover:text-red-800">
                     <TrashIcon class="w-5 h-5" />
                   </button>
@@ -389,15 +389,15 @@
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">⏰ Ore Totali Lavorate</label>
-                  <input v-model.number="entryForm.oreTotali" type="number" min="0.5" max="12" step="0.5" required class="form-input"
-                         :class="{'border-orange-500': entryForm.oreTotali > 8}">
+                  <input v-model.number="newEntryData.oreTotali" type="number" min="0.5" max="12" step="0.5" required class="form-input"
+                         :class="{'border-orange-500': newEntryData.oreTotali > 8}">
                   <p v-if="entryForm.oreTotali > 8" class="text-xs text-orange-600 mt-1">
-                    Include {{ entryForm.oreTotali - 8 }}h di straordinario
+                    Include {{ newEntryData.oreTotali - 8 }}h di straordinario
                   </p>
                 </div>
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">💶 Costi Extra</label>
-                  <input v-model.number="entryForm.costiExtra"
+                  <input v-model.number="newEntryData.costiExtra"
                          type="number"
                          min="0"
                          step="0.5"
@@ -439,21 +439,21 @@
                 </div>
 
                 <!-- Team presente riepilogo -->
-                <div v-if="entryForm.teamPresente.length > 0" class="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p class="text-sm font-medium text-blue-900 mb-2">Team presente ({{ entryForm.teamPresente.length }} dipendenti):</p>
+                <div v-if="newEntryData.teamPresente.length > 0" class="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <p class="text-sm font-medium text-blue-900 mb-2">Team presente ({{ newEntryData.teamPresente.length }} dipendenti):</p>
                   <div class="flex flex-wrap gap-2">
-                    <span v-for="membro in entryForm.teamPresente" :key="membro.id" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                    <span v-for="membro in newEntryData.teamPresente" :key="membro.id" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
                       {{ membro.nome }} - €{{ membro.pagaOraria }}/h
                     </span>
                   </div>
                   <p class="text-xs text-blue-700 mt-2">
                     Costo orario team: €{{ calcolayCostoOrarioTeam() }}/h • 
-                    {{ entryForm.oreTotali }}h × €{{ calcolayCostoOrarioTeam() }}/h = €{{ calculateDayCost() }}
+                    {{ newEntryData.oreTotali }}h × €{{ calcolayCostoOrarioTeam() }}/h = €{{ calculateDayCost() }}
                   </p>
                 </div>
 
                 <!-- Warning se nessun team -->
-                <div v-if="entryForm.teamPresente.length === 0" class="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <div v-if="newEntryData.teamPresente.length === 0" class="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
                   <p class="text-sm text-yellow-800">⚠️ Seleziona almeno un dipendente che ha lavorato in questa giornata</p>
                 </div>
               </div>
@@ -463,11 +463,11 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">📝 Note Generali</label>
-                <textarea v-model="entryForm.note" rows="4" placeholder="Note e osservazioni della giornata" class="form-input"></textarea>
+                <textarea v-model="newEntryData.note" rows="4" placeholder="Note e osservazioni della giornata" class="form-input"></textarea>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">⚠️ Problemi/Imprevisti</label>
-                <textarea v-model="entryForm.problemiText" rows="4" placeholder="Eventuali problemi riscontrati (uno per riga)" class="form-input"></textarea>
+                <textarea v-model="newEntryData.problemiText" rows="4" placeholder="Eventuali problemi riscontrati (uno per riga)" class="form-input"></textarea>
               </div>
             </div>
 
@@ -477,17 +477,17 @@
               <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p class="text-sm text-gray-600">Costo Base</p>
-                  <p class="text-lg font-semibold">€{{ (calcolayCostoOrarioTeam() * Math.min(8, entryForm.oreTotali)).toFixed(2) }}</p>
+                  <p class="text-lg font-semibold">€{{ (calcolayCostoOrarioTeam() * Math.min(8, newEntryData.oreTotali)).toFixed(2) }}</p>
                 </div>
-                <div v-if="entryForm.oreTotali > 8">
+                <div v-if="newEntryData.oreTotali > 8">
                   <p class="text-sm text-gray-600">Straordinari</p>
                   <p class="text-lg font-semibold text-orange-600">
-                    €{{ (calcolayCostoOrarioTeam() * 1.3 * (entryForm.oreTotali - 8)).toFixed(2) }}
+                    €{{ (calcolayCostoOrarioTeam() * 1.3 * (newEntryData.oreTotali - 8)).toFixed(2) }}
                   </p>
                 </div>
-                <div v-if="entryForm.costiExtra">
+                <div v-if="newEntryData.costiExtra">
                   <p class="text-sm text-gray-600">Extra</p>
-                  <p class="text-lg font-semibold text-blue-600">€{{ entryForm.costiExtra.toFixed(2) }}</p>
+                  <p class="text-lg font-semibold text-blue-600">€{{ newEntryData.costiExtra.toFixed(2) }}</p>
                 </div>
                 <div>
                   <p class="text-sm text-gray-600">Totale Giornata</p>
@@ -515,33 +515,39 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useFirestoreStore } from '@/stores/firestore'
+import { useFirestoreOperations } from '@/composables/useFirestoreOperations'
 import { usePopup } from '@/composables/usePopup'
-import { jsPDF } from 'jspdf'
-import { 
+import { useFirestoreStore } from '@/stores/firestore'
+import {
   PlusIcon,
   DocumentArrowDownIcon,
-  DocumentTextIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  XMarkIcon,
+  ClockIcon,
+  UserGroupIcon,
+  ExclamationTriangleIcon,
   PencilIcon,
-  TrashIcon,
-  XMarkIcon
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 
-// Route e Store
+// Composables
 const route = useRoute()
+const popup = usePopup()
+const { success, error, warning, info } = popup
+const firestoreOperations = useFirestoreOperations()
 const firestoreStore = useFirestoreStore()
-const { success, error, warning, info, confirm } = usePopup()
 
-// Stato reattivo
+// Reactive state
+const loading = ref(false)
 const cantiere = ref(null)
+const entries = ref([])
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const selectedWeek = ref('')
 const showEntryModal = ref(false)
+const showTeamModal = ref(false)
 const editingEntry = ref(null)
-const today = new Date().toISOString().split('T')[0]
-
-// Form per nuova registrazione
-const entryForm = ref({
+const newEntryData = ref({
   data: new Date().toISOString().split('T')[0],
   orarioInizio: '06:00',
   orarioFine: '22:00',
@@ -556,12 +562,8 @@ const entryForm = ref({
   problemiText: '',
   oreTotali: 8,
   costiExtra: 0,
-  team: [], // Team legacy per compatibilità
-  teamPresente: [] // Nuovo array per il team specifico della giornata
+  teamPresente: []
 })
-
-// Registrazioni giornale - vuoto, da caricare da Firestore
-const entries = ref([])
 
 // 💰 Costi cantiere
 const costiCantiere = ref({
@@ -585,36 +587,38 @@ const filteredEntries = computed(() => {
 })
 
 const availableWeeks = computed(() => {
-  // Genera le settimane disponibili basate sulle registrazioni
-  const weeks = []
-  const startOfYear = new Date(new Date().getFullYear(), 0, 1)
+  const weeks = new Set()
   
-  for (let i = 0; i < 52; i++) {
-    const weekStart = new Date(startOfYear.getTime() + (i * 7 * 24 * 60 * 60 * 1000))
-    const weekEnd = new Date(weekStart.getTime() + (6 * 24 * 60 * 60 * 1000))
+  entries.value.forEach(entry => {
+    const date = new Date(entry.data)
+    const weekStart = new Date(date)
+    weekStart.setDate(date.getDate() - date.getDay() + 1)
+    const weekKey = weekStart.toISOString().split('T')[0]
     
-    weeks.push({
-      value: `${weekStart.toISOString().split('T')[0]}_${weekEnd.toISOString().split('T')[0]}`,
-      label: `Settimana ${i + 1} (${weekStart.toLocaleDateString('it-IT')} - ${weekEnd.toLocaleDateString('it-IT')})`
+    weeks.add({
+      value: weekKey,
+      label: `${weekStart.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} - ${
+        new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
+      }`
     })
-  }
+  })
   
-  return weeks
+  return Array.from(weeks).sort((a, b) => b.value.localeCompare(a.value))
 })
 
 // Methods
 const formatDate = (dateString) => {
+  if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('it-IT', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
   })
 }
 
 const newEntry = () => {
   editingEntry.value = null
-  entryForm.value = {
+  newEntryData.value = {
     data: new Date().toISOString().split('T')[0],
     orarioInizio: '06:00',
     orarioFine: '22:00',
@@ -637,7 +641,7 @@ const newEntry = () => {
 
 const editEntry = (entry) => {
   editingEntry.value = entry
-  entryForm.value = {
+  newEntryData.value = {
     data: entry.data,
     orarioInizio: entry.orarioInizio,
     orarioFine: entry.orarioFine,
@@ -660,31 +664,31 @@ const closeEntryModal = () => {
 }
 
 const addAttivita = () => {
-  entryForm.value.attivita.push('')
+  newEntryData.value.attivita.push('')
 }
 
 const removeAttivita = (index) => {
-  entryForm.value.attivita.splice(index, 1)
+  newEntryData.value.attivita.splice(index, 1)
 }
 
 // 👥 ===== FUNZIONI GESTIONE TEAM PRESENTE =====
 
 // Verifica se un membro del team è presente nella registrazione
 const isTeamMemberPresent = (membro) => {
-  return entryForm.value.teamPresente.some(m => m.id === membro.id)
+  return newEntryData.value.teamPresente.some(m => m.id === membro.id)
 }
 
 // Aggiunge/rimuove un membro dal team presente
 const toggleTeamMember = (membro) => {
-  const index = entryForm.value.teamPresente.findIndex(m => m.id === membro.id)
+  const index = newEntryData.value.teamPresente.findIndex(m => m.id === membro.id)
   
   if (index >= 0) {
     // Rimuovi il membro se già presente
-    entryForm.value.teamPresente.splice(index, 1)
+    newEntryData.value.teamPresente.splice(index, 1)
   } else {
     // Aggiungi il membro se non presente
     const pagaOraria = getDipendentePagaOraria(membro.id)
-    entryForm.value.teamPresente.push({
+    newEntryData.value.teamPresente.push({
       id: membro.id,
       nome: membro.nome,
       ruolo: membro.ruolo,
@@ -721,11 +725,11 @@ const getDipendentePagaOraria = (dipendenteId) => {
 
 // Calcola il costo orario del team presente con maggiorazioni
 const calcolayCostoOrarioTeam = () => {
-  return entryForm.value.teamPresente.reduce((total, membro) => {
+  return newEntryData.value.teamPresente.reduce((total, membro) => {
     let pagaOraria = membro.pagaOraria || 25
     
     // Applica maggiorazioni in base al turno e giorno
-    const data = new Date(entryForm.value.data)
+    const data = new Date(newEntryData.value.data)
     const giorno = data.getDay() // 0 = domenica
     
     // Maggiorazione domenica/festivi (+50%)
@@ -734,12 +738,12 @@ const calcolayCostoOrarioTeam = () => {
     }
     
     // Maggiorazione turno notturno (+25%)
-    if (entryForm.value.orarioInizio === '22:00' && entryForm.value.orarioFine === '06:00') {
+    if (newEntryData.value.orarioInizio === '22:00' && newEntryData.value.orarioFine === '06:00') {
       pagaOraria *= 1.25
     }
     
     // Maggiorazione straordinari (+30% dopo 8h)
-    const oreTotali = entryForm.value.oreTotali || 0
+    const oreTotali = newEntryData.value.oreTotali || 0
     if (oreTotali > 8) {
       const oreNormali = 8
       const oreStraordinario = oreTotali - 8
@@ -755,8 +759,8 @@ const calculateDayCost = () => {
   const costoTotale = calcolayCostoOrarioTeam()
   
   // Aggiungi costi extra se specificati
-  if (entryForm.value.costiExtra) {
-    return costoTotale + entryForm.value.costiExtra
+  if (newEntryData.value.costiExtra) {
+    return costoTotale + newEntryData.value.costiExtra
   }
   
   return costoTotale
@@ -764,255 +768,308 @@ const calculateDayCost = () => {
 
 // ===== FINE FUNZIONI GESTIONE TEAM PRESENTE =====
 
-// 📊 Funzione per sincronizzare i timesheet dei dipendenti
-const syncTimesheetFromGiornale = async (entryData, registrazioneId = null) => {
-  if (!entryData.teamPresente?.length || !entryData.data || !cantiere.value?.id) {
-    console.warn('Dati insufficienti per sincronizzare timesheet')
+// 🚀 OTTIMIZZAZIONE: Caricamento iniziale parallelo e veloce
+onMounted(async () => {
+  const cantiereId = route.params.id
+  
+  if (!cantiereId) {
+    console.error('ID cantiere non trovato nella route')
+    popup.error('Errore', 'ID cantiere non valido')
     return
   }
 
   try {
-    // Se è una modifica, prima elimina i vecchi timesheet e presenze
-    if (registrazioneId) {
-      await deleteTimesheetByRegistrazione(registrazioneId)
+    loading.value = true
+    
+    // 🚀 STEP 1: Carica cantiere immediatamente per UI
+    const cantierePromise = firestoreStore.loadCantieri().then(() => {
+      const cantiereFound = firestoreStore.cantieri.find(c => c.id === cantiereId)
+      if (cantiereFound) {
+        cantiere.value = cantiereFound
+        console.log(`📍 Cantiere caricato: ${cantiereFound.nome}`)
+      } else {
+        throw new Error(`Cantiere con ID ${cantiereId} non trovato`)
+      }
+    })
+
+    // 🚀 STEP 2: Carica cantiere prima di tutto
+    await cantierePromise
+    loading.value = false
+    
+    // 🚀 STEP 3: Dopo che il cantiere è caricato, carica i dati dipendenti
+    const secondaryPromises = [
+      firestoreStore.loadDipendenti().catch(console.error),
+      loadGiornaleEntries().catch(console.error) // Ora il cantiere è sicuramente caricato
+    ]
+    
+    // Carica gli altri dati in background
+    Promise.allSettled(secondaryPromises).then(() => {
+      console.log('✅ Caricamento dati completato')
+    })
+    
+  } catch (errorObj) {
+    console.error('Errore nel caricamento del cantiere:', errorObj)
+    popup.error('Errore Caricamento', errorObj.message || 'Impossibile caricare i dati del cantiere')
+    loading.value = false
+  }
+})
+
+// 🚀 OTTIMIZZAZIONE: Caricamento con cache e operazioni parallele
+const loadGiornaleEntries = async () => {
+  try {
+    // Verifica che il cantiere sia caricato
+    if (!cantiere.value?.id) {
+      console.warn('⚠️ Cantiere non ancora caricato, rimandando caricamento giornale')
+      return
+    }
+    
+    // Mostra loading solo se non ci sono già dati
+    if (entries.value.length === 0) {
+      loading.value = true
+    }
+    
+    const result = await firestoreOperations.giornaleCantiere.load(cantiere.value.id)
+    entries.value = result.data || []
+    
+    // Aggiorna i costi accumulati
+    await updateCostiCantiere()
+  } catch (err) {
+    error('Errore', `Caricamento registrazioni fallito: ${err.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 🚀 OTTIMIZZAZIONE: Sincronizzazione timesheet non bloccante
+const syncTimesheetFromGiornale = async (entryData, registrazioneId) => {
+  try {
+    console.log('🔄 Inizio sincronizzazione timesheet (background)')
+    
+    // Verifica che ci siano dati sufficienti
+    if (!entryData.teamPresente?.length || !entryData.data || !entryData.oreTotali) {
+      console.warn('Dati insufficienti per sincronizzare timesheet')
+      return
     }
 
-    // Calcola le ore per ogni dipendente (dividi le ore totali per il numero di persone)
     const orePerPersona = entryData.oreTotali / entryData.teamPresente.length
 
-    for (const membro of entryData.teamPresente) {
-      // Crea voce timesheet per ogni dipendente
-      const timesheetData = {
-        dipendenteId: membro.id,
-        data: entryData.data,
-        cantiere: cantiere.value.nome,
-        cantiereId: cantiere.value.id,
-        ore: orePerPersona,
-        orarioInizio: entryData.orarioInizio || '08:00',
-        orarioFine: entryData.orarioFine || '17:00',
-        note: `Auto-generato da Giornale Cantiere - ${entryData.attivita?.[0] || 'Lavori generici'}`,
-        costoOrario: membro.pagaOraria,
-        costoTotale: orePerPersona * membro.pagaOraria,
-        fonte: 'giornale_cantiere',
-        registrazioneGiornaleId: registrazioneId
-      }
-
-      // Salva timesheet in Firestore
-      const result = await firestoreStore.registraTimesheet(timesheetData)
-      
-      if (result.success) {
-        console.log(`✅ Timesheet creato/aggiornato per ${membro.nome}: ${orePerPersona}h su ${cantiere.value.nome}`)
-        
-        // Crea/aggiorna la presenza con gli stessi orari del timesheet
+    // 🚀 PARALLELIZE: Crea tutte le operazioni in parallelo
+    const operazioniTimesheet = entryData.teamPresente.map(async (membro) => {
+      try {
+        // Crea presenza
         const presenzaData = {
-          id: `${entryData.data}-${membro.id}`,
           dipendenteId: membro.id,
           data: entryData.data,
-          entrata: timesheetData.orarioInizio,
-          uscita: timesheetData.orarioFine,
-          pausa: 60, // Default 1 ora di pausa
-          stato: 'presente',
-          note: `Auto-generato da Giornale Cantiere - ${cantiere.value.nome}`,
+          orarioInizio: entryData.orarioInizio,
+          orarioFine: entryData.orarioFine,
+          oreEffettive: orePerPersona,
+          cantiereId: cantiere.value.id,
+          cantiereNome: cantiere.value.nome,
+          tipoPresenza: 'normale',
+          note: `Presenza registrata da giornale cantiere - ${entryData.attivita?.join(', ') || 'Attività cantiere'}`,
           fonte: 'giornale_cantiere',
           registrazioneGiornaleId: registrazioneId,
-          oreTotali: orePerPersona,
-          updatedAt: new Date().toISOString()
+          createdAt: new Date().toISOString()
         }
 
-        // Salva presenza in Firestore
         const presenzaResult = await firestoreStore.createDocument('presenze', presenzaData)
-
-        if (presenzaResult.success) {
-          console.log(`✅ Presenza creata/aggiornata per ${membro.nome} il ${entryData.data}`)
-        } else {
+        
+        if (!presenzaResult.success) {
           console.error(`❌ Errore creazione presenza per ${membro.nome}:`, presenzaResult.error)
+          return
         }
-      } else {
-        console.error(`❌ Errore creazione timesheet per ${membro.nome}:`, result.error)
+
+        // Crea timesheet
+        const timesheetData = {
+          dipendenteId: membro.id,
+          data: entryData.data,
+          oreLavorate: orePerPersona,
+          cantiereId: cantiere.value.id,
+          fonte: 'giornale_cantiere',
+          registrazioneGiornaleId: registrazioneId,
+          descrizione: `Lavoro su cantiere ${cantiere.value.nome}`,
+          validato: false
+        }
+
+        const result = await firestoreStore.registraTimesheet(timesheetData)
+        
+        if (!result.success) {
+          console.error(`❌ Errore creazione timesheet per ${membro.nome}:`, result.error)
+        } else {
+          console.log(`✅ Timesheet creato per ${membro.nome}: ${orePerPersona}h`)
+        }
+        
+        return result
+      } catch (error) {
+        console.error(`❌ Errore sincronizzazione per ${membro.nome}:`, error)
       }
-    }
+    })
 
-    // Aggiorna le ore settimanali dei dipendenti
-    await updateDipendentiOreSettimanali(entryData.teamPresente, orePerPersona)
-
+    // Esegui tutte le operazioni in parallelo
+    await Promise.allSettled(operazioniTimesheet)
+    console.log('✅ Sincronizzazione timesheet completata (background)')
+    
   } catch (error) {
     console.error('Errore sincronizzazione timesheet/presenze:', error)
   }
 }
 
-// 📈 Aggiorna le ore settimanali accumulate dei dipendenti
-const updateDipendentiOreSettimanali = async (teamPresente, orePerPersona) => {
-  for (const membro of teamPresente) {
-    try {
-      // Trova il dipendente nello store
-      const dipendente = firestoreStore.dipendenti.find(d => d.id === membro.id)
-      
-      if (dipendente) {
-        // Aggiorna le ore settimanali accumulate
-        const nuoveOreTotali = (dipendente.oreTotaliSettimana || 0) + orePerPersona
-        
-        await firestoreStore.updateDocument('dipendenti', membro.id, {
-          oreTotaliSettimana: nuoveOreTotali,
-          cantiereAttuale: cantiere.value.nome, // Aggiorna anche il cantiere attuale
-          ultimaAttivita: new Date().toISOString()
-        })
-        
-        console.log(`📊 Ore settimanali aggiornate per ${membro.nome}: ${nuoveOreTotali}h`)
-      }
-    } catch (error) {
-      console.error(`Errore aggiornamento ore settimanali per ${membro.nome}:`, error)
+// 🔄 OTTIMIZZAZIONE: Aggiornamento costi con cache
+let costiUpdateTimeout = null
+const updateCostiCantiere = async () => {
+  if (!cantiere.value?.id) return
+  
+  try {
+    const updateData = {
+      costiAccumulati: {
+        manodopera: costiCantiere.value.manodopera,
+        materiali: costiCantiere.value.materiali,
+        totale: costiCantiere.value.totale
+      },
+      updatedAt: new Date()
     }
+    
+    await firestoreOperations.update('cantieri', cantiere.value.id, updateData)
+  } catch (err) {
+    console.error('Errore aggiornamento costi:', err)
+  }
+}
+
+// 🔄 Funzione per aggiornare manualmente i costi (pulsante "Aggiorna")
+const refreshCosts = async () => {
+  try {
+    await updateCostiCantiere()
+    success('Costi Aggiornati', 'Calcoli costi cantiere completati!')
+  } catch (error) {
+    console.error('Errore refresh costi:', error)
+    popup.error('Errore', 'Impossibile aggiornare i costi')
   }
 }
 
 const saveEntry = async () => {
   if (!cantiere.value?.id) {
-    error('Errore', 'Cantiere non selezionato')
+    popup.error('Errore', 'Cantiere non selezionato')
     return
   }
 
   try {
+    loading.value = true
+    info('Salvataggio in corso...')
+    
     const entryData = {
-      data: entryForm.value.data,
-      orarioInizio: entryForm.value.orarioInizio,
-      orarioFine: entryForm.value.orarioFine,
-      responsabile: entryForm.value.responsabile,
-      meteo: { ...entryForm.value.meteo },
-      attivita: entryForm.value.attivita.filter(a => a.trim()),
-      note: entryForm.value.note,
-      problemi: entryForm.value.problemiText.split('\n').filter(p => p.trim()),
-      oreTotali: entryForm.value.oreTotali,
-      costiExtra: entryForm.value.costiExtra,
-      team: entryForm.value.team, // Legacy per compatibilità
-      teamPresente: entryForm.value.teamPresente, // Nuovo campo per team specifico
-      costoGiornata: calculateDayCost(), // Calcola e salva il costo della giornata
-      allegati: editingEntry.value?.allegati || []
+      ...newEntryData.value,
+      cantiereId: cantiere.value.id,
+      createdAt: new Date()
     }
-
-    let registrazioneId = null
     
     if (editingEntry.value) {
-      // Aggiorna registrazione esistente
-      await firestoreStore.updateRegistrazioneGiornale(editingEntry.value.id, entryData)
-      registrazioneId = editingEntry.value.id
+      await firestoreOperations.giornaleCantiere.update(editingEntry.value.id, entryData)
     } else {
-      // Crea nuova registrazione
-      const result = await firestoreStore.createRegistrazioneGiornale(cantiere.value.id, entryData)
-      registrazioneId = result.success ? result.data?.id : null
-    }
-
-    // Ricarica le registrazioni
-    await loadGiornaleEntries()
-    
-    // 💰 Aggiorna automaticamente i costi dopo salvataggio registrazione
-    await updateCostiCantiere()
-    
-    // 📊 Sincronizza automaticamente i timesheet dei dipendenti
-    if (!editingEntry.value && registrazioneId) {
-      // Solo per nuove registrazioni, evita duplicati per modifiche
-      console.log('🔄 Sincronizzando timesheet per registrazione:', entryData)
-      await syncTimesheetFromGiornale(entryData, registrazioneId)
-    } else if (editingEntry.value) {
-      console.log('⏩ Modifica registrazione - non sincronizzando timesheet per evitare duplicati')
-    } else {
-      console.warn('⚠️ Impossibile sincronizzare timesheet: ID registrazione non disponibile')
+      await firestoreOperations.giornaleCantiere.create(cantiere.value.id, entryData)
     }
     
-    closeEntryModal()
+    // Chiudi il modal e mostra successo immediatamente
+    showEntryModal.value = false
+    success('Registrazione Salvata', 'I dati sono stati salvati con successo')
     
-    // 🎉 Popup di successo moderno che sparisce dopo 2 secondi
-    const isUpdate = !!editingEntry.value
-    const dataFormatted = new Date(entryForm.value.data).toLocaleDateString('it-IT', {
-      day: 'numeric',
-      month: 'short'
-    })
+    // Aggiorna in background
+    Promise.all([
+      loadGiornaleEntries(),
+      updateCostiCantiere(),
+      syncTimesheet()
+    ]).catch(console.error)
     
-    if (isUpdate) {
-      success(
-        'Registrazione Aggiornata',
-        `${dataFormatted} • ${entryForm.value.oreTotali}h • €${calculateDayCost().toLocaleString()}`
-      )
-    } else {
-      success(
-        'Registrazione Salvata',
-        `${dataFormatted} • ${entryForm.value.teamPresente.length} persone • ${entryForm.value.oreTotali}h • €${calculateDayCost().toLocaleString()}`
-      )
-    }
-  } catch (errorObj) {
-    console.error('Errore nel salvataggio della registrazione:', errorObj)
-    error('Errore Salvataggio', errorObj.message)
+  } catch (err) {
+    error('Errore Salvataggio', err.message)
+  } finally {
+    loading.value = false
   }
 }
 
 const deleteEntry = async (entryId) => {
-  const userConfirmed = await confirm(
-    'Eliminare Registrazione', 
-    'Sei sicuro di voler eliminare questa registrazione? Verranno eliminate anche le voci timesheet associate. Questa azione non può essere annullata.'
-  )
-  
-  if (userConfirmed) {
-    try {
-      // 📊 Prima di eliminare, rimuovi anche i timesheet associati
-      await deleteTimesheetByRegistrazione(entryId)
-      
-      await firestoreStore.deleteRegistrazioneGiornale(entryId)
-      await loadGiornaleEntries()
-      
-      // 💰 Aggiorna automaticamente i costi dopo eliminazione
-      await updateCostiCantiere()
-      
-      // 🗑️ Popup di successo per eliminazione
-      success(
-        'Registrazione Eliminata',
-        'Timesheet e costi aggiornati automaticamente'
-      )
-    } catch (errorObj) {
-      console.error('Errore nell\'eliminazione della registrazione:', errorObj)
-      error('Errore Eliminazione', errorObj.message)
-    }
+  try {
+    loading.value = true
+    
+    await firestoreOperations.giornaleCantiere.delete(entryId)
+    
+    success('Registrazione Eliminata', 'La registrazione è stata eliminata con successo')
+    
+    // Aggiorna in background
+    Promise.all([
+      loadGiornaleEntries(),
+      updateCostiCantiere(),
+      syncTimesheet()
+    ]).catch(console.error)
+    
+  } catch (err) {
+    error('Errore Eliminazione', err.message)
+  } finally {
+    loading.value = false
   }
 }
 
-// 🗑️ Elimina i timesheet e le presenze associati a una registrazione del giornale
-const deleteTimesheetByRegistrazione = async (registrazioneId) => {
+// 🚀 OTTIMIZZAZIONE: Sincronizzazione timesheet
+const syncTimesheet = async () => {
   try {
-    // Carica tutti i timesheet per trovare quelli associati a questa registrazione
-    const timesheetResult = await firestoreStore.loadCollection('timesheet')
+    // Carica tutti i timesheet esistenti per questo cantiere
+    const timesheetResult = await firestoreOperations.load('timesheet', [
+      ['cantiereId', '==', cantiere.value.id]
+    ])
     
-    if (timesheetResult.success) {
-      const timesheetAssociati = timesheetResult.data.filter(t => 
-        t.registrazioneGiornaleId === registrazioneId || 
-        t.fonte === 'giornale_cantiere'
+    // Elimina i vecchi timesheet
+    await Promise.allSettled(
+      timesheetResult.data.map(timesheet => 
+        firestoreOperations.delete('timesheet', timesheet.id)
       )
-      
-      // Elimina ogni timesheet associato
-      for (const timesheet of timesheetAssociati) {
-        await firestoreStore.deleteDocument('timesheet', timesheet.id)
-        console.log(`🗑️ Timesheet eliminato: ${timesheet.id}`)
-      }
-      
-      console.log(`✅ Eliminati ${timesheetAssociati.length} timesheet associati alla registrazione`)
-    }
-
-    // Carica tutte le presenze per trovare quelle associate a questa registrazione
-    const presenzeResult = await firestoreStore.loadCollection('presenze')
+    )
     
-    if (presenzeResult.success) {
-      const presenzeAssociate = presenzeResult.data.filter(p => 
-        p.registrazioneGiornaleId === registrazioneId || 
-        p.fonte === 'giornale_cantiere'
+    // Carica tutte le presenze esistenti
+    const presenzeResult = await firestoreOperations.load('presenze', [
+      ['cantiereId', '==', cantiere.value.id]
+    ])
+    
+    // Elimina le vecchie presenze
+    await Promise.allSettled(
+      presenzeResult.data.map(presenza => 
+        firestoreOperations.delete('presenze', presenza.id)
       )
-      
-      // Elimina ogni presenza associata
-      for (const presenza of presenzeAssociate) {
-        await firestoreStore.deleteDocument('presenze', presenza.id)
-        console.log(`🗑️ Presenza eliminata: ${presenza.id}`)
-      }
-      
-      console.log(`✅ Eliminate ${presenzeAssociate.length} presenze associate alla registrazione`)
-    }
-  } catch (error) {
-    console.error('Errore eliminazione timesheet e presenze associati:', error)
+    )
+    
+    // Crea i nuovi timesheet e presenze in parallelo
+    const promises = entries.value.flatMap(entry => {
+      return entry.teamPresente.map(async membro => {
+        // Trova il dipendente corrispondente
+        const dipendente = firestoreStore.dipendenti.find(d => d.id === membro.id)
+        if (!dipendente) return null
+        
+        // Crea timesheet
+        const timesheetData = {
+          dipendenteId: membro.id,
+          cantiereId: cantiere.value.id,
+          data: entry.data,
+          oreLavorate: membro.oreLavorate || 8,
+          costoOrario: dipendente.pagaOraria || 0
+        }
+        
+        // Crea presenza
+        const presenzaData = {
+          dipendenteId: membro.id,
+          cantiereId: cantiere.value.id,
+          data: entry.data,
+          tipo: 'cantiere',
+          note: `Cantiere: ${cantiere.value.nome}`
+        }
+        
+        return Promise.all([
+          firestoreOperations.create('timesheet', timesheetData),
+          firestoreOperations.create('presenze', presenzaData)
+        ])
+      })
+    })
+    
+    await Promise.allSettled(promises)
+  } catch (err) {
+    console.error('Errore sincronizzazione timesheet:', err)
   }
 }
 
@@ -1023,7 +1080,7 @@ const resetFilters = () => {
 
 const exportPDF = () => {
   if (!cantiere.value) {
-          error('Errore Export', 'Dati cantiere non disponibili')
+          popup.error('Errore Export', 'Dati cantiere non disponibili')
     return
   }
 
@@ -1234,174 +1291,21 @@ const exportPDF = () => {
     
   } catch (errorObj) {
     console.error('Errore durante l\'export PDF:', errorObj)
-    error('Errore Export', errorObj.message)
+    popup.error('Errore Export', errorObj.message)
   }
 }
 
 // Watch per cambiamenti di route
 watch(() => route.params.id, async (newId) => {
-  if (newId) {
-    await loadCantiereData()
+  if (newId && newId !== cantiere.value?.id) {
+    // Ricarica solo se l'ID è effettivamente cambiato
+    const cantiereFound = firestoreStore.cantieri.find(c => c.id === newId)
+    if (cantiereFound) {
+      cantiere.value = cantiereFound
+      await loadGiornaleEntries()
+    }
   }
 }, { immediate: false })
-
-// Lifecycle
-onMounted(async () => {
-  // Carica i dati del cantiere
-  await loadCantiereData()
-})
-
-const loadCantiereData = async () => {
-  try {
-    // Ottieni l'ID del cantiere dalla route
-    const cantiereId = route.params.id
-    
-    if (!cantiereId) {
-      console.error('ID cantiere non trovato nella route')
-      error('Errore Navigazione', 'ID cantiere non trovato')
-      return
-    }
-    
-    // Carica i cantieri dal store se non sono già stati caricati
-    if (firestoreStore.cantieri.length === 0) {
-      await firestoreStore.loadCantieri()
-    }
-    
-    // Trova il cantiere specifico
-    cantiere.value = firestoreStore.cantieri.find(c => c.id === cantiereId)
-    
-    if (!cantiere.value) {
-      console.error(`Cantiere con ID ${cantiereId} non trovato`)
-      error('Cantiere Non Trovato', `ID ${cantiereId} non valido`)
-    } else {
-      // Carica anche le registrazioni del giornale
-      await loadGiornaleEntries()
-      
-      // 👥 Carica i dipendenti per avere le paghe orarie
-      if (firestoreStore.dipendenti.length === 0) {
-        await firestoreStore.loadDipendenti()
-      }
-    }
-  } catch (errorObj) {
-    console.error('Errore nel caricamento del cantiere:', errorObj)
-    error('Errore Caricamento', errorObj.message)
-  }
-}
-
-const loadGiornaleEntries = async () => {
-  try {
-    const cantiereId = route.params.id
-    if (!cantiereId) return
-    
-    const result = await firestoreStore.loadGiornaleCantiere(cantiereId)
-    if (result.success) {
-      entries.value = result.data
-      
-      // 💰 Carica automaticamente i costi quando si caricano le registrazioni
-      await updateCostiCantiere()
-    } else {
-      console.error('Errore nel caricamento delle registrazioni:', result.error)
-    }
-  } catch (error) {
-    console.error('Errore nel caricamento delle registrazioni del giornale:', error)
-  }
-}
-
-// 💰 ===== FUNZIONI GESTIONE COSTI =====
-
-// Calcola e aggiorna i costi del cantiere
-const updateCostiCantiere = async () => {
-  if (!cantiere.value?.id) return
-  
-  try {
-    // Calcola costi manodopera dalle registrazioni del giornale
-    const costiManodopera = await calculateLaborCosts()
-    
-    // Calcola costi materiali utilizzati
-    const costiMateriali = await calculateMaterialsCosts()
-    
-    // Statistiche generali
-    const giorniLavorativi = entries.value.length
-    const oreTotali = entries.value.reduce((sum, entry) => sum + (entry.oreTotali || 8), 0)
-    const costiTotali = costiManodopera + costiMateriali
-    const costoMedioGiorno = giorniLavorativi > 0 ? costiTotali / giorniLavorativi : 0
-    
-    // Aggiorna i costi locali
-    costiCantiere.value = {
-      manodopera: costiManodopera,
-      materiali: costiMateriali,
-      totale: costiTotali,
-      giorniLavorativi,
-      oreTotali,
-      costoMedioGiorno
-    }
-    
-    console.log('💰 Costi cantiere aggiornati:', costiCantiere.value)
-    
-  } catch (error) {
-    console.error('Errore calcolo costi cantiere:', error)
-  }
-}
-
-// Calcola i costi della manodopera dalle registrazioni del giornale
-const calculateLaborCosts = async () => {
-  if (!entries.value.length) return 0
-  
-  let costoTotale = 0
-  
-  for (const entry of entries.value) {
-    // 🆕 Usa il team specifico della registrazione se disponibile, altrimenti fallback
-    const teamGiorno = entry.teamPresente || entry.team || cantiere.value?.team || []
-    const oreLavorate = entry.oreTotali || 8
-    
-    // Se il costo è già salvato nella registrazione, usalo direttamente
-    if (entry.costoGiornata && entry.costoGiornata > 0) {
-      costoTotale += entry.costoGiornata
-    } else {
-      // Calcola il costo per questa giornata basato sul team presente
-      const costoGiornata = teamGiorno.reduce((sum, membro) => {
-        // Paga oraria di default €25/h se non specificata
-        const pagaOraria = membro.pagaOraria || 25
-        return sum + (pagaOraria * oreLavorate)
-      }, 0)
-      
-      costoTotale += costoGiornata
-    }
-  }
-  
-  return costoTotale
-}
-
-// Calcola i costi dei materiali utilizzati
-const calculateMaterialsCosts = async () => {
-  if (!cantiere.value?.id) return 0
-  
-  try {
-    // Carica i materiali del cantiere dal Firestore
-    const result = await firestoreStore.loadMaterialiCantiere(cantiere.value.id)
-    
-    if (!result.success || !result.data) return 0
-    
-    // Calcola il costo totale dei materiali utilizzati (non solo richiesti)
-    const costoMateriali = result.data.reduce((total, materiale) => {
-      const quantitaUtilizzata = materiale.quantitaUtilizzata || 0
-      const prezzoUnitario = materiale.prezzoUnitario || 0
-      return total + (quantitaUtilizzata * prezzoUnitario)
-    }, 0)
-    
-    return costoMateriali
-    
-  } catch (error) {
-    console.error('Errore calcolo costi materiali:', error)
-    return 0
-  }
-}
-
-// Funzione per aggiornare manualmente i costi (pulsante "Aggiorna")
-const refreshCosts = async () => {
-  await updateCostiCantiere()
-  success('Costi Aggiornati', 'Calcoli costi cantiere completati!')
-}
 
 // Calcola le ore tra due orari
 const calculateHours = (startTime, endTime) => {
@@ -1427,13 +1331,11 @@ const calculateHours = (startTime, endTime) => {
 }
 
 // Watch per aggiornare automaticamente le ore totali quando cambiano gli orari
-watch([() => entryForm.value.orarioInizio, () => entryForm.value.orarioFine], ([newStart, newEnd]) => {
+watch([() => newEntryData.value.orarioInizio, () => newEntryData.value.orarioFine], ([newStart, newEnd]) => {
   if (newStart && newEnd) {
-    entryForm.value.oreTotali = calculateHours(newStart, newEnd)
+    newEntryData.value.oreTotali = calculateHours(newStart, newEnd)
   }
 })
-
-// ===== FINE FUNZIONI GESTIONE COSTI =====
 </script>
 
 <style scoped>

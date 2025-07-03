@@ -6,7 +6,8 @@ import { useFirestoreRealtime } from '@/composables/useFirestoreRealtime'
 import { usePopup } from '@/composables/usePopup'
 import { useToast } from '@/composables/useToast'
 import { useFirestoreStore } from '@/stores/firestore'
-import { db } from '@/config/firebase'
+import { db, storage } from '@/config/firebase'
+import { ref as storageRef, getDownloadURL, uploadBytes, deleteObject } from 'firebase/storage'
 import { doc, getDoc, runTransaction } from 'firebase/firestore'
 import {
   PlusIcon,
@@ -23,6 +24,7 @@ import {
   TrashIcon,
   DocumentTextIcon
 } from '@heroicons/vue/24/outline'
+import { useFirestoreOperations } from '@/composables/useFirestoreOperations'
 
 const router = useRouter()
 const popup = usePopup()
@@ -30,6 +32,7 @@ const { showToast } = useToast()
 const firestore = useFirestore()
 const firestoreRealtime = useFirestoreRealtime()
 const firestoreStore = useFirestoreStore()
+const firestoreOperations = useFirestoreOperations()
 
 // Reactive state
 const cantieri = ref([])
@@ -78,6 +81,8 @@ const materialSelectionMode = ref('existing')
 const selectedMaterialFromStock = ref('')
 const selectedMaterial = ref(null)
 const editingMaterial = ref(null)
+const newMaterial = ref(null)
+const loading = ref(false)
 const materialiCantiere = ref([])
 const materialiMagazzino = ref([])
 const fornitori = ref([])
@@ -317,13 +322,31 @@ const isScaduto = (scadenza) => {
   return dataScadenza < oggi
 }
 
-const formatDate = (date) => {
+const formatDate = (date, includeTime = false) => {
   if (!date) return 'Non definita'
-  return new Date(date).toLocaleDateString('it-IT', {
+  
+  const options = {
     day: '2-digit',
-    month: '2-digit', 
+    month: '2-digit',
     year: 'numeric'
-  })
+  }
+  
+  if (includeTime) {
+    options.hour = '2-digit'
+    options.minute = '2-digit'
+  }
+  
+  return new Date(date).toLocaleString('it-IT', options)
+}
+
+// 📊 Helper per lo storico progresso cantiere
+const getProgressHistory = (cantiereId) => {
+  // TODO: Implementare caricamento storico progresso da Firestore
+  // Per ora ritorna un array vuoto per evitare errori
+  if (!cantiereId) return []
+  
+  // Placeholder per futura implementazione
+  return []
 }
 
 // 📎 Helper per allegati (placeholder per futura implementazione)
@@ -373,6 +396,11 @@ onMounted(async () => {
     const clientiResult = await firestore.clientiOperations.load()
     if (clientiResult.success) {
       availableClients.value = clientiResult.data
+    }
+
+    // 🚀 Precarica i dipendenti per ridurre il lag dell'apertura team modal
+    if (!firestoreStore.dipendenti.length) {
+      firestoreStore.loadDipendenti().catch(console.error)
     }
   } catch (error) {
     console.error('Errore inizializzazione:', error)
@@ -426,6 +454,9 @@ const closeManageMaterialsModal = () => {
 
 const closeAddMaterialModal = () => {
   showAddMaterialModal.value = false
+  newMaterial.value = null
+  materialSelectionMode.value = 'existing'
+  selectedMaterialFromStock.value = ''
 }
 
 const closeEditMaterialModal = () => {
@@ -435,6 +466,466 @@ const closeEditMaterialModal = () => {
 
 const closeMaterialAttachmentsModal = () => {
   showMaterialAttachmentsModal.value = false
+}
+
+// 🔧 FUNZIONI GESTIONE MATERIALI CANTIERE - Fix funzioni mancanti
+
+const addMaterialToCantiere = async () => {
+  try {
+    // Carica materiali dal magazzino se non già caricati
+    if (materialiMagazzino.value.length === 0) {
+      await firestoreStore.loadMateriali()
+      materialiMagazzino.value = firestoreStore.materiali
+    }
+    
+    // Carica fornitori se non già caricati
+    if (fornitori.value.length === 0) {
+      await firestoreStore.loadFornitori()
+      fornitori.value = firestoreStore.fornitori
+    }
+    
+    // Inizializza nuovo materiale
+    newMaterial.value = {
+      nome: '',
+      codice: '',
+      descrizione: '',
+      quantitaRichiesta: 1,
+      unita: 'pz',
+      prezzoUnitario: 0,
+      stato: 'ordinato',
+      fornitoreId: '',
+      dataAcquisto: '',
+      note: ''
+    }
+    
+    // Reset selezioni
+    materialSelectionMode.value = 'existing'
+    selectedMaterialFromStock.value = ''
+    
+    // Apri modal
+    showAddMaterialModal.value = true
+    
+  } catch (err) {
+    console.error('Errore apertura modal materiali:', err)
+    popup.error('Errore', `Impossibile aprire la gestione materiali: ${err.message}`)
+  }
+}
+
+const getSelectedMaterialFromStock = () => {
+  if (!selectedMaterialFromStock.value) return null
+  return materialiMagazzino.value.find(m => m.id === selectedMaterialFromStock.value)
+}
+
+const fillMaterialFromStock = () => {
+  const selected = getSelectedMaterialFromStock()
+  if (selected && newMaterial.value) {
+    newMaterial.value = {
+      ...newMaterial.value,
+      nome: selected.nome,
+      codice: selected.codice,
+      descrizione: selected.descrizione,
+      unita: selected.unita,
+      prezzoUnitario: selected.prezzoUnitario || 0
+    }
+  }
+}
+
+const saveMaterialToCantiere = async () => {
+  try {
+    if (!selectedCantiere.value || !newMaterial.value) {
+      popup.error('Errore', 'Dati mancanti per il salvataggio')
+      return
+    }
+    
+    loading.value = true
+    
+    let materialeData = { ...newMaterial.value }
+    
+    // Se selezione da magazzino, aggiunge reference al materiale originale
+    if (materialSelectionMode.value === 'existing' && selectedMaterialFromStock.value) {
+      materialeData.materialeId = selectedMaterialFromStock.value
+      materialeData.tipoMateriale = 'magazzino'
+    } else {
+      materialeData.tipoMateriale = 'cantiere'
+    }
+    
+    // Aggiungi al cantiere
+    const result = await firestoreStore.createMaterialeCantiere(selectedCantiere.value.id, materialeData)
+    
+    if (result.success) {
+      // Ricarica materiali cantiere
+      const materialiResult = await firestoreStore.loadMaterialiCantiere(selectedCantiere.value.id)
+      if (materialiResult.success) {
+        materialiCantiere.value = materialiResult.data
+      }
+      
+      popup.success('Materiale Aggiunto', 'Il materiale è stato aggiunto al cantiere con successo')
+      closeAddMaterialModal()
+    } else {
+      throw new Error(result.error)
+    }
+    
+  } catch (err) {
+    console.error('Errore salvataggio materiale:', err)
+    popup.error('Errore Salvataggio', err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+const manageMaterialAttachments = async (materiale) => {
+  try {
+    loading.value = true
+    selectedMaterial.value = materiale
+    
+    // Carica gli allegati del materiale dal database
+    const allegatiResult = await firestoreStore.loadAllegatiMateriale(materiale.id)
+    if (allegatiResult.success) {
+      selectedMaterial.value.allegati = allegatiResult.data || []
+    } else {
+      selectedMaterial.value.allegati = []
+      console.warn('Impossibile caricare allegati materiale:', allegatiResult.error)
+    }
+    
+    showMaterialAttachmentsModal.value = true
+  } catch (err) {
+    console.error('Errore apertura modal allegati materiale:', err)
+    popup.error('Errore', `Impossibile aprire la gestione allegati: ${err.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+const editMaterialInCantiere = async (materiale) => {
+  try {
+    editingMaterial.value = { ...materiale }
+    showEditMaterialModal.value = true
+  } catch (err) {
+    console.error('Errore apertura modal modifica materiale:', err)
+    popup.error('Errore', `Impossibile modificare il materiale: ${err.message}`)
+  }
+}
+
+const removeMaterialFromCantiere = async (materialeId) => {
+  try {
+    const confirmed = await popup.confirm(
+      'Conferma Eliminazione',
+      'Sei sicuro di voler rimuovere questo materiale dal cantiere? Questa azione non può essere annullata.'
+    )
+    
+    if (!confirmed) return
+    
+    loading.value = true
+    
+    const result = await firestoreStore.deleteMaterialeCantiere(materialeId)
+    
+    if (result.success) {
+      // Ricarica materiali cantiere
+      const materialiResult = await firestoreStore.loadMaterialiCantiere(selectedCantiere.value.id)
+      if (materialiResult.success) {
+        materialiCantiere.value = materialiResult.data
+      }
+      
+      popup.success('Materiale Rimosso', 'Il materiale è stato rimosso dal cantiere con successo')
+    } else {
+      throw new Error(result.error)
+    }
+    
+  } catch (err) {
+    console.error('Errore eliminazione materiale:', err)
+    popup.error('Errore Eliminazione', err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 🔧 FUNZIONI GESTIONE ALLEGATI CANTIERI - Fix funzioni mancanti
+
+const handleFileUpload = async (event) => {
+  try {
+    const files = Array.from(event.target.files)
+    if (!files.length || !selectedCantiere.value) return
+    
+    loading.value = true
+    
+    for (const file of files) {
+      // Validazione file
+      if (file.size > 10 * 1024 * 1024) { // 10MB max
+        popup.warning('File Troppo Grande', `Il file ${file.name} supera i 10MB`)
+        continue
+      }
+      
+      // Prepara i dati dell'allegato
+      const allegatoData = {
+        name: file.name,
+        size: file.size,
+        type: file.type.split('/')[1] || 'unknown',
+        uploadDate: new Date(),
+        description: '',
+        file: file
+      }
+      
+      // Carica l'allegato
+      const result = await firestoreStore.createAllegatoCantiere(selectedCantiere.value.id, allegatoData)
+      if (!result.success) {
+        popup.error('Errore Upload', `Errore durante l'upload di ${file.name}: ${result.error}`)
+      }
+    }
+    
+    popup.success('Upload Completato', `${files.length} file(s) caricati con successo`)
+    
+    // Reset input
+    event.target.value = ''
+    
+  } catch (err) {
+    console.error('Errore upload allegati cantiere:', err)
+    popup.error('Errore Upload', err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+const openFile = async (attachment) => {
+  try {
+    if (attachment.url) {
+      window.open(attachment.url, '_blank')
+    } else {
+      popup.info('Apertura File', 'Il file verrà scaricato automaticamente')
+      await downloadFile(attachment)
+    }
+  } catch (err) {
+    console.error('Errore apertura file:', err)
+    popup.error('Errore', 'Impossibile aprire il file')
+  }
+}
+
+const downloadFile = async (attachment) => {
+  try {
+    // Se l'attachment ha un URL diretto, usalo
+    if (attachment.url) {
+      const link = document.createElement('a')
+      link.href = attachment.url
+      link.download = attachment.name
+      link.click()
+    } else {
+      popup.info('Download', 'Funzionalità di download in fase di implementazione')
+    }
+  } catch (err) {
+    console.error('Errore download file:', err)
+    popup.error('Errore', 'Impossibile scaricare il file')
+  }
+}
+
+const deleteFile = async (attachment) => {
+  try {
+    const confirmed = await popup.confirm(
+      'Conferma Eliminazione',
+      `Sei sicuro di voler eliminare il file "${attachment.name}"? Questa azione non può essere annullata.`
+    )
+    
+    if (!confirmed) return
+    
+    loading.value = true
+    
+    const result = await firestoreStore.deleteAllegatoCantiere(attachment.id)
+    if (result.success) {
+      popup.success('File Eliminato', 'Il file è stato eliminato con successo')
+    } else {
+      throw new Error(result.error)
+    }
+    
+  } catch (err) {
+    console.error('Errore eliminazione file:', err)
+    popup.error('Errore Eliminazione', err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 🔧 FUNZIONI GESTIONE ALLEGATI MATERIALI - Fix funzioni mancanti
+
+const handleMaterialFileUpload = async (event) => {
+  try {
+    const files = Array.from(event.target.files)
+    if (!files.length || !selectedMaterial.value) return
+    
+    loading.value = true
+    
+    for (const file of files) {
+      // Validazione file
+      if (file.size > 10 * 1024 * 1024) { // 10MB max
+        popup.warning('File Troppo Grande', `Il file ${file.name} supera i 10MB`)
+        continue
+      }
+      
+      // 1. Carica il file su Firebase Storage
+      const timestamp = Date.now()
+      const fileName = `${timestamp}_${file.name}`
+      const fileRef = storageRef(storage, `materiali/${selectedMaterial.value.id}/${fileName}`)
+      
+      await uploadBytes(fileRef, file)
+      const downloadURL = await getDownloadURL(fileRef)
+      
+      // 2. Prepara i dati dell'allegato per Firestore
+      const allegatoData = {
+        name: fileName,
+        originalName: file.name,
+        size: file.size,
+        type: file.type.split('/')[1] || 'unknown',
+        uploadedAt: new Date(),
+        description: '',
+        category: 'Generale',
+        fornitore: getFornitoreById(selectedMaterial.value.fornitoreId)?.nome,
+        url: downloadURL,
+        path: `materiali/${selectedMaterial.value.id}/${fileName}`
+      }
+      
+      // 3. Salva i metadati in Firestore
+      const result = await firestoreStore.createAllegatoMateriale(selectedMaterial.value.id, allegatoData)
+      if (!result.success) {
+        popup.error('Errore Upload', `Errore durante l'upload di ${file.name}: ${result.error}`)
+      }
+    }
+    
+    popup.success('Upload Completato', `${files.length} file(s) caricati con successo`)
+    
+    // Ricarica gli allegati per aggiornare la visualizzazione
+    const allegatiResult = await firestoreStore.loadAllegatiMateriale(selectedMaterial.value.id)
+    if (allegatiResult.success) {
+      selectedMaterial.value.allegati = allegatiResult.data || []
+    }
+    
+    // Reset input
+    event.target.value = ''
+    
+  } catch (err) {
+    console.error('Errore upload allegati materiale:', err)
+    popup.error('Errore Upload', err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+const openMaterialFile = async (attachment) => {
+  try {
+    if (attachment.url) {
+      window.open(attachment.url, '_blank')
+    } else {
+      popup.info('Apertura File', 'Il file verrà scaricato automaticamente')
+      await downloadMaterialFile(attachment)
+    }
+  } catch (err) {
+    console.error('Errore apertura file materiale:', err)
+    popup.error('Errore', 'Impossibile aprire il file')
+  }
+}
+
+const downloadMaterialFile = async (attachment) => {
+  try {
+    loading.value = true
+    
+    // Se abbiamo già l'URL di download, usalo
+    if (attachment.url) {
+      const link = document.createElement('a')
+      link.href = attachment.url
+      link.download = attachment.originalName || attachment.name
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else {
+      // Altrimenti prova a ottenerlo da Storage usando il path salvato
+      const fileRef = storageRef(storage, attachment.path || `materiali/${attachment.materialeId}/${attachment.name}`)
+      const url = await getDownloadURL(fileRef)
+      
+      const link = document.createElement('a')
+      link.href = url
+      link.download = attachment.originalName || attachment.name
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+    
+    popup.success('Download Avviato', `Il file ${attachment.originalName || attachment.name} verrà scaricato a breve`)
+  } catch (err) {
+    console.error('Errore download file materiale:', err)
+    popup.error('Errore', 'Impossibile scaricare il file: ' + err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+const deleteMaterialFile = async (attachment) => {
+  try {
+    const confirmed = await popup.confirm(
+      'Conferma Eliminazione',
+      `Sei sicuro di voler eliminare il file "${attachment.originalName || attachment.name}"? Questa azione non può essere annullata.`
+    )
+    
+    if (!confirmed) return
+    
+    loading.value = true
+    
+    // 1. Elimina il file da Firebase Storage
+    try {
+      const fileRef = storageRef(storage, attachment.path || `materiali/${attachment.materialeId}/${attachment.name}`)
+      await deleteObject(fileRef)
+    } catch (storageErr) {
+      console.warn('Errore eliminazione file da storage:', storageErr)
+      // Continuiamo comunque con l'eliminazione del record da Firestore
+    }
+    
+    // 2. Elimina il record da Firestore
+    const result = await firestoreStore.deleteAllegatoMateriale(attachment.id)
+    if (result.success) {
+      // 3. Ricarica gli allegati per aggiornare la visualizzazione
+      const allegatiResult = await firestoreStore.loadAllegatiMateriale(selectedMaterial.value.id)
+      if (allegatiResult.success) {
+        selectedMaterial.value.allegati = allegatiResult.data || []
+      }
+      
+      popup.success('File Eliminato', 'Il file è stato eliminato con successo')
+    } else {
+      throw new Error(result.error)
+    }
+    
+  } catch (err) {
+    console.error('Errore eliminazione file materiale:', err)
+    popup.error('Errore Eliminazione', err.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+const saveMaterialChanges = async () => {
+  try {
+    if (!editingMaterial.value) {
+      popup.error('Errore', 'Nessun materiale in modifica')
+      return
+    }
+    
+    loading.value = true
+    
+    const result = await firestoreStore.updateMaterialeCantiere(editingMaterial.value.id, editingMaterial.value)
+    
+    if (result.success) {
+      // Ricarica materiali cantiere
+      const materialiResult = await firestoreStore.loadMaterialiCantiere(selectedCantiere.value.id)
+      if (materialiResult.success) {
+        materialiCantiere.value = materialiResult.data
+      }
+      
+      popup.success('Materiale Aggiornato', 'Le modifiche sono state salvate con successo')
+      closeEditMaterialModal()
+    } else {
+      throw new Error(result.error)
+    }
+    
+  } catch (err) {
+    console.error('Errore salvataggio modifiche materiale:', err)
+    popup.error('Errore Salvataggio', err.message)
+  } finally {
+    loading.value = false
+  }
 }
 
 // 🔄 Funzioni di gestione cantieri
@@ -466,45 +957,36 @@ const resetNewCantiere = () => {
 
 const refreshCantiereCosts = async (cantiere) => {
   try {
-    // Calcola i costi dei materiali
-    const materialiResult = await firestore.materialiCantiereOperations.load(cantiere.id)
-    const costoMateriali = materialiResult.data.reduce((acc, mat) => 
-      acc + (mat.prezzoUnitario * mat.quantita), 0)
-
+    loading.value = true
+    popup.info('Aggiornamento costi in corso...')
+    
     // Calcola i costi della manodopera dal timesheet
-    const timesheetResult = await firestore.timesheetOperations.getCantiereTimesheet(cantiere.id)
-    const costoManodopera = timesheetResult.data.reduce((acc, entry) => 
-      acc + (entry.oreLavorate * entry.costoOrario), 0)
-
+    const timesheetResult = await firestoreOperations.load('timesheet', [
+      ['cantiereId', '==', cantiere.id]
+    ])
+    
+    const costoManodopera = timesheetResult.data.reduce((acc, entry) => {
+      const dipendente = firestoreStore.dipendenti.find(d => d.id === entry.dipendenteId)
+      return acc + (entry.oreLavorate * (dipendente?.pagaOraria || 0))
+    }, 0)
+    
     // Aggiorna i costi accumulati
-    const costiAccumulati = {
-      materiali: costoMateriali,
-      manodopera: costoManodopera,
-      totale: costoMateriali + costoManodopera
+    const updateData = {
+      costiAccumulati: {
+        manodopera: costoManodopera,
+        materiali: cantiere.costiAccumulati?.materiali || 0,
+        totale: costoManodopera + (cantiere.costiAccumulati?.materiali || 0)
+      },
+      updatedAt: new Date()
     }
-
-    // Aggiorna il cantiere
-    const result = await firestore.cantieriOperations.update(cantiere.id, {
-      costiAccumulati,
-      updatedAt: new Date().toISOString()
-    })
-
-    if (result.success) {
-      // Aggiorna il cantiere nella lista locale
-      const index = cantieri.value.findIndex(c => c.id === cantiere.id)
-      if (index !== -1) {
-        cantieri.value[index] = {
-          ...cantieri.value[index],
-          costiAccumulati
-        }
-      }
-      showToast('Costi aggiornati con successo', 'success')
-    } else {
-      throw new Error(result.error || 'Errore durante l\'aggiornamento dei costi')
-    }
-  } catch (error) {
-    console.error('Errore aggiornamento costi:', error)
-    popup.error('Errore', 'Impossibile aggiornare i costi del cantiere')
+    
+    await firestoreOperations.update('cantieri', cantiere.id, updateData)
+    popup.success('Costi Aggiornati', 'I costi del cantiere sono stati aggiornati con successo')
+    
+  } catch (err) {
+    popup.error('Errore Aggiornamento Costi', err.message)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -514,7 +996,13 @@ const showCantiereDetail = (cantiere) => {
 }
 
 const editCantiere = (cantiere) => {
-  editingCantiere.value = { ...cantiere }
+  // Crea una copia profonda per gestire correttamente l'oggetto cliente
+  editingCantiere.value = {
+    ...cantiere,
+    cliente: typeof cantiere.cliente === 'object' && cantiere.cliente 
+      ? { ...cantiere.cliente }
+      : { nome: cantiere.cliente || '' }
+  }
   showEditModal.value = true
 }
 
@@ -523,9 +1011,34 @@ const updateProgress = (cantiere) => {
   showProgressModal.value = true
 }
 
-const viewMaterials = (cantiere) => {
-  selectedCantiere.value = cantiere
-  showManageMaterialsModal.value = true
+const viewMaterials = async (cantiere) => {
+  try {
+    loading.value = true
+    selectedCantiere.value = cantiere
+    
+    // Carica materiali del cantiere
+    const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiere.id)
+    if (materialiResult.success) {
+      materialiCantiere.value = materialiResult.data
+    } else {
+      materialiCantiere.value = []
+    }
+    
+    showManageMaterialsModal.value = true
+    
+  } catch (err) {
+    console.error('Errore caricamento materiali cantiere:', err)
+    popup.error('Errore', `Impossibile caricare i materiali: ${err.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+const manageMaterials = () => {
+  // Questa funzione viene chiamata dal modal "visualizza" per andare al modal "gestione"
+  // Per ora è identica a viewMaterials, ma potrebbe essere espansa in futuro
+  // Il modal è già aperto, quindi non serve riaprirlo
+  console.log('Modal gestione materiali già aperto')
 }
 
 const manageAttachments = (cantiere) => {
@@ -533,7 +1046,7 @@ const manageAttachments = (cantiere) => {
   showAttachmentsModal.value = true
 }
 
-const manageTeam = (cantiere) => {
+const manageTeam = async (cantiere) => {
   selectedCantiere.value = cantiere
   showTeamModal.value = true
 }
@@ -548,43 +1061,15 @@ const openDailyLog = (cantiere) => {
 
 const deleteCantiere = async (cantiere) => {
   try {
-    // Chiedi conferma prima di procedere
-    const confirmed = await popup.confirm(
-      'Elimina Cantiere',
-      `Sei sicuro di voler eliminare il cantiere "${cantiere.nome}"? Questa azione non può essere annullata.`
-    )
-
-    if (!confirmed) return
-
-    // Mostra loading state
-    popup.info('Eliminazione in corso...', 'Verifica dipendenze e eliminazione cantiere')
-
-    try {
-      const result = await firestore.cantieriOperations.delete(cantiere.id)
-      
-      if (result.success) {
-        // Mostra conferma
-        popup.success('Cantiere Eliminato', `Il cantiere "${cantiere.nome}" è stato eliminato con successo`)
-        
-        // Chiudi eventuali modali aperti
-        if (showDetailModal.value && selectedCantiere.value?.id === cantiere.id) {
-          closeDetailModal()
-        }
-      }
-    } catch (error) {
-      if (error.message.includes('dipendenze')) {
-        popup.error(
-          'Impossibile Eliminare',
-          'Il cantiere ha materiali, allegati o altre dipendenze associate. Rimuovi prima tutte le dipendenze.'
-        )
-      } else {
-        popup.error('Errore Eliminazione', error.message || 'Si è verificato un errore durante l\'eliminazione del cantiere')
-      }
-      console.error('Errore eliminazione cantiere:', error)
-    }
-  } catch (error) {
-    console.error('Errore generale eliminazione:', error)
-    popup.error('Errore', 'Si è verificato un errore imprevisto')
+    loading.value = true
+    
+    await firestoreOperations.delete('cantieri', cantiere.id)
+    popup.success('Cantiere Eliminato', 'Il cantiere è stato eliminato con successo')
+    
+  } catch (err) {
+    popup.error('Errore Eliminazione', err.message)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -626,7 +1111,7 @@ const addCantiere = async () => {
       }
 
       // Crea il cliente in Firestore
-      const clienteResult = await firestore.clientiOperations.create(nuovoCliente)
+      const clienteResult = await firestoreStore.createCliente(nuovoCliente)
       if (!clienteResult.success) {
         throw new Error('Errore durante la creazione del cliente')
       }
@@ -645,7 +1130,7 @@ const addCantiere = async () => {
     }
 
     // Crea il cantiere in Firestore
-    const result = await firestore.cantieriOperations.create(cantiereData)
+    const result = await firestoreStore.createCantiere(cantiereData)
     
     if (result.success) {
       popup.success('Successo', 'Cantiere creato con successo')
@@ -661,26 +1146,30 @@ const addCantiere = async () => {
 
 const saveCantiere = async () => {
   try {
-    if (!editingCantiere.value.nome || !editingCantiere.value.valore) {
-      popup.error('Campi Mancanti', 'Nome e valore sono obbligatori')
-      return
-    }
-
-    const result = await firestore.cantieriOperations.update(editingCantiere.value.id, editingCantiere.value)
+    loading.value = true
+    popup.info('Salvataggio in corso...')
     
-    if (result.success) {
-      const index = cantieri.value.findIndex(c => c.id === editingCantiere.value.id)
-      if (index !== -1) {
-        cantieri.value[index] = { ...editingCantiere.value }
-      }
-      closeEditModal()
-      popup.success('Cantiere Aggiornato', `"${editingCantiere.value.nome}" è stato aggiornato con successo`)
+    if (editingCantiere.value.id) {
+      await firestoreOperations.update('cantieri', editingCantiere.value.id, editingCantiere.value)
+      popup.success('Cantiere Aggiornato', 'Le modifiche sono state salvate con successo')
     } else {
-      throw new Error(result.error || 'Errore durante l\'aggiornamento')
+      // Se il cliente è nuovo, crealo prima
+      if (typeof editingCantiere.value.cliente === 'string') {
+        const clienteResult = await firestoreOperations.create('clienti', nuovoCliente.value)
+        editingCantiere.value.cliente = clienteResult.data
+      }
+      
+      await firestoreOperations.cantieri.create(editingCantiere.value)
+      popup.success('Cantiere Creato', 'Il nuovo cantiere è stato creato con successo')
     }
-  } catch (error) {
-    console.error('Errore aggiornamento cantiere:', error)
-    popup.error('Errore Aggiornamento', 'Si è verificato un errore durante l\'aggiornamento del cantiere')
+    
+    showNewCantiereModal.value = false
+    showEditModal.value = false
+    
+  } catch (err) {
+    popup.error('Errore Salvataggio', err.message)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -704,8 +1193,9 @@ const getAvailableEmployees = () => {
     const notInTeam = !selectedCantiere.value?.team?.some(membro => membro.id === dipendente.id)
     
     // Verifica che non sia assegnato ad altri cantieri
-    // Se cantiereAttuale è null o uguale al cantiere corrente, è disponibile
-    const isAvailable = !dipendente.cantiereAttuale || dipendente.cantiereAttuale === selectedCantiere.value?.nome
+    const isAvailable = !dipendente.cantiereAttuale || 
+                       dipendente.cantiereAttuale === selectedCantiere.value?.nome ||
+                       dipendente.cantiereAttuale === ''
     
     return isActive && notInTeam && isAvailable
   }).map(dipendente => ({
@@ -779,7 +1269,8 @@ const addMemberToTeam = async (dipendente) => {
     // Aggiorna lo stato locale
     selectedCantiere.value.team = cantiereUpdate.team
     
-    popup.success('Membro Aggiunto', `${dipendente.nome} ${dipendente.cognome} è stato aggiunto al team.`)
+    // Popup veloce e discreto per conferma
+    popup.success('✅ Aggiunto al Team', `${dipendente.nome} ${dipendente.cognome}`)
   } catch (error) {
     console.error('Errore aggiunta membro al team:', error)
     popup.error('Errore', `Impossibile aggiungere il membro al team: ${error.message}`)
@@ -882,23 +1373,22 @@ const calculateMonthlyCost = (cantiere) => {
 
 const saveTeamChanges = async () => {
   try {
-    // Aggiorna i costi accumulati del cantiere
-    const costoGiornaliero = calculateTeamDailyCost(selectedCantiere.value)
-    const costoMensile = calculateMonthlyCost(selectedCantiere.value)
+    loading.value = true
     
-    await firestoreStore.updateDoc('cantieri', selectedCantiere.value.id, {
+    const updateData = {
       team: selectedCantiere.value.team,
-      costiAccumulati: {
-        ...selectedCantiere.value.costiAccumulati,
-        manodopera: costoMensile
-      }
-    })
+      updatedAt: new Date()
+    }
     
-    popup.success('Team Aggiornato', 'Le modifiche al team sono state salvate con successo.')
-    closeTeamModal()
-  } catch (error) {
-    console.error('Errore salvataggio team:', error)
-    popup.error('Errore', `Impossibile salvare le modifiche al team: ${error.message}`)
+    await firestoreOperations.update('cantieri', selectedCantiere.value.id, updateData)
+    success('Team Aggiornato', 'Il team del cantiere è stato aggiornato con successo')
+    
+    showTeamModal.value = false
+    
+  } catch (err) {
+    error('Errore Salvataggio Team', err.message)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -969,9 +1459,43 @@ const getTotalMaterialAttachmentsSize = () => {
 const getLastUploadDate = () => {
   const attachments = getMaterialAttachments()
   if (!attachments.length) return 'N/A'
-  const dates = attachments.map(att => new Date(att.uploadDate))
+  
+  // Usa uploadedAt invece di uploadDate e gestisci il timestamp di Firestore
+  const dates = attachments.map(att => {
+    const uploadedAt = att.uploadedAt
+    // Se è un timestamp Firestore, usa toDate()
+    if (uploadedAt && typeof uploadedAt.toDate === 'function') {
+      return uploadedAt.toDate()
+    }
+    // Altrimenti prova a parsare la data
+    return new Date(uploadedAt)
+  }).filter(date => !isNaN(date))
+  
+  if (!dates.length) return 'N/A'
   const lastDate = new Date(Math.max(...dates))
-  return formatDate(lastDate)
+  return formatDate(lastDate, true) // Aggiungiamo true per includere l'ora
+}
+
+// 🔧 FUNZIONI MATERIALI CANTIERE - Fix errori calcolatori
+const getTotalMaterialsValue = () => {
+  if (!materialiCantiere.value?.length) return 0
+  return materialiCantiere.value.reduce((acc, materiale) => {
+    const quantita = materiale.quantitaRichiesta || 0
+    const prezzo = materiale.prezzoUnitario || 0
+    return acc + (quantita * prezzo)
+  }, 0)
+}
+
+const getCompletedMaterials = () => {
+  if (!materialiCantiere.value?.length) return 0
+  return materialiCantiere.value.filter(materiale => 
+    materiale.stato === 'consegnato' || materiale.stato === 'completato'
+  ).length
+}
+
+const getMaterialAttachmentCount = (materiale) => {
+  if (!materiale?.allegati) return 0
+  return materiale.allegati.length
 }
 
 const getMaterialStatusColor = (stato) => {
@@ -1507,7 +2031,7 @@ const getMaterialStatusColor = (stato) => {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
               <input
-                v-model="editingCantiere.cliente"
+                v-model="editingCantiere.cliente.nome"
                 type="text"
                 required
                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
@@ -1624,7 +2148,7 @@ const getMaterialStatusColor = (stato) => {
           <div class="flex items-center justify-between mb-6">
             <div>
               <h3 class="text-xl font-semibold text-gray-900">Materiali Cantiere</h3>
-              <p class="text-sm text-gray-600 mt-1">{{ selectedCantiere?.nome }} - {{ selectedCantiere?.cliente }}</p>
+              <p class="text-sm text-gray-600 mt-1">{{ selectedCantiere?.nome }} - {{ getClienteNome(selectedCantiere?.cliente) }}</p>
             </div>
             <button @click="closeManageMaterialsModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
               <XMarkIcon class="w-6 h-6" />
@@ -2191,7 +2715,7 @@ const getMaterialStatusColor = (stato) => {
                 <p class="text-sm text-gray-600 mt-1">
                   <span class="font-medium">{{ selectedCantiere?.nome }}</span>
                   <span v-if="selectedCantiere?.cliente" class="text-gray-400"> • </span>
-                  <span class="text-gray-500">{{ typeof selectedCantiere?.cliente === 'object' ? selectedCantiere?.cliente?.nome : selectedCantiere?.cliente }}</span>
+                  <span class="text-gray-500">{{ getClienteNome(selectedCantiere?.cliente) }}</span>
                 </p>
               </div>
             </div>
@@ -2353,7 +2877,7 @@ const getMaterialStatusColor = (stato) => {
                     <div class="flex-1 min-w-0">
                       <p class="text-sm font-medium text-gray-900 truncate">{{ attachment.name }}</p>
                       <p class="text-xs text-gray-500">
-                        {{ formatFileSize(attachment.size) }} • {{ formatDate(attachment.uploadDate) }}
+                        {{ formatFileSize(attachment.size) }} • {{ formatDate(attachment.uploadedAt, true) }}
                       </p>
                       <p v-if="attachment.description" class="text-xs text-gray-600 mt-1">{{ attachment.description }}</p>
                     </div>
@@ -2417,7 +2941,7 @@ const getMaterialStatusColor = (stato) => {
               </div>
               <div>
                 <h3 class="text-xl font-semibold text-gray-900">Gestione Materiali Cantiere</h3>
-                <p class="text-sm text-gray-600 mt-1">{{ selectedCantiere?.nome }} - {{ selectedCantiere?.cliente }}</p>
+                <p class="text-sm text-gray-600 mt-1">{{ selectedCantiere?.nome }} - {{ getClienteNome(selectedCantiere?.cliente) }}</p>
               </div>
             </div>
             <button @click="closeManageMaterialsModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
@@ -2990,7 +3514,7 @@ const getMaterialStatusColor = (stato) => {
                     <div class="flex-1 min-w-0">
                       <p class="text-sm font-medium text-gray-900 truncate">{{ attachment.name }}</p>
                       <p class="text-xs text-gray-500">
-                        {{ formatFileSize(attachment.size) }} • {{ formatDate(attachment.uploadDate) }}
+                        {{ formatFileSize(attachment.size) }} • {{ formatDate(attachment.uploadedAt, true) }}
                       </p>
                       <p v-if="attachment.description" class="text-xs text-gray-600 mt-1">{{ attachment.description }}</p>
                       <div class="flex items-center space-x-2 mt-1">
@@ -3038,7 +3562,7 @@ const getMaterialStatusColor = (stato) => {
 
             <!-- Statistiche -->
             <div v-if="getMaterialAttachments()?.length > 0" class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                 <div>
                   <p class="text-sm text-blue-600">Documenti Totali</p>
                   <p class="text-xl font-bold text-blue-800">{{ getMaterialAttachments().length }}</p>
@@ -3046,10 +3570,6 @@ const getMaterialStatusColor = (stato) => {
                 <div>
                   <p class="text-sm text-blue-600">Dimensione Totale</p>
                   <p class="text-xl font-bold text-blue-800">{{ getTotalMaterialAttachmentsSize() }}</p>
-                </div>
-                <div>
-                  <p class="text-sm text-blue-600">Ultimo Upload</p>
-                  <p class="text-sm font-medium text-blue-800">{{ getLastUploadDate() }}</p>
                 </div>
                 <div>
                   <p class="text-sm text-blue-600">Fornitore</p>

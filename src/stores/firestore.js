@@ -87,8 +87,15 @@ export const useFirestoreStore = defineStore('firestore', () => {
     error.value = null
     
     try {
+      // 🧹 Sanitizza i dati prima di inviarli a Firestore
+      const sanitizedData = sanitizeFirestoreData(data)
+      
+      console.log(`🔧 Create ${collectionName}:`)
+      console.log('📋 Dati originali:', JSON.stringify(data, null, 2))
+      console.log('🧹 Dati sanitizzati:', JSON.stringify(sanitizedData, null, 2))
+      
       const docRef = await addDoc(collection(db, collectionName), {
-        ...data,
+        ...sanitizedData,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       })
@@ -97,6 +104,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
     } catch (err) {
       error.value = err.message
       console.error(`Errore creazione documento in ${collectionName}:`, err)
+      console.error('📋 Dati che causavano l\'errore:', JSON.stringify(data, null, 2))
       return { success: false, error: err.message }
     } finally {
       loading.value = false
@@ -150,7 +158,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
       }
       
       // Se dovrebbe essere un array ma non lo è, convertilo
-      if (['team', 'fasi', 'allegati'].includes(key) && !Array.isArray(value)) {
+      if (['team', 'teamPresente', 'fasi', 'allegati', 'attivita', 'problemi'].includes(key) && !Array.isArray(value)) {
         sanitized[key] = value ? [value] : []
         return
       }
@@ -161,7 +169,11 @@ export const useFirestoreStore = defineStore('firestore', () => {
         try {
           JSON.stringify(value)
           // Ricorsione per oggetti nested
-          sanitized[key] = sanitizeFirestoreData(value)
+          const sanitizedObject = sanitizeFirestoreData(value)
+          // Solo aggiunge se l'oggetto sanitizzato non è vuoto
+          if (Object.keys(sanitizedObject).length > 0) {
+            sanitized[key] = sanitizedObject
+          }
         } catch (e) {
           console.warn(`⚠️ Rimosso campo con riferimenti circolari "${key}":`, e.message)
           return
@@ -561,8 +573,24 @@ export const useFirestoreStore = defineStore('firestore', () => {
   // 📎 Metodi per Allegati Materiali (Nuovi per migrare da localStorage)
   
   const loadAllegatiMateriale = async (materialeId) => {
-    const filters = [{ field: 'materialeId', operator: '==', value: materialeId }]
-    return await loadCollection('materiali_allegati', filters)
+    try {
+      const q = query(
+        collection(db, 'materiali_allegati'),
+        where('materialeId', '==', materialeId),
+        orderBy('uploadedAt', 'desc')  // Usiamo uploadedAt invece di createdAt
+      )
+      
+      const snapshot = await getDocs(q)
+      const documents = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      
+      return { success: true, data: documents }
+    } catch (err) {
+      console.error('Errore caricamento allegati materiale:', err)
+      return { success: false, error: err.message }
+    }
   }
 
   const createAllegatoMateriale = async (materialeId, allegatoData) => {
@@ -586,11 +614,55 @@ export const useFirestoreStore = defineStore('firestore', () => {
   }
 
   const createRegistrazioneGiornale = async (cantiereId, registrazioneData) => {
+    // 🧹 Sanitizza specificamente i dati del giornale cantiere
+    const sanitizedData = {}
+    
+    // Copia solo i campi validi, convertendo undefined in null o array vuoti
+    Object.keys(registrazioneData).forEach(key => {
+      const value = registrazioneData[key]
+      
+      if (value === undefined) {
+        console.warn(`⚠️ Campo undefined rimosso: ${key}`)
+        return
+      }
+      
+      if (value === null) {
+        return // Salta anche i null
+      }
+      
+      // Gestisce array specifici del giornale cantiere
+      if (['teamPresente', 'team', 'attivita', 'problemi', 'allegati'].includes(key)) {
+        sanitizedData[key] = Array.isArray(value) ? value : (value ? [value] : [])
+        return
+      }
+      
+      // Gestisce oggetti come meteo
+      if (key === 'meteo' && typeof value === 'object') {
+        const meteoSanitized = {}
+        Object.keys(value).forEach(meteoKey => {
+          if (value[meteoKey] !== undefined && value[meteoKey] !== null) {
+            meteoSanitized[meteoKey] = value[meteoKey]
+          }
+        })
+        if (Object.keys(meteoSanitized).length > 0) {
+          sanitizedData[key] = meteoSanitized
+        }
+        return
+      }
+      
+      // Copia tutti gli altri valori validi
+      sanitizedData[key] = value
+    })
+    
     const data = {
-      ...registrazioneData,
+      ...sanitizedData,
       cantiereId,
       createdAt: serverTimestamp()
     }
+    
+    console.log('🔧 Giornale cantiere - dati originali:', JSON.stringify(registrazioneData, null, 2))
+    console.log('🧹 Giornale cantiere - dati sanitizzati:', JSON.stringify(data, null, 2))
+    
     return await createDocument('giornale_cantiere', data)
   }
 
@@ -789,6 +861,72 @@ export const useFirestoreStore = defineStore('firestore', () => {
   }
 
   /**
+   * 🔧 FUNZIONI MANCANTI CRITICHE - Implementate per risolvere errori sistema materiali
+   */
+  
+  /**
+   * Ottiene un singolo materiale dal magazzino per ID
+   */
+  const getMateriale = async (materialeId) => {
+    try {
+      const materialeRef = doc(db, firestoreConfig.collections.materiali, materialeId)
+      const materialeSnap = await getDoc(materialeRef)
+      
+      if (materialeSnap.exists()) {
+        return {
+          success: true,
+          data: {
+            id: materialeSnap.id,
+            ...materialeSnap.data()
+          }
+        }
+      } else {
+        return {
+          success: false,
+          error: `Materiale con ID ${materialeId} non trovato`
+        }
+      }
+    } catch (err) {
+      console.error(`Errore caricamento materiale ${materialeId}:`, err)
+      return {
+        success: false,
+        error: err.message
+      }
+    }
+  }
+
+  /**
+   * Ottiene un singolo materiale cantiere per ID  
+   */
+  const getMaterialeCantiere = async (materialeCantiereid) => {
+    try {
+      const materialeCRef = doc(db, 'materiali_cantieri', materialeCantiereid)
+      const materialeCSnap = await getDoc(materialeCRef)
+      
+      if (materialeCSnap.exists()) {
+        return {
+          success: true,
+          data: {
+            id: materialeCSnap.id,
+            ...materialeCSnap.data()
+          }
+        }
+      } else {
+        return {
+          success: false,
+          error: `Materiale cantiere con ID ${materialeCantiereid} non trovato`
+        }
+      }
+    } catch (err) {
+      console.error(`Errore caricamento materiale cantiere ${materialeCantiereid}:`, err)
+      return {
+        success: false,
+        error: err.message
+      }
+    }
+  }
+
+  /**
    * Verifica se un cantiere ha dipendenze prima dell'eliminazione
    */
   const checkCantiereDependencies = async (cantiereId) => {
@@ -879,6 +1017,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
     loadMateriali,
     createMateriale,
     updateMaterialeQuantita,
+    getMateriale,
     
     // Personale
     loadDipendenti,
@@ -897,6 +1036,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
     createMaterialeCantiere,
     updateMaterialeCantiere,
     deleteMaterialeCantiere,
+    getMaterialeCantiere,
     
     // Allegati
     loadAllegatiCantiere,

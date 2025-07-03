@@ -693,8 +693,8 @@ const manageMaintenance = (mezzo) => {
 const assignToCantiere = async (mezzo) => {
   try {
     // Carica lista cantieri attivi
-    const cantieriResult = await firestoreStore.cantieriOperations.load()
-    const cantieriAttivi = cantieriResult.data.filter(c => 
+    const cantieriResult = await firestoreStore.loadCantieri()
+    const cantieriAttivi = firestoreStore.cantieri.filter(c => 
       ['pianificato', 'in-corso'].includes(c.stato)
     )
 
@@ -718,7 +718,7 @@ const assignToCantiere = async (mezzo) => {
     if (!cantiereId) return
 
     // Aggiorna il mezzo con l'assegnazione
-    const result = await firestoreStore.mezziOperations.update(mezzo.id, {
+    const result = await firestoreStore.updateDocument('mezzi', mezzo.id, {
       cantiereId,
       statoOperativo: 'in-uso',
       dataAssegnazione: new Date().toISOString()
@@ -737,8 +737,8 @@ const assignToCantiere = async (mezzo) => {
       }
 
       // Aggiorna anche il cantiere
-      await firestoreStore.cantieriOperations.update(cantiereId, {
-        mezziAssegnati: increment(1)
+      await firestoreStore.updateDocument('cantieri', cantiereId, {
+        mezziAssegnati: (mezzi.value.filter(m => m.cantiereId === cantiereId).length + 1)
       })
 
       popup.success('Mezzo Assegnato', `${mezzo.nome} è stato assegnato al cantiere con successo`)

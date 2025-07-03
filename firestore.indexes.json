@@ -73,6 +73,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "materiali_allegati",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "materialeId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadedAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
