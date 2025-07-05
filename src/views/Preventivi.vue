@@ -178,6 +178,12 @@
               {{ preventivo.stato === 'inviato' ? 'Inviato' : 'Invia' }}
             </button>
           </div>
+          <button 
+            @click="deletePreventivo(preventivo)"
+            class="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+          >
+            🗑️ Elimina
+          </button>
         </div>
       </div>
     </div>
@@ -254,6 +260,12 @@
                     class="text-accent-600 hover:text-accent-900 disabled:text-gray-400 disabled:cursor-not-allowed"
                   >
                     {{ preventivo.stato === 'inviato' ? 'Inviato' : 'Invia' }}
+                  </button>
+                  <button 
+                    @click="deletePreventivo(preventivo)"
+                    class="text-red-600 hover:text-red-900"
+                  >
+                    Elimina
                   </button>
                 </div>
               </td>
@@ -573,6 +585,13 @@
             </button>
             
             <button 
+              @click="deletePreventivo(selectedPreventivo)"
+              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              🗑️ Elimina
+            </button>
+            
+            <button 
               @click="closeViewModal"
               class="btn-secondary"
             >
@@ -723,13 +742,22 @@
             ></textarea>
           </div>
 
-          <div class="flex justify-end space-x-3 pt-4">
-            <button type="button" @click="closeEditModal" class="btn-secondary">
-              Annulla
+          <div class="flex justify-between items-center pt-4">
+            <button 
+              type="button" 
+              @click="deletePreventivo(editingPreventivo)"
+              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              🗑️ Elimina
             </button>
-            <button type="submit" :disabled="saving" class="btn-primary">
-              {{ saving ? 'Salvataggio...' : 'Aggiorna Preventivo' }}
-            </button>
+            <div class="flex space-x-3">
+              <button type="button" @click="closeEditModal" class="btn-secondary">
+                Annulla
+              </button>
+              <button type="submit" :disabled="saving" class="btn-primary">
+                {{ saving ? 'Salvataggio...' : 'Aggiorna Preventivo' }}
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -1280,6 +1308,40 @@ const testEmailJS = async () => {
   } catch (error) {
     console.error('Errore nel test EmailJS:', error)
     toast.error('Errore nel test EmailJS')
+  }
+}
+
+const deletePreventivo = async (preventivo) => {
+  try {
+    const confirmed = await popup.confirm(
+      `⚠️ ATTENZIONE: Eliminazione Preventivo\n\n` +
+      `Sei sicuro di voler eliminare il preventivo:\n` +
+      `${preventivo.numero} - ${preventivo.progetto}\n\n` +
+      `Questa operazione è IRREVERSIBILE e cancellerà:\n` +
+      `• Tutti i dati del preventivo\n` +
+      `• Lo storico delle comunicazioni\n` +
+      `• I riferimenti associati\n\n` +
+      `Confermi l'eliminazione?`
+    )
+    
+    if (!confirmed) return
+
+    // Chiudi la modal se è aperta
+    if (showViewModal.value) {
+      closeViewModal()
+    }
+    if (showEditModal.value) {
+      closeEditModal()
+    }
+
+    // Elimina il preventivo da Firestore
+    await firestoreStore.deleteDocument('preventivi', preventivo.id)
+
+    toast.success(`Preventivo ${preventivo.numero} eliminato con successo`)
+    
+  } catch (error) {
+    console.error('Errore nell\'eliminazione del preventivo:', error)
+    toast.error('Errore nell\'eliminazione del preventivo')
   }
 }
 
