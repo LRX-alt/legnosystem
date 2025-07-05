@@ -1,6 +1,6 @@
 {
   "name": "legnosystem",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Sistema di gestione aziendale per Legnosystem.bio - Costruzione e posa tetti in legno",
   "private": true,
   "type": "module",

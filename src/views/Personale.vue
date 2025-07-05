@@ -1523,23 +1523,7 @@ const loadTimesheet = async (dipendenteId = null) => {
         console.log('📋 Esempio timesheet caricati:', timesheetDettagli.value.slice(0, 3))
       } else {
         console.warn('⚠️ Nessun timesheet trovato in Firestore!')
-        
-        // Se non ci sono timesheet, crea alcuni dati di test per i dipendenti attivi
-        console.log('🔄 Nessun timesheet trovato, controllo se creare dati di esempio...')
-        
-        const dipendentiAttivi = dipendenti.value.filter(d => d.stato === 'attivo')
-        console.log(`👥 Dipendenti attivi trovati: ${dipendentiAttivi.length}`)
-        
-        if (dipendentiAttivi.length > 0) {
-          console.log('💡 Suggerimento: Vai al Giornale Cantiere per aggiungere personale e generare timesheet automaticamente')
-          
-          // Crea timesheet di esempio se l'utente lo desidera
-          const shouldCreateSample = await createSampleTimesheetData()
-          if (shouldCreateSample) {
-            // Ricarica i timesheet dopo aver creato i dati di esempio
-            await loadTimesheet()
-          }
-        }
+        console.log('💡 Suggerimento: Vai al Giornale Cantiere per aggiungere personale e generare timesheet automaticamente')
       }
       
       // Aggiorna le ore settimanali per ogni dipendente
@@ -2472,92 +2456,6 @@ const calcolaOreDaOrari = (orarioInizio, orarioFine, pausaMinuti = 0) => {
   }
 }
 
-// 🚀 NUOVA: Crea timesheet di esempio per dimostrazione
-const createSampleTimesheetData = async () => {
-  try {
-    // Chiedi conferma all'utente
-    const confirmed = await confirm(
-      'Creare Dati di Esempio?', 
-      'Non ci sono timesheet nel sistema. Vuoi creare alcuni dati di esempio per vedere come funziona la pagina?'
-    )
-    
-    if (!confirmed) {
-      return false
-    }
-    
-    console.log('🚀 Creazione timesheet di esempio...')
-    
-    const dipendentiAttivi = dipendenti.value.filter(d => d.stato === 'attivo').slice(0, 3) // Max 3 dipendenti
-    
-    if (dipendentiAttivi.length === 0) {
-      console.warn('⚠️ Nessun dipendente attivo per creare timesheet di esempio')
-      return false
-    }
-    
-    const oggi = new Date()
-    const timesheetCreati = []
-    
-    // Crea timesheet per gli ultimi 5 giorni lavorativi
-    for (let i = 0; i < 5; i++) {
-      const dataLavoro = new Date(oggi)
-      dataLavoro.setDate(oggi.getDate() - i)
-      
-      // Salta domenica
-      if (dataLavoro.getDay() === 0) {
-        continue
-      }
-      
-      const dataStr = dataLavoro.toISOString().split('T')[0]
-      
-      // Crea timesheet per ogni dipendente attivo
-      for (const dipendente of dipendentiAttivi) {
-        const oreGiorno = 7 + Math.random() * 3 // Tra 7 e 10 ore
-        const oreLavorate = Math.round(oreGiorno * 2) / 2 // Arrotonda a 0.5
-        
-        const timesheetData = {
-          dipendenteId: dipendente.id,
-          data: dataStr,
-          cantiere: dipendente.cantiereAttuale || 'Cantiere Demo',
-          ore: oreLavorate,
-          oreLavorate: oreLavorate,
-          orarioInizio: '08:00',
-          orarioFine: `${Math.floor(8 + oreLavorate)}:00`,
-          note: 'Timesheet di esempio generato automaticamente',
-          costoOrario: dipendente.pagaOraria || 25,
-          costoTotale: oreLavorate * (dipendente.pagaOraria || 25),
-          fonte: 'esempio_automatico',
-          createdAt: new Date().toISOString()
-        }
-        
-        try {
-          const result = await firestoreStore.registraTimesheet(timesheetData)
-          if (result.success) {
-            timesheetCreati.push(timesheetData)
-            console.log(`✅ Timesheet esempio creato: ${dipendente.nome} - ${dataStr} - ${oreLavorate}h`)
-          } else {
-            console.error(`❌ Errore creazione timesheet esempio per ${dipendente.nome}:`, result.error)
-          }
-        } catch (error) {
-          console.error(`❌ Errore creazione timesheet esempio:`, error)
-        }
-      }
-    }
-    
-    if (timesheetCreati.length > 0) {
-      success('Dati di Esempio Creati!', `Creati ${timesheetCreati.length} timesheet di esempio. Ora puoi vedere come funziona la pagina.`)
-      console.log(`✅ Creazione completata: ${timesheetCreati.length} timesheet di esempio`)
-      return true
-    } else {
-      error('Errore', 'Impossibile creare timesheet di esempio')
-      return false
-    }
-    
-  } catch (error) {
-    console.error('❌ Errore creazione timesheet di esempio:', error)
-    error('Errore', 'Impossibile creare timesheet di esempio')
-    return false
-  }
-}
 
 // Computed per le presenze
 const presenzeComputed = computed(() => {

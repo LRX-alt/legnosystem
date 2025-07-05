@@ -5,6 +5,32 @@ Tutte le modifiche significative a questo progetto verranno documentate in quest
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2024-12-30
+
+### 🎯 **SISTEMA PREVENTIVI COMPLETO**
+- ✅ **Gestione preventivi integrata**: Creazione, modifica, visualizzazione preventivi con Firestore real-time
+- ✅ **Pipeline vendite**: Dashboard completa con statistiche (preventivi aperti, valore pipeline, tasso conversione, tempo medio)
+- ✅ **Workflow stati**: Bozza → Inviato → Accettato/Rifiutato → Convertito con tracking automatico
+- ✅ **Integrazione clienti**: Selezione da clienti esistenti o creazione nuovi clienti inline
+- ✅ **Numerazione automatica**: Formato PREV-YYYYMMDD-XXX per identificazione univoca
+- ✅ **Conversione in cantiere**: Trasferimento automatico preventivi accettati in cantieri attivi con tutti i dati
+- ✅ **Gestione scadenze**: Aggiornamento automatico stato "scaduto" per preventivi non confermati
+- ✅ **Modal avanzate**: Visualizzazione dettagliata, modifica completa, gestione workflow
+- ✅ **Filtri e ricerca**: Per stato, cliente, numero preventivo con interfaccia responsive
+- ✅ **Toast notifications**: Feedback immediato per tutte le operazioni con sistema uniforme
+
+### 🔧 **CORREZIONI TECNICHE**
+- ✅ **RISOLTO**: Errori API useToast con implementazione corretta dei metodi
+- ✅ **RISOLTO**: Integrazione Firestore per operazioni CRUD preventivi
+- ✅ **MIGLIORATO**: Gestione stati e transizioni workflow
+- ✅ **OTTIMIZZATO**: Caricamento real-time dati con subscribeToCollection
+
+### 💼 **BUSINESS IMPACT**
+- ✅ **CRM Pipeline**: Sistema completo gestione opportunità vendita
+- ✅ **Conversione automatica**: Da preventivo a cantiere con un click
+- ✅ **Tracking commerciale**: Statistiche KPI per performance vendite
+- ✅ **Integrazione workflow**: Connessione diretta preventivi → cantieri → personale
+
 ## [2.3.0] - 2024-12-30
 
 ### 🎨 **MIGLIORAMENTI UX SCHEDA CANTIERE**
