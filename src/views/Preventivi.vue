@@ -1242,17 +1242,56 @@ const sendPreventivo = async (preventivo) => {
 
 const markAsAccepted = async (preventivo) => {
   try {
-    const confirmed = await popup.confirm('Confermi che il preventivo è stato accettato dal cliente?')
-    if (!confirmed) return
+    // Per preventivi in bozza, chiediamo la modalità di accettazione
+    if (preventivo.stato === 'bozza') {
+      const viaEmail = await popup.confirm(
+        'Modalità di accettazione',
+        'Il preventivo è stato accettato via email?\n\n' +
+        '• Clicca "Conferma" se accettato via email\n' +
+        '• Clicca "Annulla" se accettato direttamente'
+      )
+      
+      if (viaEmail) {
+        // Accettato via email - aggiorniamo anche lo stato di invio
+        await firestoreStore.updateDocument('preventivi', preventivo.id, {
+          stato: 'accettato',
+          dataAccettazione: new Date(),
+          modalitaAccettazione: 'email',
+          dataInvio: new Date(),
+          updatedAt: new Date()
+        })
+        popup.success('Preventivo segnato come accettato via email')
+      } else {
+        // Chiede conferma per accettazione diretta
+        const confermaDiretto = await popup.confirm(
+          'Conferma accettazione diretta',
+          'Confermi che il preventivo è stato accettato direttamente dal cliente?'
+        )
+        
+        if (confermaDiretto) {
+          await firestoreStore.updateDocument('preventivi', preventivo.id, {
+            stato: 'accettato',
+            dataAccettazione: new Date(),
+            modalitaAccettazione: 'diretto',
+            updatedAt: new Date()
+          })
+          popup.success('Preventivo segnato come accettato direttamente')
+        }
+      }
+    } else {
+      // Per preventivi già inviati, procedura normale
+      const confirmed = await popup.confirm('Confermi che il preventivo è stato accettato dal cliente?')
+      if (!confirmed) return
 
-    await firestoreStore.updateDocument('preventivi', preventivo.id, {
-      stato: 'accettato',
-      dataAccettazione: new Date(),
-      updatedAt: new Date()
-    })
+      await firestoreStore.updateDocument('preventivi', preventivo.id, {
+        stato: 'accettato',
+        dataAccettazione: new Date(),
+        modalitaAccettazione: 'email',
+        updatedAt: new Date()
+      })
 
-    popup.success('Preventivo segnato come accettato')
-    
+      popup.success('Preventivo segnato come accettato')
+    }
   } catch (error) {
     console.error('Errore nell\'aggiornamento del preventivo:', error)
     popup.error('Errore nell\'aggiornamento del preventivo')
@@ -1374,11 +1413,18 @@ const createDropdownActions = (preventivo) => {
   ]
 
   // Azioni condizionali basate sullo stato
-  if (preventivo.stato !== 'inviato' && preventivo.stato !== 'accettato' && preventivo.stato !== 'rifiutato' && preventivo.stato !== 'convertito') {
+  if (preventivo.stato === 'bozza') {
     actions.push({
       id: 'send',
       label: 'Invia Email',
       icon: '📧',
+      disabled: false,
+      danger: false
+    })
+    actions.push({
+      id: 'accept',
+      label: 'Segna Accettato',
+      icon: '✅',
       disabled: false,
       danger: false
     })
