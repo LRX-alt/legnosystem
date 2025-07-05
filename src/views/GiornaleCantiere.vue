@@ -686,13 +686,30 @@ const isTeamMemberPresent = (membro) => {
 }
 
 // Aggiunge/rimuove un membro dal team presente
-const toggleTeamMember = (membro) => {
+const toggleTeamMember = async (membro) => {
   const index = newEntryData.value.teamPresente.findIndex(m => m.id === membro.id)
   
   if (index >= 0) {
     // Rimuovi il membro se già presente
     newEntryData.value.teamPresente.splice(index, 1)
+    console.log(`👤 Rimosso ${membro.nome} dal team presente`)
   } else {
+    // 🚀 VALIDAZIONE: Controlla se il dipendente è già assegnato altrove
+    const validationResult = await validateDipendenteAssignment(membro.id, newEntryData.value.data)
+    
+    if (!validationResult.canAssign) {
+      popup.warning('Attenzione!', validationResult.message)
+      
+      // Chiedi conferma se vuoi procedere comunque
+      const confirmed = await popup.confirm('Confermare Assegnazione?', 
+        `${membro.nome} ${validationResult.message}\n\nVuoi procedere comunque?`)
+      
+      if (!confirmed) {
+        console.log(`⚠️ Assegnazione annullata per ${membro.nome}`)
+        return
+      }
+    }
+    
     // Aggiungi il membro se non presente
     const pagaOraria = getDipendentePagaOraria(membro.id)
     newEntryData.value.teamPresente.push({
@@ -702,7 +719,11 @@ const toggleTeamMember = (membro) => {
       iniziali: membro.iniziali,
       pagaOraria: pagaOraria
     })
+    console.log(`👤 Aggiunto ${membro.nome} al team presente`)
   }
+  
+  // 🚀 SINCRONIZZAZIONE IN TEMPO REALE: Aggiorna immediatamente le presenze
+  updateRealTimePresences()
 }
 
 // Ottiene la paga oraria di un dipendente dai dati reali
@@ -771,6 +792,202 @@ const calculateDayCost = () => {
   }
   
   return costoTotale
+}
+
+// 🚀 NUOVA: Validazione assegnazione dipendente
+const validateDipendenteAssignment = async (dipendenteId, dataAssegnazione) => {
+  try {
+    const dipendente = firestoreStore.dipendenti.find(d => d.id === dipendenteId)
+    if (!dipendente) {
+      return { canAssign: false, message: 'Dipendente non trovato' }
+    }
+
+    // Controlla se il dipendente è in uno stato che permette l'assegnazione
+    if (dipendente.stato !== 'attivo') {
+      return { 
+        canAssign: false, 
+        message: `è in stato: ${dipendente.stato.toUpperCase()}` 
+      }
+    }
+
+    // Controlla se il dipendente è già assegnato a un altro cantiere in corso
+    if (dipendente.cantiereAttuale && dipendente.cantiereAttuale !== cantiere.value.nome) {
+      return { 
+        canAssign: false, 
+        message: `è già assegnato al cantiere: ${dipendente.cantiereAttuale}` 
+      }
+    }
+
+    // Controlla se il dipendente ha già presenze in altri cantieri nello stesso giorno
+    const presenzeGiorno = await firestoreOperations.load('presenze', [
+      ['dipendenteId', '==', dipendenteId],
+      ['data', '==', dataAssegnazione]
+    ])
+
+    if (presenzeGiorno.success && presenzeGiorno.data?.length > 0) {
+      // Filtra presenze di altri cantieri
+      const presenzeAltriCantieri = presenzeGiorno.data.filter(p => 
+        p.cantiereId !== cantiere.value.id && 
+        p.stato === 'presente'
+      )
+
+      if (presenzeAltriCantieri.length > 0) {
+        const altriCantieri = presenzeAltriCantieri.map(p => p.cantiereNome).join(', ')
+        return { 
+          canAssign: false, 
+          message: `ha già presenze in altri cantieri: ${altriCantieri}` 
+        }
+      }
+    }
+
+    // Controlla se il dipendente ha già timesheet in altri cantieri nello stesso giorno
+    const timesheetGiorno = await firestoreOperations.load('timesheet', [
+      ['dipendenteId', '==', dipendenteId],
+      ['data', '==', dataAssegnazione]
+    ])
+
+    if (timesheetGiorno.success && timesheetGiorno.data?.length > 0) {
+      // Filtra timesheet di altri cantieri
+      const timesheetAltriCantieri = timesheetGiorno.data.filter(t => 
+        t.cantiereId !== cantiere.value.id
+      )
+
+      if (timesheetAltriCantieri.length > 0) {
+        const oreTotali = timesheetAltriCantieri.reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
+        if (oreTotali > 0) {
+          return { 
+            canAssign: false, 
+            message: `ha già ${oreTotali}h registrate in altri cantieri` 
+          }
+        }
+      }
+    }
+
+    // Tutto OK, può essere assegnato
+    return { 
+      canAssign: true, 
+      message: 'Disponibile per assegnazione' 
+    }
+
+  } catch (error) {
+    console.error('Errore validazione assegnazione dipendente:', error)
+    return { 
+      canAssign: false, 
+      message: 'Errore durante la validazione' 
+    }
+  }
+}
+
+// 🚀 NUOVA: Aggiornamento presenze in tempo reale
+const updateRealTimePresences = async () => {
+  try {
+    // Verifica che ci siano i dati necessari
+    if (!newEntryData.value.data || !newEntryData.value.teamPresente?.length) {
+      console.log('⚠️ Dati insufficienti per aggiornamento presenze in tempo reale')
+      return
+    }
+
+    const dataRegistrazione = newEntryData.value.data
+    const orarioInizio = newEntryData.value.orarioInizio || '08:00'
+    const orarioFine = newEntryData.value.orarioFine || '17:00'
+
+    // 🚀 AGGIORNAMENTO PARALLELO: Elabora tutti i membri del team in parallelo
+    const operazioniPresenze = newEntryData.value.teamPresente.map(async (membro) => {
+      try {
+        const presenzaKey = `${dataRegistrazione}-${membro.id}`
+        
+        // Verifica se la presenza esiste già
+        const presenzaEsistente = await firestoreStore.getDocument('presenze', presenzaKey)
+        
+        const presenzaData = {
+          id: presenzaKey,
+          dipendenteId: membro.id,
+          data: dataRegistrazione,
+          orarioInizio: orarioInizio,
+          orarioFine: orarioFine,
+          oreEffettive: newEntryData.value.oreTotali / newEntryData.value.teamPresente.length,
+          cantiereId: cantiere.value.id,
+          cantiereNome: cantiere.value.nome,
+          tipoPresenza: 'normale',
+          stato: 'presente',
+          note: `Presenza da giornale cantiere - ${cantiere.value.nome}`,
+          fonte: 'giornale_cantiere_realtime',
+          updatedAt: new Date().toISOString()
+        }
+
+        // Crea o aggiorna la presenza
+        if (presenzaEsistente.success && presenzaEsistente.data) {
+          // Aggiorna presenza esistente
+          await firestoreStore.updateDocument('presenze', presenzaKey, presenzaData)
+          console.log(`✅ Presenza aggiornata per ${membro.nome}`)
+        } else {
+          // Crea nuova presenza
+          await firestoreStore.createDocument('presenze', presenzaData)
+          console.log(`✅ Presenza creata per ${membro.nome}`)
+        }
+
+        return { success: true, membro: membro.nome }
+      } catch (error) {
+        console.error(`❌ Errore aggiornamento presenza per ${membro.nome}:`, error)
+        return { success: false, membro: membro.nome, error }
+      }
+    })
+
+    // Esegui tutte le operazioni in parallelo
+    const risultati = await Promise.allSettled(operazioniPresenze)
+    
+    // Statistiche operazioni
+    const successi = risultati.filter(r => r.status === 'fulfilled' && r.value.success).length
+    const errori = risultati.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length
+    
+    console.log(`🔄 Aggiornamento presenze completato: ${successi} successi, ${errori} errori`)
+    
+    // Rimuovi presenze di dipendenti non più nel team
+    await removeObsoletePresences(dataRegistrazione)
+    
+  } catch (error) {
+    console.error('❌ Errore aggiornamento presenze in tempo reale:', error)
+  }
+}
+
+// 🚀 NUOVA: Rimuove presenze obsolete per dipendenti non più nel team
+const removeObsoletePresences = async (dataRegistrazione) => {
+  try {
+    // Carica tutte le presenze per questa data e cantiere
+    const presenzeResult = await firestoreOperations.load('presenze', [
+      ['data', '==', dataRegistrazione],
+      ['cantiereId', '==', cantiere.value.id]
+    ])
+
+    if (!presenzeResult.success || !presenzeResult.data) return
+
+    // Trova presenze da rimuovere (dipendenti non più nel team)
+    const teamIds = newEntryData.value.teamPresente.map(m => m.id)
+    const presenzeDaRimuovere = presenzeResult.data.filter(presenza => 
+      !teamIds.includes(presenza.dipendenteId) && 
+      presenza.fonte === 'giornale_cantiere_realtime'
+    )
+
+    // Rimuovi presenze obsolete in parallelo
+    const operazioniRimozione = presenzeDaRimuovere.map(async (presenza) => {
+      try {
+        await firestoreOperations.delete('presenze', presenza.id)
+        console.log(`🗑️ Presenza rimossa per dipendente ${presenza.dipendenteId}`)
+        return { success: true }
+      } catch (error) {
+        console.error(`❌ Errore rimozione presenza ${presenza.id}:`, error)
+        return { success: false, error }
+      }
+    })
+
+    if (operazioniRimozione.length > 0) {
+      await Promise.allSettled(operazioniRimozione)
+      console.log(`🔄 Rimozione presenze obsolete completata: ${operazioniRimozione.length} operazioni`)
+    }
+
+  } catch (error) {
+    console.error('❌ Errore rimozione presenze obsolete:', error)
+  }
 }
 
 // ===== FINE FUNZIONI GESTIONE TEAM PRESENTE =====

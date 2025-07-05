@@ -479,6 +479,14 @@ export const useFirestoreStore = defineStore('firestore', () => {
     return await createDocument(firestoreConfig.collections.dipendenti, data)
   }
 
+  const loadTimesheet = async () => {
+    const result = await loadCollection(firestoreConfig.collections.timesheet)
+    if (result.success) {
+      timesheet.value = result.data
+    }
+    return result
+  }
+
   const registraTimesheet = async (timesheetData) => {
     return await createDocument(firestoreConfig.collections.timesheet, timesheetData)
   }
@@ -1042,6 +1050,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
     // Personale
     loadDipendenti,
     createDipendente,
+    loadTimesheet,
     registraTimesheet,
     
     // Fornitori

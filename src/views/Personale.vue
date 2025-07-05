@@ -7,6 +7,12 @@
         <p class="text-gray-600 text-base">Dipendenti e timesheet - Legnosystem.bio</p>
       </div>
       <div class="flex space-x-3">
+        <button @click="forceRefreshAllData" class="btn-secondary text-base font-medium" title="Aggiorna tutti i dati">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          Aggiorna
+        </button>
         <button @click="showTimesheetModal = true" class="btn-secondary text-base font-medium">
           <ClockIcon class="w-5 h-5 mr-2" />
           Registra Ore
@@ -132,6 +138,16 @@
         >
           Calendario
         </button>
+        <button
+          @click="activeTab = 'controlli'"
+          :class="activeTab === 'controlli' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+          class="whitespace-nowrap py-3 px-2 border-b-2 font-medium text-base relative"
+        >
+          Controlli
+          <span v-if="incoerenze.length > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+            {{ incoerenze.length }}
+          </span>
+        </button>
       </nav>
     </div>
 
@@ -185,7 +201,10 @@
             <span class="font-medium">{{ dipendente.oreTotaliSettimana }}h</span>
           </div>
           <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${(dipendente.oreTotaliSettimana / 48) * 100}%`"></div>
+            <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${Math.min((dipendente.oreTotaliSettimana / 52) * 100, 100)}%`"></div>
+          </div>
+          <div class="text-xs text-gray-500 mt-1">
+            Target: 52h/settimana (6 giorni lavorativi)
           </div>
         </div>
 
@@ -241,7 +260,7 @@
               <p class="text-base text-gray-600">{{ record.cantiere }}</p>
             </div>
             <div class="text-right">
-              <p class="text-xl font-bold" :class="record.totale >= 40 ? 'text-green-600' : 'text-gray-900'">
+              <p class="text-xl font-bold" :class="record.totale >= 52 ? 'text-green-600' : 'text-gray-900'">
                 {{ record.totale }}h
               </p>
               <p class="text-sm text-gray-500">totale</p>
@@ -249,7 +268,7 @@
           </div>
           
           <!-- Ore giornaliere mobile -->
-          <div class="grid grid-cols-5 gap-2 text-center">
+          <div class="grid grid-cols-6 gap-2 text-center">
             <div class="py-2">
               <p class="text-sm text-gray-500 mb-1">Lun</p>
               <p class="font-medium text-base">{{ record.lunedi }}h</p>
@@ -270,6 +289,10 @@
               <p class="text-sm text-gray-500 mb-1">Ven</p>
               <p class="font-medium text-base">{{ record.venerdi }}h</p>
             </div>
+            <div class="py-2">
+              <p class="text-sm text-gray-500 mb-1">Sab</p>
+              <p class="font-medium text-base">{{ record.sabato }}h</p>
+            </div>
           </div>
         </div>
       </div>
@@ -286,6 +309,7 @@
                 <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Mercoledì</th>
                 <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Giovedì</th>
                 <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Venerdì</th>
+                <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Sabato</th>
                 <th class="px-6 py-4 text-left text-base font-medium text-gray-500 uppercase tracking-wider">Totale</th>
               </tr>
             </thead>
@@ -307,8 +331,9 @@
                 <td class="px-6 py-4 whitespace-nowrap text-base text-gray-900">{{ record.mercoledi }}h</td>
                 <td class="px-6 py-4 whitespace-nowrap text-base text-gray-900">{{ record.giovedi }}h</td>
                 <td class="px-6 py-4 whitespace-nowrap text-base text-gray-900">{{ record.venerdi }}h</td>
+                <td class="px-6 py-4 whitespace-nowrap text-base text-gray-900">{{ record.sabato }}h</td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="text-base font-semibold" :class="record.totale >= 40 ? 'text-green-600' : 'text-gray-900'">
+                  <span class="text-base font-semibold" :class="record.totale >= 52 ? 'text-green-600' : 'text-gray-900'">
                     {{ record.totale }}h
                   </span>
                 </td>
@@ -639,6 +664,155 @@
       </div>
     </div>
 
+    <!-- Tab Content: Controlli -->
+    <div v-if="activeTab === 'controlli'" class="space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-xl font-semibold text-gray-900">Controlli di Coerenza</h3>
+          <p class="text-gray-600">Analisi automatica di incoerenze tra presenze e timesheet</p>
+        </div>
+        <button @click="runCoherenceCheck" class="btn-primary">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          Esegui Controllo
+        </button>
+      </div>
+
+      <!-- Stato Controllo -->
+      <div v-if="controlloInCorso" class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-center">
+          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+          <span class="text-blue-700">Controllo in corso...</span>
+        </div>
+      </div>
+
+      <!-- Riepilogo Incoerenze -->
+      <div v-if="incoerenze.length > 0" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div class="flex items-center">
+            <div class="p-2 bg-red-100 rounded-lg">
+              <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"></path>
+              </svg>
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-red-800">Incoerenze Gravi</p>
+              <p class="text-2xl font-bold text-red-900">{{ incoerenze.filter(i => i.gravita === 'alta').length }}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div class="flex items-center">
+            <div class="p-2 bg-yellow-100 rounded-lg">
+              <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-yellow-800">Incoerenze Medie</p>
+              <p class="text-2xl font-bold text-yellow-900">{{ incoerenze.filter(i => i.gravita === 'media').length }}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div class="flex items-center">
+            <div class="p-2 bg-green-100 rounded-lg">
+              <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div class="ml-4">
+              <p class="text-sm font-medium text-green-800">Totale Controlli</p>
+              <p class="text-2xl font-bold text-green-900">{{ ultimoControlloCount }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Nessuna Incoerenza -->
+      <div v-if="incoerenze.length === 0 && !controlloInCorso && ultimoControlloCount > 0" class="text-center py-12">
+        <div class="text-green-500 text-6xl mb-4">✅</div>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">Tutto in Ordine!</h3>
+        <p class="text-gray-600">Nessuna incoerenza rilevata tra presenze e timesheet</p>
+        <p class="text-sm text-gray-500 mt-2">Ultimo controllo: {{ ultimoControlloCount }} record analizzati</p>
+      </div>
+
+      <!-- Lista Incoerenze -->
+      <div v-if="incoerenze.length > 0" class="space-y-4">
+        <h4 class="text-lg font-semibold text-gray-900">Dettaglio Incoerenze</h4>
+        
+        <!-- Incoerenze Gravi -->
+        <div v-if="incoerenze.filter(i => i.gravita === 'alta').length > 0">
+          <h5 class="text-base font-medium text-red-800 mb-3 flex items-center">
+            <span class="bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-2">GRAVI</span>
+            Richiedono Attenzione Immediata
+          </h5>
+          <div class="space-y-2">
+            <div v-for="incoerenza in incoerenze.filter(i => i.gravita === 'alta')" :key="incoerenza.dipendente + incoerenza.data" 
+                 class="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-3">
+                    <div class="font-medium text-red-900">{{ incoerenza.dipendente }}</div>
+                    <div class="text-sm text-red-700">{{ formatDate(incoerenza.data) }}</div>
+                  </div>
+                  <div class="text-sm text-red-700 mt-1">{{ incoerenza.dettaglio }}</div>
+                </div>
+                <div class="flex space-x-2">
+                  <button @click="risolviIncoerenza(incoerenza)" class="px-3 py-1 text-sm font-medium rounded bg-red-100 text-red-800 hover:bg-red-200 transition-colors">
+                    Risolvi
+                  </button>
+                  <button @click="ignoraIncoerenza(incoerenza)" class="px-3 py-1 text-sm font-medium rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                    Ignora
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Incoerenze Medie -->
+        <div v-if="incoerenze.filter(i => i.gravita === 'media').length > 0">
+          <h5 class="text-base font-medium text-yellow-800 mb-3 flex items-center">
+            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-2">MEDIE</span>
+            Da Verificare
+          </h5>
+          <div class="space-y-2">
+            <div v-for="incoerenza in incoerenze.filter(i => i.gravita === 'media')" :key="incoerenza.dipendente + incoerenza.data" 
+                 class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-3">
+                    <div class="font-medium text-yellow-900">{{ incoerenza.dipendente }}</div>
+                    <div class="text-sm text-yellow-700">{{ formatDate(incoerenza.data) }}</div>
+                  </div>
+                  <div class="text-sm text-yellow-700 mt-1">{{ incoerenza.dettaglio }}</div>
+                </div>
+                <div class="flex space-x-2">
+                  <button @click="risolviIncoerenza(incoerenza)" class="px-3 py-1 text-sm font-medium rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 transition-colors">
+                    Risolvi
+                  </button>
+                  <button @click="ignoraIncoerenza(incoerenza)" class="px-3 py-1 text-sm font-medium rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                    Ignora
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stato Vuoto -->
+      <div v-if="incoerenze.length === 0 && !controlloInCorso && ultimoControlloCount === 0" class="text-center py-12">
+        <div class="text-gray-400 text-6xl mb-4">🔍</div>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">Nessun Controllo Eseguito</h3>
+        <p class="text-gray-600">Clicca su "Esegui Controllo" per analizzare le incoerenze</p>
+      </div>
+    </div>
+
     <!-- Modal Registrazione Ore -->
     <div v-if="showTimesheetModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeTimesheetModal">
       <div class="relative top-4 mx-auto border w-full max-w-md shadow-lg rounded-md bg-white" @click.stop>
@@ -856,7 +1030,10 @@
                 <p class="text-2xl font-bold text-blue-900">{{ selectedDipendente?.oreTotaliSettimana || 0 }}h</p>
                 <div class="w-full bg-blue-200 rounded-full h-2 mt-2">
                   <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                       :style="`width: ${Math.min(((selectedDipendente?.oreTotaliSettimana || 0) / 48) * 100, 100)}%`"></div>
+                       :style="`width: ${Math.min(((selectedDipendente?.oreTotaliSettimana || 0) / 52) * 100, 100)}%`"></div>
+                </div>
+                <div class="text-xs text-blue-600 mt-1">
+                  Target: 52h/settimana (6 giorni lavorativi, Lun-Sab)
                 </div>
               </div>
               <div class="bg-green-50 p-4 rounded-lg border border-green-200">
@@ -913,15 +1090,15 @@
                         </div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div class="font-medium">{{ entry.cantiere }}</div>
-                        <div v-if="entry.cantiereId" class="text-xs text-gray-500">ID: {{ entry.cantiereId }}</div>
+                        <div class="font-medium">{{ entry.cantiere || entry.cantiereNome || 'Non Assegnato' }}</div>
+                        <div v-if="entry.fonte" class="text-xs text-gray-500">{{ entry.fonte === 'giornale_cantiere' ? 'Auto-generato' : 'Manuale' }}</div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        <span class="text-lg">{{ entry.ore }}h</span>
+                        <span class="text-lg">{{ (entry.ore || entry.oreLavorate || 0).toFixed(1) }}h</span>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div class="font-medium text-green-600">€{{ (entry.costoTotale || (entry.ore * (entry.costoOrario || selectedDipendente?.pagaOraria || 25))).toLocaleString() }}</div>
-                        <div class="text-xs text-gray-500">{{ entry.costoOrario || selectedDipendente?.pagaOraria || 25 }}€/h</div>
+                        <div class="font-medium text-green-600">€{{ ((entry.costoTotale || ((entry.ore || entry.oreLavorate || 0) * (entry.costoOrario || selectedDipendente?.pagaOraria || 25))) || 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
+                        <div class="text-xs text-gray-500">{{ (entry.costoOrario || selectedDipendente?.pagaOraria || 25).toFixed(2) }}€/h</div>
                       </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm">
                         <span v-if="entry.fonte === 'giornale_cantiere'" 
@@ -1157,6 +1334,9 @@
                 </div>
               </div>
               <div class="mt-4 text-center">
+                <p class="text-sm text-gray-600">🕐 Settimana lavorativa: 6 giorni (Lun-Sab) - 52h totali</p>
+              </div>
+              <div class="mt-4 text-center">
                 <p class="text-sm text-gray-500">📝 Planning completo disponibile nel modulo Calendario</p>
               </div>
             </div>
@@ -1205,15 +1385,26 @@ const selectedDate = ref(new Date().toISOString().split('T')[0])
 // Stats - calcolate dinamicamente dai dati Firestore
 const stats = computed(() => {
   const dipendentiAttivi = dipendenti.value.filter(d => d.stato === 'attivo').length
-  const oreSettimana = dipendenti.value.reduce((total, d) => total + (d.ore_settimana || 0), 0)
+  
+  // Calcola ore settimanali totali dai timesheet reali
+  const oreSettimanaTotali = dipendenti.value.reduce((total, d) => total + (d.oreTotaliSettimana || 0), 0)
+  
   const costoOrarioMedio = dipendentiAttivi > 0 
     ? dipendenti.value.reduce((total, d) => total + (d.pagaOraria || 0), 0) / dipendentiAttivi 
     : 0
   
+  // 🚀 NUOVO: Calcola presenti oggi dai timesheet reali
+  const oggi = new Date().toISOString().split('T')[0]
+  const presentiOggi = new Set(
+    timesheetDettagli.value
+      .filter(t => t.data === oggi && (t.ore > 0 || t.oreLavorate > 0))
+      .map(t => t.dipendenteId)
+  ).size
+  
   return {
     dipendentiAttivi,
-    oreSettimana,
-    presentiOggi: 0, // Da implementare con sistema presenze
+    oreSettimana: Math.round(oreSettimanaTotali * 2) / 2,
+    presentiOggi,
     costoOrarioMedio: Math.round(costoOrarioMedio * 100) / 100
   }
 })
@@ -1234,6 +1425,11 @@ const timesheetData = ref([])
 
 // Dati timesheet dettagliati - vuoto, da caricare da Firestore
 const timesheetDettagli = ref([])
+
+// 🚀 NUOVO: Variabili per il controllo coerenze
+const incoerenze = ref([])
+const controlloInCorso = ref(false)
+const ultimoControlloCount = ref(0)
 
 // Nuovo dipendente
 const newDipendente = ref({
@@ -1290,6 +1486,9 @@ const loadDipendenti = async () => {
   try {
     await firestoreStore.loadDipendenti()
     console.log('✅ Dipendenti caricati da Firestore:', dipendenti.value.length)
+    
+    // Carica anche i timesheet automaticamente
+    await loadTimesheet()
   } catch (e) {
     console.warn('Errore nel caricamento dipendenti da Firestore:', e)
   }
@@ -1298,42 +1497,92 @@ const loadDipendenti = async () => {
 // Funzioni per la gestione dei timesheet - carica da Firestore
 const loadTimesheet = async (dipendenteId = null) => {
   try {
-    // Se non specificato il dipendente, carica tutti i timesheet
-    const result = await firestoreStore.loadCollection('timesheet')
+    console.log('🔄 Inizio caricamento timesheet...')
+    
+    // Carica tutti i timesheet usando il metodo dello store
+    const result = await firestoreStore.loadTimesheet()
+    
+    console.log('📊 Risultato caricamento timesheet:', result)
     
     if (result.success) {
-      const allTimesheet = result.data || []
+      const allTimesheet = firestoreStore.timesheet || []
+      console.log(`📋 Timesheet trovati in Firestore: ${allTimesheet.length}`)
       
       if (dipendenteId) {
         // Filtra per dipendente specifico
         timesheetDettagli.value = allTimesheet.filter(t => t.dipendenteId === dipendenteId)
+        console.log(`👤 Timesheet per dipendente ${dipendenteId}: ${timesheetDettagli.value.length}`)
       } else {
         // Carica tutti
         timesheetDettagli.value = allTimesheet
+        console.log(`📊 Tutti i timesheet caricati: ${timesheetDettagli.value.length}`)
       }
       
-      console.log(`✅ Timesheet caricati da Firestore: ${timesheetDettagli.value.length} voci`)
+      // Debug: mostra alcuni esempi di timesheet
+      if (timesheetDettagli.value.length > 0) {
+        console.log('📋 Esempio timesheet caricati:', timesheetDettagli.value.slice(0, 3))
+      } else {
+        console.warn('⚠️ Nessun timesheet trovato in Firestore!')
+        
+        // Se non ci sono timesheet, crea alcuni dati di test per i dipendenti attivi
+        console.log('🔄 Nessun timesheet trovato, controllo se creare dati di esempio...')
+        
+        const dipendentiAttivi = dipendenti.value.filter(d => d.stato === 'attivo')
+        console.log(`👥 Dipendenti attivi trovati: ${dipendentiAttivi.length}`)
+        
+        if (dipendentiAttivi.length > 0) {
+          console.log('💡 Suggerimento: Vai al Giornale Cantiere per aggiungere personale e generare timesheet automaticamente')
+          
+          // Crea timesheet di esempio se l'utente lo desidera
+          const shouldCreateSample = await createSampleTimesheetData()
+          if (shouldCreateSample) {
+            // Ricarica i timesheet dopo aver creato i dati di esempio
+            await loadTimesheet()
+          }
+        }
+      }
       
       // Aggiorna le ore settimanali per ogni dipendente
       updateDipendentiOreFromTimesheet()
+      
+      // 🚀 NUOVA: Controllo coerenza presenze-timesheet dopo caricamento (solo se non siamo nel tab controlli)
+      if (activeTab.value !== 'controlli') {
+        await checkPresenceTimesheetCoherence()
+      }
+      
+      console.log('✅ Caricamento timesheet completato')
+    } else {
+      console.error('❌ Errore caricamento timesheet:', result.error)
     }
   } catch (e) {
-    console.warn('Errore nel caricamento timesheet da Firestore:', e)
+    console.error('❌ Errore nel caricamento timesheet da Firestore:', e)
   }
 }
 
 // Aggiorna le ore settimanali dei dipendenti basandosi sui timesheet
 const updateDipendentiOreFromTimesheet = () => {
+  console.log('🔄 Aggiornamento ore settimanali dipendenti...')
+  
   const now = new Date()
   // Imposta l'inizio della settimana a Lunedì
   const startOfWeek = new Date(now)
   startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1))
   startOfWeek.setHours(0, 0, 0, 0)
   
-  // Imposta la fine della settimana a Sabato
+  // Imposta la fine della settimana a Sabato (6 giorni lavorativi: Lun-Sab)
   const endOfWeek = new Date(startOfWeek)
   endOfWeek.setDate(startOfWeek.getDate() + 5) // +5 per arrivare a Sabato
   endOfWeek.setHours(23, 59, 59, 999)
+  
+  console.log('📅 Periodo analizzato:', {
+    start: startOfWeek.toISOString().split('T')[0],
+    end: endOfWeek.toISOString().split('T')[0]
+  })
+  
+  if (dipendenti.value.length === 0) {
+    console.warn('⚠️ Nessun dipendente trovato per aggiornamento ore')
+    return
+  }
   
   dipendenti.value.forEach(dipendente => {
     // Filtra i timesheet per questa settimana
@@ -1350,7 +1599,7 @@ const updateDipendentiOreFromTimesheet = () => {
       if (!orePerGiorno[t.data]) {
         orePerGiorno[t.data] = 0
       }
-      orePerGiorno[t.data] += t.ore
+      orePerGiorno[t.data] += (t.ore || t.oreLavorate || 0)
     })
 
     // Controlla limiti ore giornaliere
@@ -1361,10 +1610,121 @@ const updateDipendentiOreFromTimesheet = () => {
     })
     
     // Calcola ore settimanali totali
-    const oreSettimana = timesheetSettimana.reduce((total, t) => total + (t.ore || 0), 0)
+    const oreSettimana = timesheetSettimana.reduce((total, t) => total + (t.ore || t.oreLavorate || 0), 0)
     
     // Aggiorna il dipendente
     dipendente.oreTotaliSettimana = Math.round(oreSettimana * 2) / 2 // Arrotonda a 0.5
+    
+    console.log(`👤 ${dipendente.nome}: ${dipendente.oreTotaliSettimana}h questa settimana`)
+  })
+  
+  // 🚀 NUOVA FUNZIONE: Popola timesheetData per la visualizzazione settimanale
+  updateTimesheetDataFromDetails(startOfWeek, endOfWeek)
+  
+  console.log('✅ Aggiornamento ore settimanali completato')
+}
+
+// 🚀 NUOVA: Forza aggiornamento completo di tutti i dati
+const forceRefreshAllData = async () => {
+  try {
+    console.log('🔄 Aggiornamento forzato di tutti i dati...')
+    
+    // Ricarica tutto
+    await loadDipendenti() // Questo carica sia dipendenti che timesheet
+    
+    success('Dati Aggiornati', 'Tutti i dati della pagina sono stati ricaricati con successo!')
+    
+  } catch (error) {
+    console.error('❌ Errore aggiornamento forzato:', error)
+    error('Errore', 'Impossibile aggiornare i dati')
+  }
+}
+
+// 🚀 NUOVA: Popola timesheetData con i dati reali per la visualizzazione settimanale
+const updateTimesheetDataFromDetails = (startOfWeek, endOfWeek) => {
+  const weeklyData = []
+  
+  console.log('📊 Aggiornamento timesheetData per periodo:', {
+    startOfWeek: startOfWeek.toISOString().split('T')[0],
+    endOfWeek: endOfWeek.toISOString().split('T')[0],
+    dipendenti: dipendenti.value.length,
+    timesheetTotali: timesheetDettagli.value.length
+  })
+  
+  dipendenti.value.forEach(dipendente => {
+    // Filtra i timesheet per questa settimana
+    const timesheetSettimana = timesheetDettagli.value.filter(t => {
+      const dataTimesheet = new Date(t.data)
+      return t.dipendenteId === dipendente.id && 
+             dataTimesheet >= startOfWeek && 
+             dataTimesheet <= endOfWeek
+    })
+
+    console.log(`👤 ${dipendente.nome}: ${timesheetSettimana.length} timesheet questa settimana`)
+
+    // Crea un oggetto per aggregare ore per giorno
+    const orePerGiorno = {
+      lunedi: 0,
+      martedi: 0,
+      mercoledi: 0,
+      giovedi: 0,
+      venerdi: 0,
+      sabato: 0
+    }
+
+    // Aggrega le ore per giorno della settimana
+    timesheetSettimana.forEach(t => {
+      const dataTimesheet = new Date(t.data)
+      const dayOfWeek = dataTimesheet.getDay()
+      const ore = t.ore || t.oreLavorate || 0
+      
+      console.log(`  📅 ${t.data} (giorno ${dayOfWeek}): ${ore}h`)
+      
+      switch (dayOfWeek) {
+        case 1: orePerGiorno.lunedi += ore; break
+        case 2: orePerGiorno.martedi += ore; break
+        case 3: orePerGiorno.mercoledi += ore; break
+        case 4: orePerGiorno.giovedi += ore; break
+        case 5: orePerGiorno.venerdi += ore; break
+        case 6: orePerGiorno.sabato += ore; break
+      }
+    })
+
+    // Calcola il totale settimanale
+    const totale = Object.values(orePerGiorno).reduce((sum, ore) => sum + ore, 0)
+    
+    // Trova il cantiere più comune per questo dipendente
+    const cantieri = timesheetSettimana.map(t => t.cantiere || t.cantiereNome || 'Non Assegnato')
+    const cantiereComune = cantieri.length > 0 ? 
+      cantieri.reduce((a, b, i, arr) => (arr.filter(v => v === a).length >= arr.filter(v => v === b).length ? a : b)) :
+      dipendente.cantiereAttuale || 'Non Assegnato'
+
+    // Aggiungi i dati settimanali (includi anche dipendenti senza ore)
+    const dipendenteData = {
+      dipendenteId: dipendente.id,
+      nome: `${dipendente.nome} ${dipendente.cognome}`,
+      iniziali: dipendente.iniziali || `${dipendente.nome?.[0] || ''}${dipendente.cognome?.[0] || ''}`,
+      cantiere: cantiereComune,
+      lunedi: Math.round(orePerGiorno.lunedi * 2) / 2,
+      martedi: Math.round(orePerGiorno.martedi * 2) / 2,
+      mercoledi: Math.round(orePerGiorno.mercoledi * 2) / 2,
+      giovedi: Math.round(orePerGiorno.giovedi * 2) / 2,
+      venerdi: Math.round(orePerGiorno.venerdi * 2) / 2,
+      sabato: Math.round(orePerGiorno.sabato * 2) / 2,
+      totale: Math.round(totale * 2) / 2
+    }
+    
+    weeklyData.push(dipendenteData)
+    
+    console.log(`  ✅ ${dipendente.nome}: ${totale}h totali`)
+  })
+
+  // Aggiorna timesheetData
+  timesheetData.value = weeklyData
+  console.log('✅ TimesheetData aggiornato:', {
+    dipendenti: weeklyData.length,
+    conOre: weeklyData.filter(d => d.totale > 0).length,
+    oreTotali: weeklyData.reduce((sum, d) => sum + d.totale, 0)
   })
 }
 
@@ -1864,14 +2224,37 @@ const closeScheduleModal = () => {
 
 // Inizializzazione del componente
 onMounted(async () => {
-  // Carica cantieri da Firestore
-  await loadCantieri()
-  
-  // Carica dipendenti da Firestore
-  await loadDipendenti()
-  
-  // Carica tutti i timesheet da Firestore
-  await loadTimesheet()
+  try {
+    console.log('🚀 Inizializzazione pagina Personale...')
+    
+    // STEP 1: Carica cantieri da Firestore
+    console.log('1️⃣ Caricamento cantieri...')
+    await loadCantieri()
+    
+    // STEP 2: Carica dipendenti da Firestore (include anche timesheet)
+    console.log('2️⃣ Caricamento dipendenti e timesheet...')
+    await loadDipendenti()
+    console.log(`👥 Dipendenti caricati: ${dipendenti.value.length}`)
+    console.log(`📊 Timesheet caricati: ${timesheetDettagli.value.length}`)
+    
+    // STEP 3: Forza aggiornamento anche se non ci sono timesheet
+    console.log('3️⃣ Aggiornamento forzato dati...')
+    updateDipendentiOreFromTimesheet()
+    
+    // STEP 4: Debug finale dello stato
+    console.log('📊 Stato finale caricamento:')
+    console.log(`  - Dipendenti: ${dipendenti.value.length}`)
+    console.log(`  - Timesheet dettagli: ${timesheetDettagli.value.length}`)
+    console.log(`  - Timesheet data: ${timesheetData.value.length}`)
+    console.log(`  - Stats ore settimana: ${stats.value.oreSettimana}`)
+    console.log(`  - Stats presenti oggi: ${stats.value.presentiOggi}`)
+    
+    console.log('✅ Inizializzazione pagina Personale completata')
+    
+  } catch (error) {
+    console.error('❌ Errore durante inizializzazione pagina Personale:', error)
+    error('Errore Inizializzazione', 'Impossibile caricare tutti i dati della pagina Personale')
+  }
 })
 
 // Computed per il calendario
@@ -1934,6 +2317,248 @@ const deleteDipendente = async (dipendente) => {
   }
 }
 
+// 🚀 NUOVA: Controllo coerenza tra presenze e timesheet
+const checkPresenceTimesheetCoherence = async () => {
+  try {
+    console.log('🔍 Inizio controllo coerenza presenze-timesheet...')
+    
+    // Carica tutte le presenze
+    const presenzeResult = await firestoreStore.loadCollection('presenze')
+    if (!presenzeResult.success) {
+      console.warn('⚠️ Impossibile caricare presenze per controllo coerenza')
+      return
+    }
+
+    const listaIncoerenze = []
+    const presenzeFiltrate = presenzeResult.data || []
+
+    // Raggruppa timesheet e presenze per dipendente e data
+    const dataMap = new Map()
+
+    // Aggiungi timesheet alla mappa
+    timesheetDettagli.value.forEach(timesheet => {
+      const key = `${timesheet.dipendenteId}-${timesheet.data}`
+      if (!dataMap.has(key)) {
+        dataMap.set(key, { timesheet: [], presenze: [] })
+      }
+      dataMap.get(key).timesheet.push(timesheet)
+    })
+
+    // Aggiungi presenze alla mappa
+    presenzeFiltrate.forEach(presenza => {
+      const key = `${presenza.dipendenteId}-${presenza.data}`
+      if (!dataMap.has(key)) {
+        dataMap.set(key, { timesheet: [], presenze: [] })
+      }
+      dataMap.get(key).presenze.push(presenza)
+    })
+
+    // Controlla coerenza per ogni combinazione dipendente-data
+    for (const [key, data] of dataMap.entries()) {
+      const [dipendenteId, dataStr] = key.split('-')
+      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
+      
+      if (!dipendente) continue
+
+      const timesheetGiorno = data.timesheet
+      const presenzeGiorno = data.presenze
+
+      // Caso 1: Timesheet senza presenza
+      if (timesheetGiorno.length > 0 && presenzeGiorno.length === 0) {
+        const oreTotali = timesheetGiorno.reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
+        if (oreTotali > 0) {
+          listaIncoerenze.push({
+            tipo: 'timesheet_senza_presenza',
+            dipendente: `${dipendente.nome} ${dipendente.cognome}`,
+            data: dataStr,
+            dettaglio: `${oreTotali}h in timesheet ma nessuna presenza registrata`,
+            gravita: 'alta'
+          })
+        }
+      }
+
+      // Caso 2: Presenza senza timesheet
+      if (presenzeGiorno.length > 0 && timesheetGiorno.length === 0) {
+        const presenzeAttive = presenzeGiorno.filter(p => p.stato === 'presente')
+        if (presenzeAttive.length > 0) {
+          listaIncoerenze.push({
+            tipo: 'presenza_senza_timesheet',
+            dipendente: `${dipendente.nome} ${dipendente.cognome}`,
+            data: dataStr,
+            dettaglio: 'Presenza registrata ma nessun timesheet',
+            gravita: 'media'
+          })
+        }
+      }
+
+      // Caso 3: Ore timesheet vs ore calcolate da presenza
+      if (timesheetGiorno.length > 0 && presenzeGiorno.length > 0) {
+        const oreTimesheet = timesheetGiorno.reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
+        
+        presenzeGiorno.forEach(presenza => {
+          if (presenza.stato === 'presente' && presenza.orarioInizio && presenza.orarioFine) {
+            const oreCalcolate = presenza.oreEffettive || calcolaOreDaOrari(presenza.orarioInizio, presenza.orarioFine, presenza.pausa || 0)
+            const differenza = Math.abs(oreTimesheet - oreCalcolate)
+            
+            if (differenza > 0.5) { // Tolleranza di 30 minuti
+              listaIncoerenze.push({
+                tipo: 'ore_non_corrispondenti',
+                dipendente: `${dipendente.nome} ${dipendente.cognome}`,
+                data: dataStr,
+                dettaglio: `Timesheet: ${oreTimesheet}h vs Presenza: ${oreCalcolate}h (diff: ${differenza.toFixed(1)}h)`,
+                gravita: 'media'
+              })
+            }
+          }
+        })
+      }
+    }
+
+    // Aggiorna variabili reattive per l'interfaccia
+    incoerenze.value = listaIncoerenze
+    ultimoControlloCount.value = dataMap.size
+    
+    // Mostra risultati controllo
+    if (listaIncoerenze.length === 0) {
+      console.log('✅ Controllo coerenza completato: nessuna incoerenza trovata')
+    } else {
+      console.warn(`⚠️ Trovate ${listaIncoerenze.length} incoerenze:`)
+      
+      // Raggruppa per gravità
+      const incoerenzGravi = listaIncoerenze.filter(i => i.gravita === 'alta')
+      const incoerenzMedie = listaIncoerenze.filter(i => i.gravita === 'media')
+      
+      if (incoerenzGravi.length > 0) {
+        console.error('❌ Incoerenze GRAVI:')
+        incoerenzGravi.forEach(inc => console.error(`  - ${inc.dipendente} (${inc.data}): ${inc.dettaglio}`))
+      }
+      
+      if (incoerenzMedie.length > 0) {
+        console.warn('⚠️ Incoerenze MEDIE:')
+        incoerenzMedie.forEach(inc => console.warn(`  - ${inc.dipendente} (${inc.data}): ${inc.dettaglio}`))
+      }
+      
+      // Mostra popup di riepilogo migliorato
+      const messaggioRiepilogo = `Trovate ${listaIncoerenze.length} incoerenze:\n` +
+        (incoerenzGravi.length > 0 ? `• ${incoerenzGravi.length} gravi\n` : '') +
+        (incoerenzMedie.length > 0 ? `• ${incoerenzMedie.length} medie\n` : '') +
+        '\nVai al tab "Controlli" per visualizzarle e risolverle.'
+      
+      warning('Incoerenze Rilevate', messaggioRiepilogo)
+    }
+
+    return listaIncoerenze
+
+  } catch (error) {
+    console.error('❌ Errore controllo coerenza presenze-timesheet:', error)
+    return []
+  }
+}
+
+// Helper per calcolare ore da orari
+const calcolaOreDaOrari = (orarioInizio, orarioFine, pausaMinuti = 0) => {
+  try {
+    const [inizioOre, inizioMin] = orarioInizio.split(':').map(Number)
+    const [fineOre, fineMin] = orarioFine.split(':').map(Number)
+    
+    const inizioTotaleMin = inizioOre * 60 + inizioMin
+    const fineTotaleMin = fineOre * 60 + fineMin
+    
+    const differenzaMin = fineTotaleMin - inizioTotaleMin - pausaMinuti
+    return Math.max(0, differenzaMin / 60)
+  } catch (error) {
+    console.error('Errore calcolo ore da orari:', error)
+    return 0
+  }
+}
+
+// 🚀 NUOVA: Crea timesheet di esempio per dimostrazione
+const createSampleTimesheetData = async () => {
+  try {
+    // Chiedi conferma all'utente
+    const confirmed = await confirm(
+      'Creare Dati di Esempio?', 
+      'Non ci sono timesheet nel sistema. Vuoi creare alcuni dati di esempio per vedere come funziona la pagina?'
+    )
+    
+    if (!confirmed) {
+      return false
+    }
+    
+    console.log('🚀 Creazione timesheet di esempio...')
+    
+    const dipendentiAttivi = dipendenti.value.filter(d => d.stato === 'attivo').slice(0, 3) // Max 3 dipendenti
+    
+    if (dipendentiAttivi.length === 0) {
+      console.warn('⚠️ Nessun dipendente attivo per creare timesheet di esempio')
+      return false
+    }
+    
+    const oggi = new Date()
+    const timesheetCreati = []
+    
+    // Crea timesheet per gli ultimi 5 giorni lavorativi
+    for (let i = 0; i < 5; i++) {
+      const dataLavoro = new Date(oggi)
+      dataLavoro.setDate(oggi.getDate() - i)
+      
+      // Salta domenica
+      if (dataLavoro.getDay() === 0) {
+        continue
+      }
+      
+      const dataStr = dataLavoro.toISOString().split('T')[0]
+      
+      // Crea timesheet per ogni dipendente attivo
+      for (const dipendente of dipendentiAttivi) {
+        const oreGiorno = 7 + Math.random() * 3 // Tra 7 e 10 ore
+        const oreLavorate = Math.round(oreGiorno * 2) / 2 // Arrotonda a 0.5
+        
+        const timesheetData = {
+          dipendenteId: dipendente.id,
+          data: dataStr,
+          cantiere: dipendente.cantiereAttuale || 'Cantiere Demo',
+          ore: oreLavorate,
+          oreLavorate: oreLavorate,
+          orarioInizio: '08:00',
+          orarioFine: `${Math.floor(8 + oreLavorate)}:00`,
+          note: 'Timesheet di esempio generato automaticamente',
+          costoOrario: dipendente.pagaOraria || 25,
+          costoTotale: oreLavorate * (dipendente.pagaOraria || 25),
+          fonte: 'esempio_automatico',
+          createdAt: new Date().toISOString()
+        }
+        
+        try {
+          const result = await firestoreStore.registraTimesheet(timesheetData)
+          if (result.success) {
+            timesheetCreati.push(timesheetData)
+            console.log(`✅ Timesheet esempio creato: ${dipendente.nome} - ${dataStr} - ${oreLavorate}h`)
+          } else {
+            console.error(`❌ Errore creazione timesheet esempio per ${dipendente.nome}:`, result.error)
+          }
+        } catch (error) {
+          console.error(`❌ Errore creazione timesheet esempio:`, error)
+        }
+      }
+    }
+    
+    if (timesheetCreati.length > 0) {
+      success('Dati di Esempio Creati!', `Creati ${timesheetCreati.length} timesheet di esempio. Ora puoi vedere come funziona la pagina.`)
+      console.log(`✅ Creazione completata: ${timesheetCreati.length} timesheet di esempio`)
+      return true
+    } else {
+      error('Errore', 'Impossibile creare timesheet di esempio')
+      return false
+    }
+    
+  } catch (error) {
+    console.error('❌ Errore creazione timesheet di esempio:', error)
+    error('Errore', 'Impossibile creare timesheet di esempio')
+    return false
+  }
+}
+
 // Computed per le presenze
 const presenzeComputed = computed(() => {
   const result = {}
@@ -1958,5 +2583,177 @@ const presenzeComputed = computed(() => {
 const getPresenzaComputed = (dipendenteId) => {
   const key = `${selectedDate.value}-${dipendenteId}`
   return presenzeComputed.value[key]
+}
+
+// 🚀 NUOVE: Funzioni per gestire il tab Controlli
+
+/**
+ * Esegue il controllo di coerenza manualmente
+ */
+const runCoherenceCheck = async () => {
+  try {
+    controlloInCorso.value = true
+    console.log('🔄 Esecuzione controllo coerenza manuale...')
+    
+    // Esegui il controllo
+    await checkPresenceTimesheetCoherence()
+    
+    // Mostra risultato
+    if (incoerenze.value.length === 0) {
+      success('Controllo Completato', 'Nessuna incoerenza rilevata. Tutto in ordine!')
+    } else {
+      const gravi = incoerenze.value.filter(i => i.gravita === 'alta').length
+      const medie = incoerenze.value.filter(i => i.gravita === 'media').length
+      warning('Controllo Completato', `Rilevate ${incoerenze.value.length} incoerenze (${gravi} gravi, ${medie} medie)`)
+    }
+    
+  } catch (error) {
+    console.error('❌ Errore controllo coerenza manuale:', error)
+    error('Errore Controllo', 'Impossibile eseguire il controllo di coerenza')
+  } finally {
+    controlloInCorso.value = false
+  }
+}
+
+/**
+ * Risolve un'incoerenza specifica
+ */
+const risolviIncoerenza = async (incoerenza) => {
+  try {
+    console.log('🔧 Risoluzione incoerenza:', incoerenza)
+    
+    const dipendente = dipendenti.value.find(d => `${d.nome} ${d.cognome}` === incoerenza.dipendente)
+    if (!dipendente) {
+      throw new Error('Dipendente non trovato')
+    }
+    
+    let messaggioRisoluzione = ''
+    let azioneRisoluzione = null
+    
+    // Determina l'azione di risoluzione in base al tipo di incoerenza
+    switch (incoerenza.tipo) {
+      case 'timesheet_senza_presenza':
+        messaggioRisoluzione = `Vuoi creare automaticamente una presenza per ${dipendente.nome} ${dipendente.cognome} il ${formatDate(incoerenza.data)}?`
+        azioneRisoluzione = async () => {
+          // Crea presenza automatica basata sul timesheet
+          const timesheetGiorno = timesheetDettagli.value.filter(t => 
+            t.dipendenteId === dipendente.id && t.data === incoerenza.data
+          )
+          
+          if (timesheetGiorno.length > 0) {
+            const oreTotali = timesheetGiorno.reduce((sum, t) => sum + (t.ore || 0), 0)
+            const presenzaData = {
+              dipendenteId: dipendente.id,
+              data: incoerenza.data,
+              stato: 'presente',
+              orarioInizio: '08:00',
+              orarioFine: `${Math.floor(8 + oreTotali)}:00`,
+              pausa: 60,
+              oreEffettive: oreTotali,
+              note: 'Presenza generata automaticamente da timesheet',
+              fonte: 'risoluzione_automatica'
+            }
+            
+            const result = await firestoreStore.createDocument('presenze', presenzaData)
+            if (!result.success) {
+              throw new Error(result.error || 'Errore creazione presenza')
+            }
+          }
+        }
+        break
+        
+      case 'presenza_senza_timesheet':
+        messaggioRisoluzione = `Vuoi creare automaticamente un timesheet per ${dipendente.nome} ${dipendente.cognome} il ${formatDate(incoerenza.data)}?`
+        azioneRisoluzione = async () => {
+          // Crea timesheet automatico basato sulla presenza
+          const presenzeResult = await firestoreStore.loadCollection('presenze', [
+            ['dipendenteId', '==', dipendente.id],
+            ['data', '==', incoerenza.data]
+          ])
+          
+          if (presenzeResult.success && presenzeResult.data?.length > 0) {
+            const presenza = presenzeResult.data[0]
+            const oreEffettive = presenza.oreEffettive || 8 // Default 8 ore
+            
+            const timesheetData = {
+              dipendenteId: dipendente.id,
+              data: incoerenza.data,
+              cantiere: dipendente.cantiereAttuale || 'Non Assegnato',
+              ore: oreEffettive,
+              orarioInizio: presenza.orarioInizio || '08:00',
+              orarioFine: presenza.orarioFine || '17:00',
+              note: 'Timesheet generato automaticamente da presenza',
+              costoOrario: dipendente.pagaOraria || 25,
+              costoTotale: oreEffettive * (dipendente.pagaOraria || 25),
+              fonte: 'risoluzione_automatica'
+            }
+            
+            const result = await firestoreStore.registraTimesheet(timesheetData)
+            if (!result.success) {
+              throw new Error(result.error || 'Errore creazione timesheet')
+            }
+          }
+        }
+        break
+        
+      case 'ore_non_corrispondenti':
+        messaggioRisoluzione = `Incoerenza nelle ore per ${dipendente.nome} ${dipendente.cognome} il ${formatDate(incoerenza.data)}. Questa richiede verifica manuale.`
+        azioneRisoluzione = async () => {
+          // Apri modal per modifica manuale
+          selectedDipendente.value = dipendente
+          showDetailModal.value = true
+        }
+        break
+        
+      default:
+        throw new Error(`Tipo di incoerenza non gestito: ${incoerenza.tipo}`)
+    }
+    
+    // Chiedi conferma
+    const confermato = await confirm('Risolvi Incoerenza', messaggioRisoluzione)
+    
+    if (confermato && azioneRisoluzione) {
+      await azioneRisoluzione()
+      
+      // Rimuovi l'incoerenza dalla lista
+      incoerenze.value = incoerenze.value.filter(i => 
+        !(i.dipendente === incoerenza.dipendente && i.data === incoerenza.data && i.tipo === incoerenza.tipo)
+      )
+      
+      // Ricarica i dati
+      await loadTimesheet()
+      
+      success('Incoerenza Risolta', `Incoerenza per ${dipendente.nome} ${dipendente.cognome} risolta con successo!`)
+    }
+    
+  } catch (error) {
+    console.error('❌ Errore risoluzione incoerenza:', error)
+    error('Errore Risoluzione', `Impossibile risolvere l'incoerenza: ${error.message}`)
+  }
+}
+
+/**
+ * Ignora un'incoerenza (la rimuove dalla lista senza risolverla)
+ */
+const ignoraIncoerenza = async (incoerenza) => {
+  try {
+    const confermato = await confirm(
+      'Ignora Incoerenza', 
+      `Sei sicuro di voler ignorare questa incoerenza per ${incoerenza.dipendente} del ${formatDate(incoerenza.data)}? L'incoerenza rimarrà nel sistema ma non sarà più mostrata.`
+    )
+    
+    if (confermato) {
+      // Rimuovi l'incoerenza dalla lista
+      incoerenze.value = incoerenze.value.filter(i => 
+        !(i.dipendente === incoerenza.dipendente && i.data === incoerenza.data && i.tipo === incoerenza.tipo)
+      )
+      
+      success('Incoerenza Ignorata', 'L\'incoerenza è stata rimossa dalla lista')
+    }
+    
+  } catch (error) {
+    console.error('❌ Errore ignorando incoerenza:', error)
+    error('Errore', 'Impossibile ignorare l\'incoerenza')
+  }
 }
 </script> 
