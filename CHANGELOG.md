@@ -37,6 +37,9 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - ✅ **CORRETTO**: Posizionamento dropdown che si apriva all'interno del box limitando visibilità
 - ✅ **RIMOSSO**: Effetto hover sui box che causava spostamenti indesiderati durante l'interazione
 - ✅ **MIGLIORATO**: Calcolo intelligente posizione dropdown con controllo viewport boundaries
+- ✅ **ELIMINATI**: TUTTI gli effetti hover indesiderati dall'intera applicazione
+- ✅ **PULITO**: CSS globale da .card:active transform che causava movimento box
+- ✅ **STABILIZZATA**: Interfaccia completamente senza movimenti o animazioni fastidiose
 
 ### 💼 **BUSINESS IMPACT**
 - ✅ **CRM Pipeline**: Sistema completo gestione opportunità vendita
