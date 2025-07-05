@@ -47,12 +47,12 @@ export const useFirestoreOperations = () => {
     },
 
     // READ
-    async load(collection, filters = []) {
-      const cacheKey = `${collection}:${JSON.stringify(filters)}`
+    async load(collection, filters = [], orderByField = 'createdAt', orderDirection = 'desc', limitCount = null) {
+      const cacheKey = `${collection}:${JSON.stringify(filters)}:${orderByField}:${orderDirection}:${limitCount}`
       
       return cache.getWithCache(cacheKey, async () => {
         return withErrorHandling(
-          () => firestoreStore.loadCollection(collection, filters),
+          () => firestoreStore.loadCollection(collection, filters, orderByField, orderDirection, limitCount),
           `Caricamento ${collection}`
         )
       })

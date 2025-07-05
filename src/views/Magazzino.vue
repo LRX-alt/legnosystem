@@ -531,6 +531,9 @@ const saveEditMateriale = async () => {
     success('Materiale aggiornato con successo!')
     closeEditModal()
     await firestoreStore.loadMateriali()
+    
+    // 🚀 AGGIORNAMENTO AUTOMATICO: Aggiorna i costi dei cantieri che usano questo materiale
+    await updateCantieriCostsForMaterial(editingMateriale.value.id)
   } else {
     error('Errore durante l\'aggiornamento del materiale.', result.error)
   }
@@ -546,6 +549,88 @@ const deleteMateriale = async (id) => {
     } else {
       error('Errore durante l\'eliminazione.', result.error)
     }
+  }
+}
+
+// 🚀 AGGIORNAMENTO AUTOMATICO: Aggiorna i costi dei cantieri che usano un materiale specifico
+const updateCantieriCostsForMaterial = async (materialeId) => {
+  if (!materialeId) return
+  
+  try {
+    console.log('🔄 Aggiornamento costi cantieri per materiale modificato:', materialeId)
+    
+    // Carica tutti i cantieri
+    await firestoreStore.loadCantieri()
+    
+    // Per ogni cantiere, verifica se usa questo materiale e aggiorna i costi
+    for (const cantiere of firestoreStore.cantieri) {
+      try {
+        const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiere.id)
+        
+        if (materialiResult.success && materialiResult.data) {
+          // Verifica se questo cantiere usa il materiale modificato
+          const usaMateriale = materialiResult.data.some(m => m.materialeId === materialeId)
+          
+          if (usaMateriale) {
+            // Aggiorna i costi di questo cantiere
+            await autoUpdateSingleCantiereCosts(cantiere.id)
+          }
+        }
+      } catch (error) {
+        console.error(`Errore aggiornamento costi cantiere ${cantiere.id}:`, error)
+      }
+    }
+  } catch (error) {
+    console.error('Errore aggiornamento costi cantieri per materiale:', error)
+  }
+}
+
+// Funzione helper per aggiornare i costi di un singolo cantiere
+const autoUpdateSingleCantiereCosts = async (cantiereId) => {
+  if (!cantiereId) return
+  
+  try {
+    // Carica i timesheet per questo cantiere
+    const timesheetResult = await firestoreStore.loadCollection('timesheet', [
+      { field: 'cantiereId', operator: '==', value: cantiereId }
+    ])
+    
+    let costoManodopera = 0
+    if (timesheetResult.success && timesheetResult.data) {
+      costoManodopera = timesheetResult.data.reduce((acc, entry) => {
+        const oreLavorate = entry.oreLavorate || entry.ore || 0
+        const costoOrario = entry.costoOrario || 0
+        return acc + (oreLavorate * costoOrario)
+      }, 0)
+    }
+    
+    // Carica i materiali per questo cantiere
+    const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiereId)
+    let costoMateriali = 0
+    if (materialiResult.success && materialiResult.data) {
+      costoMateriali = materialiResult.data.reduce((acc, materiale) => {
+        const quantita = materiale.quantitaUtilizzata || materiale.quantitaRichiesta || 0
+        const prezzo = materiale.prezzoUnitario || 0
+        return acc + (quantita * prezzo)
+      }, 0)
+    }
+    
+    // Aggiorna i costi nel cantiere
+    const updateData = {
+      costiAccumulati: {
+        manodopera: Math.round(costoManodopera * 100) / 100,
+        materiali: Math.round(costoMateriali * 100) / 100,
+        totale: Math.round((costoManodopera + costoMateriali) * 100) / 100
+      },
+      updatedAt: new Date()
+    }
+    
+    await firestoreStore.updateDocument('cantieri', cantiereId, updateData)
+    
+    console.log(`✅ Costi aggiornati per cantiere ${cantiereId}:`, updateData.costiAccumulati)
+    
+  } catch (error) {
+    console.error('Errore aggiornamento costi singolo cantiere:', error)
   }
 }
 

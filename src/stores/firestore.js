@@ -90,9 +90,14 @@ export const useFirestoreStore = defineStore('firestore', () => {
       // 🧹 Sanitizza i dati prima di inviarli a Firestore
       const sanitizedData = sanitizeFirestoreData(data)
       
-      console.log(`🔧 Create ${collectionName}:`)
-      console.log('📋 Dati originali:', JSON.stringify(data, null, 2))
-      console.log('🧹 Dati sanitizzati:', JSON.stringify(sanitizedData, null, 2))
+      // 🔧 Debug mode ridotto - mostra solo se ci sono campi complessi
+      const complexFields = Object.entries(sanitizedData)
+        .filter(([key, value]) => value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date))
+        .map(([key]) => key)
+      
+      if (complexFields.length > 0) {
+        console.log(`🔧 Create ${collectionName} - campi complessi:`, complexFields)
+      }
       
       const docRef = await addDoc(collection(db, collectionName), {
         ...sanitizedData,
@@ -203,7 +208,6 @@ export const useFirestoreStore = defineStore('firestore', () => {
     
     // 🚨 IMPORTANTE: Converti sempre docId in stringa
     const stringDocId = String(docId)
-    console.log(`🔧 Update ${collectionName}/${docId} → ${stringDocId}`)
     
     let sanitizedData = null // Sposta la dichiarazione fuori dal try
     
@@ -211,16 +215,13 @@ export const useFirestoreStore = defineStore('firestore', () => {
       // Sanitizza i dati prima dell'update
       sanitizedData = sanitizeFirestoreData(data)
       
-      console.log(`🔧 Update ${collectionName}/${stringDocId}:`)
-      console.log('📋 Dati originali:', JSON.stringify(data, null, 2))
-      console.log('🧹 Dati sanitizzati:', JSON.stringify(sanitizedData, null, 2))
+      // 🔧 Debug mode ridotto - mostra solo se ci sono campi complessi
+      const complexFields = Object.entries(sanitizedData)
+        .filter(([key, value]) => value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date))
+        .map(([key]) => key)
       
-      // Controlliamo ogni campo individualmente per identificare il problema
-      for (const [key, value] of Object.entries(sanitizedData)) {
-        console.log(`🔍 Campo "${key}":`, typeof value, value)
-        if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
-          console.log(`⚠️ Oggetto complesso in "${key}":`, Object.keys(value))
-        }
+      if (complexFields.length > 0) {
+        console.log(`🔧 Update ${collectionName}/${stringDocId} - campi complessi:`, complexFields)
       }
       
       await updateDoc(doc(db, collectionName, stringDocId), {
@@ -271,9 +272,16 @@ export const useFirestoreStore = defineStore('firestore', () => {
     try {
       let q = collection(db, collectionName)
       
-      // Applica filtri
+      // Applica filtri con supporto per entrambi i formati
       filters.forEach(filter => {
-        q = query(q, where(filter.field, filter.operator, filter.value))
+        // Supporta sia formato array che formato oggetto
+        if (Array.isArray(filter)) {
+          // Formato array: ['field', 'operator', 'value']
+          q = query(q, where(filter[0], filter[1], filter[2]))
+        } else {
+          // Formato oggetto: { field, operator, value }
+          q = query(q, where(filter.field, filter.operator, filter.value))
+        }
       })
       
       // Applica ordinamento
@@ -308,9 +316,16 @@ export const useFirestoreStore = defineStore('firestore', () => {
   const subscribeToCollection = (collectionName, callback, filters = []) => {
     let q = collection(db, collectionName)
     
-    // Applica filtri
+    // Applica filtri con supporto per entrambi i formati
     filters.forEach(filter => {
-      q = query(q, where(filter.field, filter.operator, filter.value))
+      // Supporta sia formato array che formato oggetto
+      if (Array.isArray(filter)) {
+        // Formato array: ['field', 'operator', 'value']
+        q = query(q, where(filter[0], filter[1], filter[2]))
+      } else {
+        // Formato oggetto: { field, operator, value }
+        q = query(q, where(filter.field, filter.operator, filter.value))
+      }
     })
     
     return onSnapshot(q, (snapshot) => {
@@ -610,7 +625,8 @@ export const useFirestoreStore = defineStore('firestore', () => {
   
   const loadGiornaleCantiere = async (cantiereId) => {
     const filters = [{ field: 'cantiereId', operator: '==', value: cantiereId }]
-    return await loadCollection('giornale_cantiere', filters, 'data', 'desc')
+    // Disabilito ordinamento per evitare errore indice Firestore
+    return await loadCollection('giornale_cantiere', filters, null)
   }
 
   const createRegistrazioneGiornale = async (cantiereId, registrazioneData) => {
@@ -970,6 +986,9 @@ export const useFirestoreStore = defineStore('firestore', () => {
     }
   }
 
+  // Alias for backward compatibility
+  const addDocument = createDocument
+
   return {
     // State
     loading,
@@ -999,6 +1018,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
     
     // Methods
     createDocument,
+    addDocument, // Alias for backward compatibility
     updateDocument,
     deleteDocument,
     loadCollection,

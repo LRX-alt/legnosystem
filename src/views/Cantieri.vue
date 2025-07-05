@@ -561,6 +561,9 @@ const saveMaterialToCantiere = async () => {
       
       popup.success('Materiale Aggiunto', 'Il materiale è stato aggiunto al cantiere con successo')
       closeAddMaterialModal()
+      
+      // 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere
+      await autoUpdateCantiereCosts(selectedCantiere.value.id)
     } else {
       throw new Error(result.error)
     }
@@ -627,6 +630,9 @@ const removeMaterialFromCantiere = async (materialeId) => {
       }
       
       popup.success('Materiale Rimosso', 'Il materiale è stato rimosso dal cantiere con successo')
+      
+      // 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere
+      await autoUpdateCantiereCosts(selectedCantiere.value.id)
     } else {
       throw new Error(result.error)
     }
@@ -916,6 +922,9 @@ const saveMaterialChanges = async () => {
       
       popup.success('Materiale Aggiornato', 'Le modifiche sono state salvate con successo')
       closeEditMaterialModal()
+      
+      // 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere
+      await autoUpdateCantiereCosts(selectedCantiere.value.id)
     } else {
       throw new Error(result.error)
     }
@@ -925,6 +934,75 @@ const saveMaterialChanges = async () => {
     popup.error('Errore Salvataggio', err.message)
   } finally {
     loading.value = false
+  }
+}
+
+// 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere quando si modificano i materiali
+const autoUpdateCantiereCosts = async (cantiereId) => {
+  if (!cantiereId) return
+  
+  try {
+    console.log('🔄 Aggiornamento automatico costi dopo modifica materiali:', cantiereId)
+    
+    // Carica i timesheet per questo cantiere
+    const timesheetResult = await firestoreOperations.load('timesheet', [
+      ['cantiereId', '==', cantiereId]
+    ])
+    
+    let costoManodopera = 0
+    if (timesheetResult.success && timesheetResult.data) {
+      costoManodopera = timesheetResult.data.reduce((acc, entry) => {
+        const oreLavorate = entry.oreLavorate || entry.ore || 0
+        const costoOrario = entry.costoOrario || 0
+        return acc + (oreLavorate * costoOrario)
+      }, 0)
+    }
+    
+    // Carica i materiali per questo cantiere
+    const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiereId)
+    let costoMateriali = 0
+    if (materialiResult.success && materialiResult.data) {
+      costoMateriali = materialiResult.data.reduce((acc, materiale) => {
+        const quantita = materiale.quantitaUtilizzata || materiale.quantitaRichiesta || 0
+        const prezzo = materiale.prezzoUnitario || 0
+        return acc + (quantita * prezzo)
+      }, 0)
+    }
+    
+    // Calcola statistiche
+    const giorniLavorativi = timesheetResult.success ? 
+      [...new Set(timesheetResult.data.map(t => t.data))].length : 0
+    const oreTotali = timesheetResult.success ?
+      timesheetResult.data.reduce((acc, t) => acc + (t.oreLavorate || t.ore || 0), 0) : 0
+    
+    // Aggiorna i costi nel cantiere
+    const updateData = {
+      costiAccumulati: {
+        manodopera: Math.round(costoManodopera * 100) / 100,
+        materiali: Math.round(costoMateriali * 100) / 100,
+        totale: Math.round((costoManodopera + costoMateriali) * 100) / 100
+      },
+      statisticheCosti: {
+        giorniLavorativi,
+        oreTotaliLavorate: oreTotali,
+        costoMedioGiornaliero: giorniLavorativi > 0 ? Math.round(((costoManodopera + costoMateriali) / giorniLavorativi) * 100) / 100 : 0
+      },
+      updatedAt: new Date()
+    }
+    
+    await firestoreOperations.update('cantieri', cantiereId, updateData)
+    
+    // Ricarica i cantieri per aggiornare l'UI
+    await firestoreStore.loadCantieri()
+    
+    console.log('✅ Costi aggiornati automaticamente:', {
+      manodopera: costoManodopera,
+      materiali: costoMateriali,
+      totale: costoManodopera + costoMateriali
+    })
+    
+  } catch (error) {
+    console.error('Errore aggiornamento automatico costi:', error)
   }
 }
 
@@ -965,25 +1043,58 @@ const refreshCantiereCosts = async (cantiere) => {
       ['cantiereId', '==', cantiere.id]
     ])
     
-    const costoManodopera = timesheetResult.data.reduce((acc, entry) => {
-      const dipendente = firestoreStore.dipendenti.find(d => d.id === entry.dipendenteId)
-      return acc + (entry.oreLavorate * (dipendente?.pagaOraria || 0))
-    }, 0)
+    let costoManodopera = 0
+    if (timesheetResult.success && timesheetResult.data) {
+      costoManodopera = timesheetResult.data.reduce((acc, entry) => {
+        const dipendente = firestoreStore.dipendenti.find(d => d.id === entry.dipendenteId)
+        const oreLavorate = entry.oreLavorate || entry.ore || 0
+        const pagaOraria = dipendente?.pagaOraria || entry.costoOrario || 0
+        return acc + (oreLavorate * pagaOraria)
+      }, 0)
+    }
+    
+    // Calcola i costi dei materiali dal cantiere
+    const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiere.id)
+    let costoMateriali = 0
+    if (materialiResult.success && materialiResult.data) {
+      costoMateriali = materialiResult.data.reduce((acc, materiale) => {
+        const quantita = materiale.quantitaUtilizzata || materiale.quantitaRichiesta || 0
+        const prezzo = materiale.prezzoUnitario || 0
+        return acc + (quantita * prezzo)
+      }, 0)
+    }
+    
+    // Calcola statistiche aggiuntive
+    const giorniLavorativi = timesheetResult.success ? 
+      [...new Set(timesheetResult.data.map(t => t.data))].length : 0
+    const oreTotali = timesheetResult.success ?
+      timesheetResult.data.reduce((acc, t) => acc + (t.oreLavorate || t.ore || 0), 0) : 0
     
     // Aggiorna i costi accumulati
     const updateData = {
       costiAccumulati: {
-        manodopera: costoManodopera,
-        materiali: cantiere.costiAccumulati?.materiali || 0,
-        totale: costoManodopera + (cantiere.costiAccumulati?.materiali || 0)
+        manodopera: Math.round(costoManodopera * 100) / 100,
+        materiali: Math.round(costoMateriali * 100) / 100,
+        totale: Math.round((costoManodopera + costoMateriali) * 100) / 100
+      },
+      statisticheCosti: {
+        giorniLavorativi,
+        oreTotaliLavorate: oreTotali,
+        costoMedioGiornaliero: giorniLavorativi > 0 ? Math.round(((costoManodopera + costoMateriali) / giorniLavorativi) * 100) / 100 : 0
       },
       updatedAt: new Date()
     }
     
     await firestoreOperations.update('cantieri', cantiere.id, updateData)
-    popup.success('Costi Aggiornati', 'I costi del cantiere sono stati aggiornati con successo')
+    
+    // Ricarica i cantieri per aggiornare l'UI
+    await firestoreStore.loadCantieri()
+    
+    popup.success('Costi Aggiornati', 
+      `Manodopera: €${costoManodopera.toFixed(2)} • Materiali: €${costoMateriali.toFixed(2)} • Totale: €${(costoManodopera + costoMateriali).toFixed(2)}`)
     
   } catch (err) {
+    console.error('Errore aggiornamento costi:', err)
     popup.error('Errore Aggiornamento Costi', err.message)
   } finally {
     loading.value = false

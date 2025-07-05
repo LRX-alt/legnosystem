@@ -116,7 +116,7 @@
                 <div class="text-xs text-gray-500">Giorni Lavorati</div>
               </div>
               <div>
-                <div class="text-2xl font-bold text-primary-600">{{ costiCantiere.oreTotali }}</div>
+                <div class="text-2xl font-bold text-primary-600">{{ costiCantiere?.oreTotali || 0 }}</div>
                 <div class="text-xs text-gray-500">Ore Totali</div>
               </div>
             </div>
@@ -163,24 +163,24 @@
       <div class="grid grid-cols-3 gap-4 text-center">
         <div>
           <p class="text-xs text-gray-600">Manodopera</p>
-          <p class="text-lg font-bold text-orange-600">€{{ costiCantiere.manodopera.toLocaleString() }}</p>
-          <p class="text-xs text-gray-500">{{ costiCantiere.giorniLavorativi }} giorni</p>
+          <p class="text-lg font-bold text-orange-600">€{{ (costiCantiere?.manodopera || 0).toLocaleString() }}</p>
+          <p class="text-xs text-gray-500">{{ costiCantiere?.giorniLavorativi || 0 }} giorni</p>
         </div>
         <div>
           <p class="text-xs text-gray-600">Materiali</p>
-          <p class="text-lg font-bold text-blue-600">€{{ costiCantiere.materiali.toLocaleString() }}</p>
+          <p class="text-lg font-bold text-blue-600">€{{ (costiCantiere?.materiali || 0).toLocaleString() }}</p>
           <p class="text-xs text-gray-500">utilizzati</p>
         </div>
         <div>
           <p class="text-xs text-gray-600">Totale</p>
-          <p class="text-lg font-bold text-red-600">€{{ costiCantiere.totale.toLocaleString() }}</p>
+          <p class="text-lg font-bold text-red-600">€{{ (costiCantiere?.totale || 0).toLocaleString() }}</p>
           <p class="text-xs text-gray-500">sostenuto</p>
         </div>
       </div>
-      <div v-if="costiCantiere.oreTotali > 0" class="pt-2 mt-2 border-t border-green-200 text-center">
+      <div v-if="(costiCantiere?.oreTotali || 0) > 0" class="pt-2 mt-2 border-t border-green-200 text-center">
         <p class="text-xs text-gray-600">
-          {{ costiCantiere.oreTotali }}h lavorate • 
-          €{{ costiCantiere.costoMedioGiorno?.toFixed(0) || 0 }}/giorno medio
+          {{ costiCantiere?.oreTotali || 0 }}h lavorate • 
+          €{{ costiCantiere?.costoMedioGiorno?.toFixed(0) || 0 }}/giorno medio
         </p>
       </div>
     </div>
@@ -246,7 +246,7 @@
           </div>
 
           <!-- Attività -->
-          <div>
+          <div v-if="entry.attivita && entry.attivita.length > 0">
             <h4 class="text-sm font-medium text-gray-700 mb-2">🔨 Attività Principali</h4>
             <ul class="text-sm space-y-1">
               <li v-for="attivita in entry.attivita.slice(0, 2)" :key="attivita" class="text-gray-700">
@@ -257,12 +257,12 @@
         </div>
 
         <!-- Note e Problemi -->
-        <div v-if="entry.note || entry.problemi.length > 0" class="mt-4 pt-4 border-t border-gray-200">
+        <div v-if="entry.note || (entry.problemi && entry.problemi.length > 0)" class="mt-4 pt-4 border-t border-gray-200">
           <div v-if="entry.note" class="mb-3">
             <h4 class="text-sm font-medium text-gray-700 mb-1">📝 Note</h4>
             <p class="text-sm text-gray-600">{{ entry.note }}</p>
           </div>
-          <div v-if="entry.problemi.length > 0">
+          <div v-if="entry.problemi && entry.problemi.length > 0">
             <h4 class="text-sm font-medium text-red-700 mb-1">⚠️ Problemi/Imprevisti</h4>
             <ul class="text-sm text-red-600 space-y-1">
               <li v-for="problema in entry.problemi" :key="problema">• {{ problema }}</li>
@@ -271,7 +271,7 @@
         </div>
 
         <!-- Allegati -->
-        <div v-if="entry.allegati.length > 0" class="mt-4 pt-4 border-t border-gray-200">
+        <div v-if="entry.allegati && entry.allegati.length > 0" class="mt-4 pt-4 border-t border-gray-200">
           <h4 class="text-sm font-medium text-gray-700 mb-2">📎 Allegati ({{ entry.allegati.length }})</h4>
           <div class="flex space-x-2">
             <span v-for="allegato in entry.allegati.slice(0, 3)" :key="allegato.id" 
@@ -391,7 +391,7 @@
                   <label class="block text-sm font-medium text-gray-700 mb-2">⏰ Ore Totali Lavorate</label>
                   <input v-model.number="newEntryData.oreTotali" type="number" min="0.5" max="12" step="0.5" required class="form-input"
                          :class="{'border-orange-500': newEntryData.oreTotali > 8}">
-                  <p v-if="entryForm.oreTotali > 8" class="text-xs text-orange-600 mt-1">
+                  <p v-if="newEntryData.oreTotali > 8" class="text-xs text-orange-600 mt-1">
                     Include {{ newEntryData.oreTotali - 8 }}h di straordinario
                   </p>
                 </div>
@@ -521,6 +521,7 @@ import { useFirestoreStore } from '@/stores/firestore'
 import {
   PlusIcon,
   DocumentArrowDownIcon,
+  DocumentTextIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   XMarkIcon,
@@ -558,6 +559,8 @@ const newEntryData = ref({
     note: ''
   },
   attivita: [''],
+  problemi: [],
+  allegati: [],
   note: '',
   problemiText: '',
   oreTotali: 8,
@@ -629,6 +632,8 @@ const newEntry = () => {
       note: ''
     },
     attivita: [''],
+    problemi: [],
+    allegati: [],
     note: '',
     problemiText: '',
     oreTotali: 8,
@@ -647,11 +652,13 @@ const editEntry = (entry) => {
     orarioFine: entry.orarioFine,
     responsabile: entry.responsabile,
     meteo: { ...entry.meteo },
-    attivita: [...entry.attivita],
-    note: entry.note,
-    problemiText: entry.problemi.join('\n'),
-    oreTotali: entry.oreTotali,
-    costiExtra: 0,
+    attivita: [...(entry.attivita || [])],
+    problemi: [...(entry.problemi || [])],
+    allegati: [...(entry.allegati || [])],
+    note: entry.note || '',
+    problemiText: (entry.problemi || []).join('\n'),
+    oreTotali: entry.oreTotali || 8,
+    costiExtra: entry.costiExtra || 0,
     team: [...(entry.team || [])], // Legacy
     teamPresente: [...(entry.teamPresente || entry.team || [])] // Nuovo team, fallback su legacy
   }
@@ -803,8 +810,14 @@ onMounted(async () => {
     ]
     
     // Carica gli altri dati in background
-    Promise.allSettled(secondaryPromises).then(() => {
+    Promise.allSettled(secondaryPromises).then(async () => {
       console.log('✅ Caricamento dati completato')
+      
+      // 🚀 CALCOLO AUTOMATICO COSTI MATERIALI: Anche se non ci sono registrazioni giornale
+      if (entries.value.length === 0) {
+        console.log('🔄 Nessuna registrazione giornale, calcolo solo costi materiali...')
+        await calculateMaterialCostsOnly()
+      }
     })
     
   } catch (errorObj) {
@@ -829,10 +842,16 @@ const loadGiornaleEntries = async () => {
     }
     
     const result = await firestoreOperations.giornaleCantiere.load(cantiere.value.id)
-    entries.value = result.data || []
+    // 🔄 ORDINAMENTO LATO CLIENT: Ordina per data (più recente prima) senza causare errori indice Firestore
+    const sortedEntries = (result.data || []).sort((a, b) => {
+      const dateA = new Date(a.data || '1970-01-01')
+      const dateB = new Date(b.data || '1970-01-01')
+      return dateB - dateA // Ordine decrescente (più recente prima)
+    })
+    entries.value = sortedEntries
     
-    // Aggiorna i costi accumulati
-    await updateCostiCantiere()
+    // 🚀 CALCOLO AUTOMATICO COSTI: Calcola sia manodopera che materiali al caricamento
+    await refreshCantiereCostsFromTimesheet()
   } catch (err) {
     error('Errore', `Caricamento registrazioni fallito: ${err.message}`)
   } finally {
@@ -926,7 +945,7 @@ const updateCostiCantiere = async () => {
         materiali: costiCantiere.value.materiali,
         totale: costiCantiere.value.totale
       },
-      updatedAt: new Date()
+      updatedAt: new Date().toISOString()
     }
     
     await firestoreOperations.update('cantieri', cantiere.value.id, updateData)
@@ -935,14 +954,145 @@ const updateCostiCantiere = async () => {
   }
 }
 
+// 🚀 CALCOLO COSTI MATERIALI: Solo materiali (quando non ci sono registrazioni giornale)
+const calculateMaterialCostsOnly = async () => {
+  if (!cantiere.value?.id) return
+  
+  try {
+    console.log('🔄 Calcolo costi materiali per cantiere:', cantiere.value.nome)
+    
+    // Carica i materiali per questo cantiere
+    const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiere.value.id)
+    let costoMateriali = 0
+    if (materialiResult.success && materialiResult.data) {
+      costoMateriali = materialiResult.data.reduce((acc, materiale) => {
+        const quantita = materiale.quantitaUtilizzata || materiale.quantitaRichiesta || 0
+        const prezzo = materiale.prezzoUnitario || 0
+        return acc + (quantita * prezzo)
+      }, 0)
+      
+      console.log(`📦 Trovati ${materialiResult.data.length} materiali, costo totale: €${costoMateriali}`)
+    }
+    
+    // Aggiorna i costi locali per la visualizzazione (manodopera = 0 se non ci sono registrazioni)
+    costiCantiere.value = {
+      manodopera: 0,
+      materiali: Math.round(costoMateriali * 100) / 100,
+      totale: Math.round(costoMateriali * 100) / 100,
+      giorniLavorativi: 0,
+      oreTotali: 0,
+      costoMedioGiorno: 0
+    }
+    
+    // Aggiorna anche il database se ci sono materiali
+    if (costoMateriali > 0) {
+      const updateData = {
+        costiAccumulati: {
+          manodopera: 0,
+          materiali: Math.round(costoMateriali * 100) / 100,
+          totale: Math.round(costoMateriali * 100) / 100
+        },
+        statisticheCosti: {
+          giorniLavorativi: 0,
+          oreTotaliLavorate: 0,
+          costoMedioGiornaliero: 0
+        },
+        updatedAt: new Date().toISOString()
+      }
+      
+      await firestoreOperations.update('cantieri', cantiere.value.id, updateData)
+      console.log('✅ Costi materiali aggiornati:', costoMateriali)
+    }
+    
+  } catch (error) {
+    console.error('Errore calcolo costi materiali:', error)
+  }
+}
+
 // 🔄 Funzione per aggiornare manualmente i costi (pulsante "Aggiorna")
 const refreshCosts = async () => {
   try {
-    await updateCostiCantiere()
+    await refreshCantiereCostsFromTimesheet()
     success('Costi Aggiornati', 'Calcoli costi cantiere completati!')
   } catch (error) {
     console.error('Errore refresh costi:', error)
     popup.error('Errore', 'Impossibile aggiornare i costi')
+  }
+}
+
+// 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere dal timesheet
+const refreshCantiereCostsFromTimesheet = async () => {
+  if (!cantiere.value?.id) return
+  
+  try {
+    console.log('🔄 Aggiornamento automatico costi cantiere:', cantiere.value.nome)
+    
+    // Carica i timesheet per questo cantiere (senza ordinamento per evitare errore indice)
+    const timesheetResult = await firestoreOperations.load('timesheet', [
+      ['cantiereId', '==', cantiere.value.id]
+    ], null)
+    
+    let costoManodopera = 0
+    if (timesheetResult.success && timesheetResult.data) {
+      costoManodopera = timesheetResult.data.reduce((acc, entry) => {
+        const oreLavorate = entry.oreLavorate || entry.ore || 0
+        const costoOrario = entry.costoOrario || 0
+        return acc + (oreLavorate * costoOrario)
+      }, 0)
+    }
+    
+    // Carica i materiali per questo cantiere
+    const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiere.value.id)
+    let costoMateriali = 0
+    if (materialiResult.success && materialiResult.data) {
+      costoMateriali = materialiResult.data.reduce((acc, materiale) => {
+        const quantita = materiale.quantitaUtilizzata || materiale.quantitaRichiesta || 0
+        const prezzo = materiale.prezzoUnitario || 0
+        return acc + (quantita * prezzo)
+      }, 0)
+    }
+    
+    // Calcola statistiche
+    const giorniLavorativi = timesheetResult.success ? 
+      [...new Set(timesheetResult.data.map(t => t.data))].length : 0
+    const oreTotali = timesheetResult.success ?
+      timesheetResult.data.reduce((acc, t) => acc + (t.oreLavorate || t.ore || 0), 0) : 0
+    
+    // Aggiorna i costi nel cantiere
+    const updateData = {
+      costiAccumulati: {
+        manodopera: Math.round(costoManodopera * 100) / 100,
+        materiali: Math.round(costoMateriali * 100) / 100,
+        totale: Math.round((costoManodopera + costoMateriali) * 100) / 100
+      },
+      statisticheCosti: {
+        giorniLavorativi,
+        oreTotaliLavorate: oreTotali,
+        costoMedioGiornaliero: giorniLavorativi > 0 ? Math.round(((costoManodopera + costoMateriali) / giorniLavorativi) * 100) / 100 : 0
+      },
+      updatedAt: new Date().toISOString()
+    }
+    
+    await firestoreOperations.update('cantieri', cantiere.value.id, updateData)
+    
+    // Aggiorna anche i costi locali per la visualizzazione
+    costiCantiere.value = {
+      manodopera: costoManodopera,
+      materiali: costoMateriali,
+      totale: costoManodopera + costoMateriali,
+      giorniLavorativi,
+      oreTotali,
+      costoMedioGiorno: giorniLavorativi > 0 ? (costoManodopera + costoMateriali) / giorniLavorativi : 0
+    }
+    
+    console.log('✅ Costi aggiornati automaticamente:', {
+      manodopera: costoManodopera,
+      materiali: costoMateriali,
+      totale: costoManodopera + costoMateriali
+    })
+    
+  } catch (error) {
+    console.error('Errore aggiornamento automatico costi:', error)
   }
 }
 
@@ -956,11 +1106,20 @@ const saveEntry = async () => {
     loading.value = true
     info('Salvataggio in corso...')
     
+    // 🔧 CONVERSIONE DATI: Converte problemiText in array problemi
+    const problemiArray = newEntryData.value.problemiText
+      ? newEntryData.value.problemiText.split('\n').filter(p => p.trim() !== '')
+      : []
+    
     const entryData = {
       ...newEntryData.value,
+      problemi: problemiArray, // Sostituisce problemiText con array problemi
       cantiereId: cantiere.value.id,
-      createdAt: new Date()
+      createdAt: new Date().toISOString()
     }
+    
+    // 🧹 PULIZIA: Rimuove problemiText dal salvataggio (è solo per l'UI)
+    delete entryData.problemiText
     
     if (editingEntry.value) {
       await firestoreOperations.giornaleCantiere.update(editingEntry.value.id, entryData)
@@ -977,7 +1136,10 @@ const saveEntry = async () => {
       loadGiornaleEntries(),
       updateCostiCantiere(),
       syncTimesheet()
-    ]).catch(console.error)
+    ]).then(async () => {
+      // 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere
+      await refreshCantiereCostsFromTimesheet()
+    }).catch(console.error)
     
   } catch (err) {
     error('Errore Salvataggio', err.message)
@@ -999,7 +1161,10 @@ const deleteEntry = async (entryId) => {
       loadGiornaleEntries(),
       updateCostiCantiere(),
       syncTimesheet()
-    ]).catch(console.error)
+    ]).then(async () => {
+      // 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere
+      await refreshCantiereCostsFromTimesheet()
+    }).catch(console.error)
     
   } catch (err) {
     error('Errore Eliminazione', err.message)
@@ -1011,10 +1176,10 @@ const deleteEntry = async (entryId) => {
 // 🚀 OTTIMIZZAZIONE: Sincronizzazione timesheet
 const syncTimesheet = async () => {
   try {
-    // Carica tutti i timesheet esistenti per questo cantiere
+    // Carica tutti i timesheet esistenti per questo cantiere (senza ordinamento per evitare errore indice)
     const timesheetResult = await firestoreOperations.load('timesheet', [
       ['cantiereId', '==', cantiere.value.id]
-    ])
+    ], null)
     
     // Elimina i vecchi timesheet
     await Promise.allSettled(
@@ -1023,10 +1188,10 @@ const syncTimesheet = async () => {
       )
     )
     
-    // Carica tutte le presenze esistenti
+    // Carica tutte le presenze esistenti (senza ordinamento per evitare errore indice)
     const presenzeResult = await firestoreOperations.load('presenze', [
       ['cantiereId', '==', cantiere.value.id]
-    ])
+    ], null)
     
     // Elimina le vecchie presenze
     await Promise.allSettled(
