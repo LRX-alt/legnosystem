@@ -34,6 +34,9 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - ✅ **RISOLTO**: Integrazione Firestore per operazioni CRUD preventivi
 - ✅ **MIGLIORATO**: Gestione stati e transizioni workflow
 - ✅ **OTTIMIZZATO**: Caricamento real-time dati con subscribeToCollection
+- ✅ **CORRETTO**: Posizionamento dropdown che si apriva all'interno del box limitando visibilità
+- ✅ **RIMOSSO**: Effetto hover sui box che causava spostamenti indesiderati durante l'interazione
+- ✅ **MIGLIORATO**: Calcolo intelligente posizione dropdown con controllo viewport boundaries
 
 ### 💼 **BUSINESS IMPACT**
 - ✅ **CRM Pipeline**: Sistema completo gestione opportunità vendita
