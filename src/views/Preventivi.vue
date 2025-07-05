@@ -115,7 +115,7 @@
 
     <!-- Mobile: Card Layout -->
     <div v-else class="block lg:hidden space-y-4">
-      <div v-for="preventivo in filteredPreventivi" :key="preventivo.id" class="card hover:shadow-md transition-shadow duration-200">
+      <div v-for="preventivo in filteredPreventivi" :key="preventivo.id" class="card">
         <div class="flex items-start justify-between mb-4">
           <div class="flex-1">
             <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ preventivo.numero }}</h3>
@@ -193,7 +193,7 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="preventivo in filteredPreventivi" :key="preventivo.id" class="hover:bg-gray-50">
+            <tr v-for="preventivo in filteredPreventivi" :key="preventivo.id">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {{ preventivo.numero }}
               </td>

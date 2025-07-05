@@ -2,6 +2,7 @@
   <div class="relative inline-block text-left">
     <!-- Pulsante tre punti -->
     <button 
+      ref="buttonRef"
       @click="toggleDropdown"
       class="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 transition-colors duration-200"
       :class="{ 'bg-gray-100': isOpen }"
@@ -14,7 +15,8 @@
     <!-- Dropdown menu -->
     <div 
       v-if="isOpen"
-      class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+      class="origin-top-right fixed mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-[9999]"
+      :style="dropdownStyle"
       @click.stop
     >
       <div class="py-1" role="menu">
@@ -47,7 +49,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 // Props
 const props = defineProps({
@@ -63,9 +65,53 @@ const emit = defineEmits(['action'])
 
 // State
 const isOpen = ref(false)
+const buttonRef = ref(null)
+const dropdownPosition = ref({ top: 0, left: 0 })
+
+// Computed
+const dropdownStyle = computed(() => {
+  return {
+    top: `${dropdownPosition.value.top}px`,
+    left: `${dropdownPosition.value.left}px`
+  }
+})
 
 // Methods
-const toggleDropdown = () => {
+const calculateDropdownPosition = () => {
+  if (!buttonRef.value) return
+  
+  const buttonRect = buttonRef.value.getBoundingClientRect()
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+  
+  // Calcola la posizione del dropdown
+  let top = buttonRect.bottom + 8 // 8px di margine
+  let left = buttonRect.left
+  
+  // Controlla se il dropdown esce dal viewport in basso
+  const dropdownHeight = 200 // Altezza stimata del dropdown
+  if (top + dropdownHeight > viewportHeight) {
+    top = buttonRect.top - dropdownHeight - 8 // Aprilo sopra il pulsante
+  }
+  
+  // Controlla se il dropdown esce dal viewport a destra
+  const dropdownWidth = 192 // 48 * 4 = 192px (w-48)
+  if (left + dropdownWidth > viewportWidth) {
+    left = buttonRect.right - dropdownWidth // Allinea a destra del pulsante
+  }
+  
+  // Controlla se il dropdown esce dal viewport a sinistra
+  if (left < 16) {
+    left = 16 // Margine minimo dal bordo sinistro
+  }
+  
+  dropdownPosition.value = { top, left }
+}
+
+const toggleDropdown = (event) => {
+  if (!isOpen.value) {
+    calculateDropdownPosition()
+  }
   isOpen.value = !isOpen.value
 }
 
