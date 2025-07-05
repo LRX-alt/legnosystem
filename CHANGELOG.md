@@ -40,6 +40,9 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - ✅ **ELIMINATI**: TUTTI gli effetti hover indesiderati dall'intera applicazione
 - ✅ **PULITO**: CSS globale da .card:active transform che causava movimento box
 - ✅ **STABILIZZATA**: Interfaccia completamente senza movimenti o animazioni fastidiose
+- ✅ **RIMOSSI**: Tutti i toast dalla pagina Preventivi sostituiti con popup professionali
+- ✅ **UNIFICATO**: Sistema notifiche coerente - solo popup centrati in tutta l'app
+- ✅ **MIGLIORATA**: UX professionale senza toast notifications fastidiose
 
 ### 💼 **BUSINESS IMPACT**
 - ✅ **CRM Pipeline**: Sistema completo gestione opportunità vendita
