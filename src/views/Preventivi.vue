@@ -89,6 +89,15 @@
             {{ cliente.nome }}
           </option>
         </select>
+        <button 
+          @click="testEmailJS"
+          class="px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
+          :class="emailJS.isConfigured() ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-400 text-gray-600 cursor-not-allowed'"
+          :disabled="!emailJS.isConfigured()"
+          :title="emailJS.isConfigured() ? 'Testa configurazione EmailJS' : 'EmailJS non configurato'"
+        >
+          {{ emailJS.isConfigured() ? '✅ EmailJS' : '⚠️ EmailJS' }}
+        </button>
       </div>
     </div>
 
@@ -519,7 +528,7 @@
               @click="sendPreventivo(selectedPreventivo)"
               class="bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
-              Invia al Cliente
+              📧 Invia al Cliente
             </button>
             
             <button 
@@ -527,7 +536,7 @@
               @click="markAsAccepted(selectedPreventivo)"
               class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
-              Segna come Accettato
+              ✅ Segna come Accettato
             </button>
             
             <button 
@@ -535,7 +544,7 @@
               @click="markAsRejected(selectedPreventivo)"
               class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
-              Segna come Rifiutato
+              ❌ Segna come Rifiutato
             </button>
             
             <button 
@@ -543,7 +552,24 @@
               @click="convertToCantiere(selectedPreventivo)"
               class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
-              Converti in Cantiere
+              🏗️ Converti in Cantiere
+            </button>
+
+            <!-- Pulsante Download PDF -->
+            <button 
+              @click="downloadPDF(selectedPreventivo)"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              📄 Scarica PDF
+            </button>
+
+            <!-- Pulsante Reinvia Email (solo per preventivi già inviati) -->
+            <button 
+              v-if="['inviato', 'scaduto'].includes(selectedPreventivo.stato)"
+              @click="resendPreventivo(selectedPreventivo)"
+              class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+            >
+              🔄 Reinvia Email
             </button>
             
             <button 
@@ -716,6 +742,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useFirestore } from '@/composables/useFirestore'
 import { usePopup } from '@/composables/usePopup'
 import { useToast } from '@/composables/useToast'
+import { useEmailJS } from '@/composables/useEmailJS'
 import { useFirestoreStore } from '@/stores/firestore'
 import { 
   PlusIcon, 
@@ -730,6 +757,7 @@ import {
 const firestore = useFirestore()
 const popup = usePopup()
 const toast = useToast()
+const emailJS = useEmailJS()
 const firestoreStore = useFirestoreStore()
 
 // Stato della pagina
@@ -1103,16 +1131,71 @@ const updatePreventivo = async () => {
 
 const sendPreventivo = async (preventivo) => {
   try {
-    const confirmed = await popup.confirm('Confermi l\'invio del preventivo al cliente?')
+    // Verifica che il cliente abbia un'email valida
+    if (!preventivo.cliente?.contatto || !preventivo.cliente.contatto.includes('@')) {
+      toast.error('Il cliente non ha un\'email valida. Aggiorna i dati del cliente.')
+      return
+    }
+
+    // Verifica configurazione EmailJS
+    if (!emailJS.isConfigured()) {
+      const useAnyway = await popup.confirm(
+        'EmailJS non è configurato. Vuoi comunque segnare il preventivo come inviato?\n\n' +
+        'Per abilitare l\'invio email reale, configura le variabili d\'ambiente EmailJS.'
+      )
+      
+      if (!useAnyway) return
+      
+      // Solo aggiorna lo stato senza inviare email
+      await firestoreStore.updateDocument('preventivi', preventivo.id, {
+        stato: 'inviato',
+        dataInvio: new Date(),
+        updatedAt: new Date(),
+        notaInvio: 'Segnato come inviato manualmente (EmailJS non configurato)'
+      })
+      
+      toast.warning('Preventivo segnato come inviato (email non inviata)')
+      return
+    }
+
+    const confirmed = await popup.confirm(
+      `Confermi l'invio del preventivo via email a:\n${preventivo.cliente.nome} (${preventivo.cliente.contatto})?`
+    )
     if (!confirmed) return
 
-    await firestoreStore.updateDocument('preventivi', preventivo.id, {
-      stato: 'inviato',
-      dataInvio: new Date(),
-      updatedAt: new Date()
-    })
+    // Invia email tramite EmailJS
+    const emailResult = await emailJS.sendPreventivoEmail(preventivo)
 
-    toast.success('Preventivo inviato con successo')
+    if (emailResult.success) {
+      // Aggiorna stato preventivo dopo invio riuscito
+      await firestoreStore.updateDocument('preventivi', preventivo.id, {
+        stato: 'inviato',
+        dataInvio: new Date(),
+        updatedAt: new Date(),
+        emailInviata: true,
+        emailResponse: emailResult.response?.text || 'Email inviata tramite EmailJS'
+      })
+      
+      toast.success(`Preventivo inviato via email a ${preventivo.cliente.nome}`)
+    } else {
+      // Offri opzione di segnare come inviato comunque
+      const markAnyway = await popup.confirm(
+        'Invio email fallito. Vuoi comunque segnare il preventivo come inviato?\n\n' +
+        'Potresti dover inviare manualmente il preventivo al cliente.'
+      )
+      
+      if (markAnyway) {
+        await firestoreStore.updateDocument('preventivi', preventivo.id, {
+          stato: 'inviato',
+          dataInvio: new Date(),
+          updatedAt: new Date(),
+          emailInviata: false,
+          notaInvio: `Errore invio email: ${emailResult.error}`
+        })
+        
+        toast.warning('Preventivo segnato come inviato (invio email fallito)')
+      }
+    }
     
   } catch (error) {
     console.error('Errore nell\'invio del preventivo:', error)
@@ -1155,6 +1238,48 @@ const markAsRejected = async (preventivo) => {
   } catch (error) {
     console.error('Errore nell\'aggiornamento del preventivo:', error)
     toast.error('Errore nell\'aggiornamento del preventivo')
+  }
+}
+
+const downloadPDF = (preventivo) => {
+  try {
+    const pdfDoc = emailJS.generatePreventivoPDF(preventivo)
+    pdfDoc.save(`Preventivo-${preventivo.numero}.pdf`)
+    toast.success('PDF scaricato con successo')
+  } catch (error) {
+    console.error('Errore nel download del PDF:', error)
+    toast.error('Errore nel download del PDF')
+  }
+}
+
+const resendPreventivo = async (preventivo) => {
+  try {
+    const confirmed = await popup.confirm(
+      `Reinviare il preventivo via email a:\n${preventivo.cliente.nome} (${preventivo.cliente.contatto})?`
+    )
+    if (!confirmed) return
+
+    // Utilizza la stessa funzione di invio
+    await sendPreventivo(preventivo)
+  } catch (error) {
+    console.error('Errore nel reinvio del preventivo:', error)
+    toast.error('Errore nel reinvio del preventivo')
+  }
+}
+
+const testEmailJS = async () => {
+  try {
+    const confirmed = await popup.confirm(
+      'Vuoi testare la configurazione EmailJS?\n\n' +
+      'Questa operazione invierà un\'email di test per verificare che tutto funzioni correttamente.'
+    )
+    
+    if (!confirmed) return
+    
+    await emailJS.testEmailConfiguration()
+  } catch (error) {
+    console.error('Errore nel test EmailJS:', error)
+    toast.error('Errore nel test EmailJS')
   }
 }
 
