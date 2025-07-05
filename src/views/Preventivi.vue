@@ -124,7 +124,11 @@
           </div>
           <div class="flex items-center space-x-3">
             <div class="flex flex-col items-end space-y-2">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatoColor(preventivo.stato)">
+              <span 
+                v-if="preventivo.stato !== 'convertito'"
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
+                :class="getStatoColor(preventivo.stato)"
+              >
                 {{ getStatoLabel(preventivo.stato) }}
               </span>
               <button 
@@ -221,7 +225,11 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex flex-col space-y-1">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatoColor(preventivo.stato)">
+                  <span 
+                    v-if="preventivo.stato !== 'convertito'"
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
+                    :class="getStatoColor(preventivo.stato)"
+                  >
                     {{ getStatoLabel(preventivo.stato) }}
                   </span>
                   <button 
