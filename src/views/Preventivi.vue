@@ -763,7 +763,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useFirestore } from '@/composables/useFirestore'
 import { usePopup } from '@/composables/usePopup'
-import { useToast } from '@/composables/useToast'
+
 import { useEmailJS } from '@/composables/useEmailJS'
 import { useDateUtils } from '@/composables/useDateUtils'
 import { useFirestoreStore } from '@/stores/firestore'
@@ -780,7 +780,7 @@ import {
 
 const firestore = useFirestore()
 const popup = usePopup()
-const toast = useToast()
+
 const emailJS = useEmailJS()
 const dateUtils = useDateUtils()
 const firestoreStore = useFirestoreStore()
@@ -970,7 +970,7 @@ const loadPreventivi = async () => {
     
   } catch (error) {
     console.error('Errore nel caricamento dei preventivi:', error)
-    toast.error('Errore nel caricamento dei preventivi')
+    popup.error('Errore nel caricamento dei preventivi')
   } finally {
     loading.value = false
   }
@@ -1028,12 +1028,12 @@ const savePreventivo = async () => {
 
     await firestoreStore.createDocument('preventivi', preventivoData)
     
-    toast.success('Preventivo salvato con successo')
+    popup.success('Preventivo salvato con successo')
     closeAddModal()
     
   } catch (error) {
     console.error('Errore nel salvataggio del preventivo:', error)
-    toast.error('Errore nel salvataggio del preventivo')
+    popup.error('Errore nel salvataggio del preventivo')
   } finally {
     saving.value = false
   }
@@ -1147,14 +1147,14 @@ const updatePreventivo = async () => {
 
     await firestoreStore.updateDocument('preventivi', editingPreventivo.value.id, updateData)
     
-    toast.success('Preventivo aggiornato con successo')
+    popup.success('Preventivo aggiornato con successo')
     closeEditModal()
     
-  } catch (error) {
-    console.error('Errore nell\'aggiornamento del preventivo:', error)
-    toast.error('Errore nell\'aggiornamento del preventivo')
-  } finally {
-    saving.value = false
+      } catch (error) {
+      console.error('Errore nell\'aggiornamento del preventivo:', error)
+      popup.error('Errore nell\'aggiornamento del preventivo')
+    } finally {
+      saving.value = false
   }
 }
 
@@ -1162,7 +1162,7 @@ const sendPreventivo = async (preventivo) => {
   try {
     // Verifica che il cliente abbia un'email valida
     if (!preventivo.cliente?.contatto || !preventivo.cliente.contatto.includes('@')) {
-      toast.error('Il cliente non ha un\'email valida. Aggiorna i dati del cliente.')
+      popup.error('Il cliente non ha un\'email valida. Aggiorna i dati del cliente.')
       return
     }
 
@@ -1183,7 +1183,7 @@ const sendPreventivo = async (preventivo) => {
         notaInvio: 'Segnato come inviato manualmente (EmailJS non configurato)'
       })
       
-      toast.warning('Preventivo segnato come inviato (email non inviata)')
+              popup.warning('Preventivo segnato come inviato (email non inviata)')
       return
     }
 
@@ -1205,7 +1205,7 @@ const sendPreventivo = async (preventivo) => {
         emailResponse: emailResult.response?.text || 'Email inviata tramite EmailJS'
       })
       
-      toast.success(`Preventivo inviato via email a ${preventivo.cliente.nome}`)
+              popup.success(`Preventivo inviato via email a ${preventivo.cliente.nome}`)
     } else {
       // Offri opzione di segnare come inviato comunque
       const markAnyway = await popup.confirm(
@@ -1222,13 +1222,13 @@ const sendPreventivo = async (preventivo) => {
           notaInvio: `Errore invio email: ${emailResult.error}`
         })
         
-        toast.warning('Preventivo segnato come inviato (invio email fallito)')
+        popup.warning('Preventivo segnato come inviato (invio email fallito)')
       }
     }
     
   } catch (error) {
     console.error('Errore nell\'invio del preventivo:', error)
-    toast.error('Errore nell\'invio del preventivo')
+    popup.error('Errore nell\'invio del preventivo')
   }
 }
 
@@ -1243,11 +1243,11 @@ const markAsAccepted = async (preventivo) => {
       updatedAt: new Date()
     })
 
-    toast.success('Preventivo segnato come accettato')
+    popup.success('Preventivo segnato come accettato')
     
   } catch (error) {
     console.error('Errore nell\'aggiornamento del preventivo:', error)
-    toast.error('Errore nell\'aggiornamento del preventivo')
+    popup.error('Errore nell\'aggiornamento del preventivo')
   }
 }
 
@@ -1262,11 +1262,11 @@ const markAsRejected = async (preventivo) => {
       updatedAt: new Date()
     })
 
-    toast.success('Preventivo segnato come rifiutato')
+    popup.success('Preventivo segnato come rifiutato')
     
   } catch (error) {
     console.error('Errore nell\'aggiornamento del preventivo:', error)
-    toast.error('Errore nell\'aggiornamento del preventivo')
+    popup.error('Errore nell\'aggiornamento del preventivo')
   }
 }
 
@@ -1274,10 +1274,10 @@ const downloadPDF = (preventivo) => {
   try {
     const pdfDoc = emailJS.generatePreventivoPDF(preventivo)
     pdfDoc.save(`Preventivo-${preventivo.numero}.pdf`)
-    toast.success('PDF scaricato con successo')
+    popup.success('PDF scaricato con successo')
   } catch (error) {
     console.error('Errore nel download del PDF:', error)
-    toast.error('Errore nel download del PDF')
+    popup.error('Errore nel download del PDF')
   }
 }
 
@@ -1292,7 +1292,7 @@ const resendPreventivo = async (preventivo) => {
     await sendPreventivo(preventivo)
   } catch (error) {
     console.error('Errore nel reinvio del preventivo:', error)
-    toast.error('Errore nel reinvio del preventivo')
+    popup.error('Errore nel reinvio del preventivo')
   }
 }
 
@@ -1308,7 +1308,7 @@ const testEmailJS = async () => {
     await emailJS.testEmailConfiguration()
   } catch (error) {
     console.error('Errore nel test EmailJS:', error)
-    toast.error('Errore nel test EmailJS')
+    popup.error('Errore nel test EmailJS')
   }
 }
 
@@ -1338,11 +1338,11 @@ const deletePreventivo = async (preventivo) => {
     // Elimina il preventivo da Firestore
     await firestoreStore.deleteDocument('preventivi', preventivo.id)
 
-    toast.success(`Preventivo ${preventivo.numero} eliminato con successo`)
+    popup.success(`Preventivo ${preventivo.numero} eliminato con successo`)
     
   } catch (error) {
     console.error('Errore nell\'eliminazione del preventivo:', error)
-    toast.error('Errore nell\'eliminazione del preventivo')
+    popup.error('Errore nell\'eliminazione del preventivo')
   }
 }
 
@@ -1504,7 +1504,7 @@ const convertToCantiere = async (preventivo) => {
       updatedAt: new Date()
     })
 
-    toast.success('Preventivo convertito in cantiere con successo')
+    popup.success('Preventivo convertito in cantiere con successo')
     
     // Chiudi la modal se è aperta
     if (showViewModal.value) {
@@ -1513,7 +1513,7 @@ const convertToCantiere = async (preventivo) => {
     
   } catch (error) {
     console.error('Errore nella conversione del preventivo:', error)
-    toast.error('Errore nella conversione del preventivo')
+    popup.error('Errore nella conversione del preventivo')
   }
 }
 
