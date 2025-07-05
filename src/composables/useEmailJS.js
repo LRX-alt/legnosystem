@@ -1,6 +1,7 @@
 import emailjs from '@emailjs/browser'
 import jsPDF from 'jspdf'
 import { useToast } from './useToast'
+import { useDateUtils } from './useDateUtils'
 
 // Configurazione EmailJS (sostituire con le proprie chiavi)
 const EMAILJS_CONFIG = {
@@ -11,6 +12,7 @@ const EMAILJS_CONFIG = {
 
 export const useEmailJS = () => {
   const toast = useToast()
+  const dateUtils = useDateUtils()
 
   // Inizializza EmailJS
   const initEmailJS = () => {
@@ -52,8 +54,8 @@ export const useEmailJS = () => {
       
       doc.setFontSize(12)
       doc.text(`Numero: ${preventivo.numero}`, 20, 90)
-      doc.text(`Data: ${new Date(preventivo.createdAt?.seconds * 1000 || preventivo.createdAt).toLocaleDateString('it-IT')}`, 20, 98)
-      doc.text(`Scadenza: ${new Date(preventivo.scadenza).toLocaleDateString('it-IT')}`, 20, 106)
+      doc.text(`Data: ${dateUtils.formatDate(preventivo.createdAt, 'Non disponibile')}`, 20, 98)
+      doc.text(`Scadenza: ${dateUtils.formatDate(preventivo.scadenza, 'Non specificata')}`, 20, 106)
       
       // Dati cliente
       doc.setFontSize(14)
@@ -141,7 +143,7 @@ export const useEmailJS = () => {
         preventivo_numero: preventivo.numero,
         preventivo_progetto: preventivo.progetto,
         preventivo_importo: `€ ${preventivo.importo?.toLocaleString('it-IT')}`,
-        preventivo_scadenza: new Date(preventivo.scadenza).toLocaleDateString('it-IT'),
+        preventivo_scadenza: dateUtils.formatDate(preventivo.scadenza, 'Non specificata'),
         message: `Gentile ${preventivo.cliente.nome},
 
 Le inviamo in allegato il preventivo ${preventivo.numero} per il progetto "${preventivo.progetto}".
@@ -149,7 +151,7 @@ Le inviamo in allegato il preventivo ${preventivo.numero} per il progetto "${pre
 Dettagli:
 - Tipo lavoro: ${preventivo.tipoLavoro}
 - Importo: € ${preventivo.importo?.toLocaleString('it-IT')}
-- Scadenza: ${new Date(preventivo.scadenza).toLocaleDateString('it-IT')}
+- Scadenza: ${dateUtils.formatDate(preventivo.scadenza, 'Non specificata')}
 
 Per qualsiasi chiarimento o per confermare il preventivo, non esiti a contattarci.
 

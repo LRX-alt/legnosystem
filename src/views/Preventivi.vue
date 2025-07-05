@@ -154,7 +154,7 @@
           </div>
           <div>
             <p class="text-xs text-gray-500 mb-1">Data Invio</p>
-            <p class="text-sm font-medium text-gray-900">{{ preventivo.dataInvio ? formatDate(preventivo.dataInvio) : 'Non inviato' }}</p>
+            <p class="text-sm font-medium text-gray-900">{{ formatDate(preventivo.dataInvio, 'Non inviato') }}</p>
           </div>
         </div>
 
@@ -162,7 +162,7 @@
           <p class="text-xs text-gray-500 mb-1">Scadenza</p>
           <p class="text-sm font-medium" :class="isScaduto(preventivo.scadenza) ? 'text-red-600' : 'text-gray-900'">
             {{ formatDate(preventivo.scadenza) }}
-            <span v-if="isScaduto(preventivo.scadenza)" class="text-xs ml-1">(Scaduto)</span>
+            <span v-if="isScaduto(preventivo.scadenza)" class="text-xs ml-1 bg-red-100 text-red-800 px-2 py-1 rounded-full">Scaduto</span>
           </p>
         </div>
 
@@ -225,10 +225,11 @@
                 €{{ preventivo.importo.toLocaleString() }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ preventivo.dataInvio ? formatDate(preventivo.dataInvio) : 'Non inviato' }}
+                {{ formatDate(preventivo.dataInvio, 'Non inviato') }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm" :class="isScaduto(preventivo.scadenza) ? 'text-red-600' : 'text-gray-900'">
                 {{ formatDate(preventivo.scadenza) }}
+                <span v-if="isScaduto(preventivo.scadenza)" class="text-xs ml-1 bg-red-100 text-red-800 px-1 py-0.5 rounded">Scaduto</span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex flex-col space-y-1">
@@ -397,7 +398,8 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Scadenza *</label>
               <input
-                v-model="newPreventivo.scadenza"
+                :value="toInputDate(newPreventivo.scadenza)"
+                @input="newPreventivo.scadenza = $event.target.value"
                 type="date"
                 required
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
@@ -453,7 +455,8 @@
               </div>
               <div>
                 <p class="text-sm text-gray-600 mb-1">Data Creazione</p>
-                <p class="text-sm font-medium text-gray-900">{{ formatDate(selectedPreventivo.createdAt?.seconds ? new Date(selectedPreventivo.createdAt.seconds * 1000) : selectedPreventivo.createdAt) }}</p>
+                <p class="text-sm font-medium text-gray-900">{{ formatDate(selectedPreventivo.createdAt, 'Non disponibile') }}</p>
+                <p v-if="selectedPreventivo.createdAt" class="text-xs text-gray-500 mt-1">{{ formatRelativeDate(selectedPreventivo.createdAt) }}</p>
               </div>
             </div>
           </div>
@@ -502,18 +505,33 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <p class="text-sm text-gray-600 mb-1">Data Invio</p>
-                <p class="text-base font-medium text-gray-900">{{ selectedPreventivo.dataInvio ? formatDate(selectedPreventivo.dataInvio) : 'Non inviato' }}</p>
+                <p class="text-base font-medium text-gray-900">{{ formatDate(selectedPreventivo.dataInvio, 'Non inviato') }}</p>
+                <p v-if="selectedPreventivo.dataInvio" class="text-xs text-gray-500 mt-1">{{ formatRelativeDate(selectedPreventivo.dataInvio) }}</p>
               </div>
               <div>
                 <p class="text-sm text-gray-600 mb-1">Scadenza</p>
                 <p class="text-base font-medium" :class="isScaduto(selectedPreventivo.scadenza) ? 'text-red-600' : 'text-gray-900'">
-                  {{ formatDate(selectedPreventivo.scadenza) }}
-                  <span v-if="isScaduto(selectedPreventivo.scadenza)" class="text-sm ml-1">(Scaduto)</span>
+                  {{ formatDate(selectedPreventivo.scadenza, 'Non impostata') }}
+                  <span v-if="isScaduto(selectedPreventivo.scadenza)" class="text-sm ml-2 bg-red-100 text-red-800 px-2 py-1 rounded-full">Scaduto</span>
+                </p>
+                <p v-if="selectedPreventivo.scadenza && !isScaduto(selectedPreventivo.scadenza)" class="text-xs text-gray-500 mt-1">
+                  {{ daysBetween(new Date(), selectedPreventivo.scadenza) }} giorni rimanenti
                 </p>
               </div>
               <div v-if="selectedPreventivo.dataConversione">
                 <p class="text-sm text-gray-600 mb-1">Data Conversione</p>
-                <p class="text-base font-medium text-purple-600">{{ formatDate(selectedPreventivo.dataConversione) }}</p>
+                <p class="text-base font-medium text-purple-600">{{ formatDate(selectedPreventivo.dataConversione, 'Non convertito') }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ formatRelativeDate(selectedPreventivo.dataConversione) }}</p>
+              </div>
+              <div v-else-if="selectedPreventivo.dataAccettazione">
+                <p class="text-sm text-gray-600 mb-1">Data Accettazione</p>
+                <p class="text-base font-medium text-green-600">{{ formatDate(selectedPreventivo.dataAccettazione, 'Non accettato') }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ formatRelativeDate(selectedPreventivo.dataAccettazione) }}</p>
+              </div>
+              <div v-else-if="selectedPreventivo.dataRifiuto">
+                <p class="text-sm text-gray-600 mb-1">Data Rifiuto</p>
+                <p class="text-base font-medium text-red-600">{{ formatDate(selectedPreventivo.dataRifiuto, 'Non rifiutato') }}</p>
+                <p class="text-xs text-gray-500 mt-1">{{ formatRelativeDate(selectedPreventivo.dataRifiuto) }}</p>
               </div>
             </div>
           </div>
@@ -724,7 +742,8 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Scadenza *</label>
               <input
-                v-model="editingPreventivo.scadenza"
+                :value="toInputDate(editingPreventivo.scadenza)"
+                @input="editingPreventivo.scadenza = $event.target.value"
                 type="date"
                 required
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
@@ -771,6 +790,7 @@ import { useFirestore } from '@/composables/useFirestore'
 import { usePopup } from '@/composables/usePopup'
 import { useToast } from '@/composables/useToast'
 import { useEmailJS } from '@/composables/useEmailJS'
+import { useDateUtils } from '@/composables/useDateUtils'
 import { useFirestoreStore } from '@/stores/firestore'
 import { 
   PlusIcon, 
@@ -786,6 +806,7 @@ const firestore = useFirestore()
 const popup = usePopup()
 const toast = useToast()
 const emailJS = useEmailJS()
+const dateUtils = useDateUtils()
 const firestoreStore = useFirestoreStore()
 
 // Stato della pagina
@@ -915,25 +936,22 @@ const getClienteNome = (cliente) => {
   return 'Cliente non specificato'
 }
 
-const isScaduto = (scadenza) => {
-  if (!scadenza) return false
-  return new Date(scadenza) < new Date()
-}
-
-const formatDate = (dateString) => {
-  if (!dateString) return ''
-  return new Date(dateString).toLocaleDateString('it-IT')
-}
+// Utilizziamo le funzioni del composable dateUtils per gestione robusta delle date
+const isScaduto = (scadenza) => dateUtils.isExpired(scadenza)
+const formatDate = (dateInput, fallback = 'Non disponibile') => dateUtils.formatDate(dateInput, fallback)
+const formatDateTime = (dateInput, fallback = 'Non disponibile') => dateUtils.formatDateTime(dateInput, fallback)
+const formatRelativeDate = (dateInput, fallback = 'Non disponibile') => dateUtils.formatRelativeDate(dateInput, fallback)
+const daysBetween = (startDate, endDate) => dateUtils.daysBetween(startDate, endDate)
+const toInputDate = (dateInput) => dateUtils.toInputDate(dateInput)
 
 const calculateAverageTime = () => {
   const completedPreventivi = preventivi.value.filter(p => ['accettato', 'rifiutato'].includes(p.stato))
   if (completedPreventivi.length === 0) return 0
 
   const totalDays = completedPreventivi.reduce((acc, p) => {
-    const created = new Date(p.createdAt?.seconds * 1000 || p.createdAt)
-    const completed = new Date(p.updatedAt?.seconds * 1000 || p.updatedAt)
-    const days = Math.ceil((completed - created) / (1000 * 60 * 60 * 24))
-    return acc + days
+    // Usa il nuovo sistema di gestione date per parsing robusto
+    const days = daysBetween(p.createdAt, p.updatedAt)
+    return acc + Math.max(days, 0) // Evita giorni negativi
   }, 0)
 
   return Math.round(totalDays / completedPreventivi.length)
@@ -955,9 +973,16 @@ const loadPreventivi = async () => {
     // Configura l'ascolto real-time per i preventivi
     unsubscribePreventivi.value = firestoreStore.subscribeToCollection('preventivi', (data) => {
       preventivi.value = data.sort((a, b) => {
-        const dateA = a.createdAt?.seconds || 0
-        const dateB = b.createdAt?.seconds || 0
-        return dateB - dateA
+        // Usa il nuovo sistema di parsing per ordinamento robusto
+        const dateA = dateUtils.parseDate(a.createdAt)
+        const dateB = dateUtils.parseDate(b.createdAt)
+        
+        // Se una delle date non è valida, mettila alla fine
+        if (!dateA && !dateB) return 0
+        if (!dateA) return 1
+        if (!dateB) return -1
+        
+        return dateB.getTime() - dateA.getTime()
       })
       
       // Aggiorna stati automaticamente per preventivi scaduti
@@ -976,9 +1001,9 @@ const loadPreventivi = async () => {
 }
 
 const updateScaduti = async () => {
-  const now = new Date()
+  // Usa il nuovo sistema per identificare preventivi scaduti
   const preventiviScaduti = preventivi.value.filter(p => 
-    p.stato === 'inviato' && new Date(p.scadenza) < now
+    p.stato === 'inviato' && isScaduto(p.scadenza)
   )
 
   for (const preventivo of preventiviScaduti) {
