@@ -122,23 +122,29 @@
             <p class="text-sm font-medium text-gray-700">{{ getClienteNome(preventivo.cliente) }}</p>
             <p class="text-xs text-gray-500">{{ preventivo.cliente?.contatto || 'Contatto non disponibile' }}</p>
           </div>
-          <div class="flex flex-col items-end space-y-2">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatoColor(preventivo.stato)">
-              {{ getStatoLabel(preventivo.stato) }}
-            </span>
-            <button 
-              v-if="preventivo.stato === 'accettato'"
-              @click="convertToCantiere(preventivo)"
-              class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full transition-colors"
-            >
-              → Cantiere
-            </button>
-            <span 
-              v-if="preventivo.stato === 'convertito'"
-              class="text-xs bg-purple-600 text-white px-3 py-1 rounded-full"
-            >
-              ✓ Convertito
-            </span>
+          <div class="flex items-center space-x-3">
+            <div class="flex flex-col items-end space-y-2">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatoColor(preventivo.stato)">
+                {{ getStatoLabel(preventivo.stato) }}
+              </span>
+              <button 
+                v-if="preventivo.stato === 'accettato'"
+                @click="convertToCantiere(preventivo)"
+                class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full transition-colors"
+              >
+                → Cantiere
+              </button>
+              <span 
+                v-if="preventivo.stato === 'convertito'"
+                class="text-xs bg-purple-600 text-white px-3 py-1 rounded-full"
+              >
+                ✓ Convertito
+              </span>
+            </div>
+            <ActionDropdown 
+              :actions="createDropdownActions(preventivo)"
+              @action="(action) => handleDropdownAction(action, preventivo)"
+            />
           </div>
         </div>
 
@@ -166,25 +172,7 @@
           </p>
         </div>
 
-        <div class="flex flex-col space-y-2 pt-4 border-t border-gray-200">
-          <button @click="viewPreventivo(preventivo)" class="w-full btn-primary py-2 text-sm">Visualizza</button>
-          <div class="grid grid-cols-2 gap-2">
-            <button @click="editPreventivo(preventivo)" class="btn-secondary py-2 text-sm">Modifica</button>
-            <button 
-              @click="sendPreventivo(preventivo)" 
-              :disabled="preventivo.stato === 'inviato'"
-              class="bg-accent-500 hover:bg-accent-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
-            >
-              {{ preventivo.stato === 'inviato' ? 'Inviato' : 'Invia' }}
-            </button>
-          </div>
-          <button 
-            @click="deletePreventivo(preventivo)"
-            class="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
-          >
-            🗑️ Elimina
-          </button>
-        </div>
+        <!-- Azioni ora nel dropdown menu -->
       </div>
     </div>
 
@@ -252,23 +240,10 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <div class="flex space-x-2">
-                  <button @click="viewPreventivo(preventivo)" class="text-primary-600 hover:text-primary-900">Visualizza</button>
-                  <button @click="editPreventivo(preventivo)" class="text-gray-600 hover:text-gray-900">Modifica</button>
-                  <button 
-                    @click="sendPreventivo(preventivo)" 
-                    :disabled="preventivo.stato === 'inviato'"
-                    class="text-accent-600 hover:text-accent-900 disabled:text-gray-400 disabled:cursor-not-allowed"
-                  >
-                    {{ preventivo.stato === 'inviato' ? 'Inviato' : 'Invia' }}
-                  </button>
-                  <button 
-                    @click="deletePreventivo(preventivo)"
-                    class="text-red-600 hover:text-red-900"
-                  >
-                    Elimina
-                  </button>
-                </div>
+                <ActionDropdown 
+                  :actions="createDropdownActions(preventivo)"
+                  @action="(action) => handleDropdownAction(action, preventivo)"
+                />
               </td>
             </tr>
           </tbody>
@@ -792,6 +767,7 @@ import { useToast } from '@/composables/useToast'
 import { useEmailJS } from '@/composables/useEmailJS'
 import { useDateUtils } from '@/composables/useDateUtils'
 import { useFirestoreStore } from '@/stores/firestore'
+import ActionDropdown from '@/components/ActionDropdown.vue'
 import { 
   PlusIcon, 
   DocumentTextIcon, 
@@ -1367,6 +1343,125 @@ const deletePreventivo = async (preventivo) => {
   } catch (error) {
     console.error('Errore nell\'eliminazione del preventivo:', error)
     toast.error('Errore nell\'eliminazione del preventivo')
+  }
+}
+
+// Funzione per creare le azioni del dropdown
+const createDropdownActions = (preventivo) => {
+  const actions = [
+    {
+      id: 'view',
+      label: 'Visualizza',
+      icon: '👁️',
+      disabled: false,
+      danger: false
+    },
+    {
+      id: 'edit',
+      label: 'Modifica',
+      icon: '✏️',
+      disabled: false,
+      danger: false
+    }
+  ]
+
+  // Azioni condizionali basate sullo stato
+  if (preventivo.stato !== 'inviato' && preventivo.stato !== 'accettato' && preventivo.stato !== 'rifiutato' && preventivo.stato !== 'convertito') {
+    actions.push({
+      id: 'send',
+      label: 'Invia Email',
+      icon: '📧',
+      disabled: false,
+      danger: false
+    })
+  }
+
+  if (preventivo.stato === 'inviato') {
+    actions.push({
+      id: 'resend',
+      label: 'Reinvia Email',
+      icon: '🔄',
+      disabled: false,
+      danger: false
+    })
+    actions.push({
+      id: 'accept',
+      label: 'Segna Accettato',
+      icon: '✅',
+      disabled: false,
+      danger: false
+    })
+    actions.push({
+      id: 'reject',
+      label: 'Segna Rifiutato',
+      icon: '❌',
+      disabled: false,
+      danger: false
+    })
+  }
+
+  if (preventivo.stato === 'accettato') {
+    actions.push({
+      id: 'convert',
+      label: 'Converti in Cantiere',
+      icon: '🏗️',
+      disabled: false,
+      danger: false
+    })
+  }
+
+  // Aggiungi sempre le azioni di download e eliminazione
+  actions.push({
+    id: 'download',
+    label: 'Scarica PDF',
+    icon: '📄',
+    disabled: false,
+    danger: false
+  })
+
+  actions.push({
+    id: 'delete',
+    label: 'Elimina',
+    icon: '🗑️',
+    disabled: false,
+    danger: true
+  })
+
+  return actions
+}
+
+// Gestore delle azioni del dropdown
+const handleDropdownAction = (action, preventivo) => {
+  switch (action) {
+    case 'view':
+      viewPreventivo(preventivo)
+      break
+    case 'edit':
+      editPreventivo(preventivo)
+      break
+    case 'send':
+      sendPreventivo(preventivo)
+      break
+    case 'resend':
+      resendPreventivo(preventivo)
+      break
+    case 'accept':
+      markAsAccepted(preventivo)
+      break
+    case 'reject':
+      markAsRejected(preventivo)
+      break
+    case 'convert':
+      convertToCantiere(preventivo)
+      break
+    case 'download':
+      downloadPDF(preventivo)
+      break
+    case 'delete':
+      deletePreventivo(preventivo)
+      break
+    default:
+      console.warn('Azione non riconosciuta:', action)
   }
 }
 
