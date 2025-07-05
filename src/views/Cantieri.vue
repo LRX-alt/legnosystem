@@ -88,6 +88,14 @@ const materialiMagazzino = ref([])
 const fornitori = ref([])
 const availableClients = ref([])
 
+// Oggetto per l'aggiornamento progresso
+const progressUpdate = ref({
+  incremento: 5,
+  fase: '',
+  nota: '',
+  dataCompletamento: new Date().toISOString().split('T')[0]
+})
+
 // Computed properties
 const cantieriOrdinati = computed(() => {
   return firestoreStore.cantieri
@@ -1119,7 +1127,78 @@ const editCantiere = (cantiere) => {
 
 const updateProgress = (cantiere) => {
   selectedCantiere.value = cantiere
+  
+  // Reset dei dati del modal
+  progressUpdate.value = {
+    incremento: 5,
+    fase: '',
+    nota: '',
+    dataCompletamento: new Date().toISOString().split('T')[0]
+  }
+  
   showProgressModal.value = true
+}
+
+const saveProgressUpdate = async () => {
+  try {
+    if (!selectedCantiere.value || !progressUpdate.value.incremento || !progressUpdate.value.fase) {
+      popup.error('Campi Mancanti', 'Incremento e fase sono obbligatori')
+      return
+    }
+    
+    loading.value = true
+    
+    // Calcola il nuovo progresso
+    const nuovoProgresso = Math.min(
+      (selectedCantiere.value.progresso || 0) + progressUpdate.value.incremento,
+      100
+    )
+    
+    // Prepara i dati di aggiornamento
+    const updateData = {
+      progresso: nuovoProgresso,
+      ultimaFaseCompletata: progressUpdate.value.fase,
+      noteProgresso: progressUpdate.value.nota,
+      dataUltimoAggiornamento: new Date(),
+      updatedAt: new Date()
+    }
+    
+    // Se raggiungiamo il 100%, aggiorna lo stato
+    if (nuovoProgresso === 100) {
+      updateData.stato = 'completato'
+      updateData.dataCompletamento = new Date(progressUpdate.value.dataCompletamento)
+    }
+    
+    // Salva in Firestore
+    await firestoreOperations.update('cantieri', selectedCantiere.value.id, updateData)
+    
+    // Chiudi modal e resetta dati
+    showProgressModal.value = false
+    progressUpdate.value = {
+      incremento: 5,
+      fase: '',
+      nota: '',
+      dataCompletamento: new Date().toISOString().split('T')[0]
+    }
+    
+    // Mostra messaggio di successo
+    if (nuovoProgresso === 100) {
+      popup.success('Cantiere Completato! 🎉', 
+        `Il cantiere "${selectedCantiere.value.nome}" è stato completato al 100%`)
+    } else {
+      popup.success('Progresso Aggiornato', 
+        `Progresso aggiornato al ${nuovoProgresso}% - Fase: ${progressUpdate.value.fase}`)
+    }
+    
+    // Ricarica i cantieri per aggiornare l'UI
+    await firestoreStore.loadCantieri()
+    
+  } catch (error) {
+    console.error('Errore aggiornamento progresso:', error)
+    popup.error('Errore Aggiornamento', 'Impossibile aggiornare il progresso del cantiere')
+  } finally {
+    loading.value = false
+  }
 }
 
 const viewMaterials = async (cantiere) => {
