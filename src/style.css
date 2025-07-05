@@ -23,15 +23,15 @@
 /* Custom components */
 @layer components {
   .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-primary-500 text-white font-medium py-2 px-4 rounded-lg;
   }
   
   .btn-secondary {
-    @apply bg-white hover:bg-gray-50 text-primary-700 font-medium py-2 px-4 rounded-lg border border-primary-300 transition-colors duration-200;
+    @apply bg-white text-primary-700 font-medium py-2 px-4 rounded-lg border border-primary-300;
   }
   
   .btn-danger {
-    @apply bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-red-500 text-white font-medium py-2 px-4 rounded-lg;
   }
   
   .card {
@@ -39,7 +39,7 @@
   }
   
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors duration-200;
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 transition-colors duration-200;
   }
   
   .nav-link.active {
@@ -94,8 +94,7 @@
 /* Feedback tattile per interazioni */
 button:active,
 .btn-primary:active,
-.btn-secondary:active,
-.card:active {
+.btn-secondary:active {
   transform: scale(0.98);
   transition: transform 0.1s ease;
 }

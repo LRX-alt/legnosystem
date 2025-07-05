@@ -4,7 +4,7 @@
     <button 
       ref="buttonRef"
       @click="toggleDropdown"
-      class="inline-flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 transition-colors duration-200"
+      class="inline-flex items-center justify-center w-8 h-8 rounded-full"
       :class="{ 'bg-gray-100': isOpen }"
     >
       <svg class="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
@@ -25,11 +25,11 @@
           :key="action.id"
           @click="handleAction(action)"
           :disabled="action.disabled"
-          :class="[
-            'flex items-center w-full px-4 py-2 text-sm text-left transition-colors duration-150',
+                      :class="[
+            'flex items-center w-full px-4 py-2 text-sm text-left',
             action.disabled 
               ? 'text-gray-400 cursor-not-allowed' 
-              : `text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${action.danger ? 'hover:bg-red-50 hover:text-red-900' : ''}`
+              : action.danger ? 'text-red-700' : 'text-gray-700'
           ]"
           role="menuitem"
         >

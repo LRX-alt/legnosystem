@@ -92,7 +92,7 @@
         <button 
           @click="testEmailJS"
           class="px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
-          :class="emailJS.isConfigured() ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-400 text-gray-600 cursor-not-allowed'"
+          :class="emailJS.isConfigured() ? 'bg-green-600 text-white' : 'bg-gray-400 text-gray-600 cursor-not-allowed'"
           :disabled="!emailJS.isConfigured()"
           :title="emailJS.isConfigured() ? 'Testa configurazione EmailJS' : 'EmailJS non configurato'"
         >
@@ -130,7 +130,7 @@
               <button 
                 v-if="preventivo.stato === 'accettato'"
                 @click="convertToCantiere(preventivo)"
-                class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full transition-colors"
+                class="text-xs bg-green-600 text-white px-3 py-1 rounded-full"
               >
                 → Cantiere
               </button>
@@ -227,7 +227,7 @@
                   <button 
                     v-if="preventivo.stato === 'accettato'"
                     @click="convertToCantiere(preventivo)"
-                    class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full transition-colors"
+                    class="text-xs bg-green-600 text-white px-3 py-1 rounded-full"
                   >
                     → Cantiere
                   </button>
@@ -256,7 +256,7 @@
       <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-bold text-gray-900">Nuovo Preventivo</h2>
-          <button @click="closeAddModal" class="text-gray-400 hover:text-gray-600">
+          <button @click="closeAddModal" class="text-gray-400">
             <XMarkIcon class="w-6 h-6" />
           </button>
         </div>
@@ -531,7 +531,7 @@
             <button 
               v-if="selectedPreventivo.stato === 'bozza'"
               @click="sendPreventivo(selectedPreventivo)"
-              class="bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              class="bg-accent-500 text-white px-4 py-2 rounded-lg font-medium"
             >
               📧 Invia al Cliente
             </button>
@@ -539,7 +539,7 @@
             <button 
               v-if="selectedPreventivo.stato === 'inviato'"
               @click="markAsAccepted(selectedPreventivo)"
-              class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium"
             >
               ✅ Segna come Accettato
             </button>
@@ -547,7 +547,7 @@
             <button 
               v-if="selectedPreventivo.stato === 'inviato'"
               @click="markAsRejected(selectedPreventivo)"
-              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              class="bg-red-600 text-white px-4 py-2 rounded-lg font-medium"
             >
               ❌ Segna come Rifiutato
             </button>
@@ -555,7 +555,7 @@
             <button 
               v-if="selectedPreventivo.stato === 'accettato'"
               @click="convertToCantiere(selectedPreventivo)"
-              class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              class="bg-green-600 text-white px-4 py-2 rounded-lg font-medium"
             >
               🏗️ Converti in Cantiere
             </button>
@@ -563,7 +563,7 @@
             <!-- Pulsante Download PDF -->
             <button 
               @click="downloadPDF(selectedPreventivo)"
-              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium"
             >
               📄 Scarica PDF
             </button>
@@ -572,14 +572,14 @@
             <button 
               v-if="['inviato', 'scaduto'].includes(selectedPreventivo.stato)"
               @click="resendPreventivo(selectedPreventivo)"
-              class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              class="bg-orange-600 text-white px-4 py-2 rounded-lg font-medium"
             >
               🔄 Reinvia Email
             </button>
             
             <button 
               @click="deletePreventivo(selectedPreventivo)"
-              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              class="bg-red-600 text-white px-4 py-2 rounded-lg font-medium"
             >
               🗑️ Elimina
             </button>
@@ -600,7 +600,7 @@
       <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-bold text-gray-900">Modifica Preventivo</h2>
-          <button @click="closeEditModal" class="text-gray-400 hover:text-gray-600">
+          <button @click="closeEditModal" class="text-gray-400">
             <XMarkIcon class="w-6 h-6" />
           </button>
         </div>
@@ -740,7 +740,7 @@
             <button 
               type="button" 
               @click="deletePreventivo(editingPreventivo)"
-              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              class="bg-red-600 text-white px-4 py-2 rounded-lg font-medium"
             >
               🗑️ Elimina
             </button>
