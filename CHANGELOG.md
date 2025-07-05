@@ -18,6 +18,16 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - ✅ **Modal avanzate**: Visualizzazione dettagliata, modifica completa, gestione workflow
 - ✅ **Filtri e ricerca**: Per stato, cliente, numero preventivo con interfaccia responsive
 - ✅ **Toast notifications**: Feedback immediato per tutte le operazioni con sistema uniforme
+- ✅ **Menu dropdown elegante**: Sostituiti pulsanti separati con menu a tre punti per UI pulita e moderna
+
+### 🎨 **MENU DROPDOWN AZIONI**
+- ✅ **Componente ActionDropdown**: Nuovo componente riutilizzabile con menu a tre punti
+- ✅ **Azioni dinamiche**: Menu contestuali basati sullo stato del preventivo
+- ✅ **UX moderna**: Sostituiti pulsanti multipli con elegante dropdown
+- ✅ **Animazioni smooth**: Transizioni fluide con effetto zoom + fade
+- ✅ **Gestione keyboard**: Supporto chiusura con ESC key
+- ✅ **Responsive design**: Menu ottimizzato per mobile e desktop
+- ✅ **Icone emoji**: Visualizzazione chiara azioni con icone intuitive
 
 ### 🔧 **CORREZIONI TECNICHE**
 - ✅ **RISOLTO**: Errori API useToast con implementazione corretta dei metodi
