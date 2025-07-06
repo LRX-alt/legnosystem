@@ -1475,41 +1475,36 @@ const deleteCantiere = async (cantiere) => {
     // Controlla progresso cantiere
     const hasProgresso = cantiere.progresso && cantiere.progresso > 0
     
-    // 3. Prepara messaggio di avvertimento dettagliato
-    let warningMessage = `⚠️ ATTENZIONE: Stai per eliminare DEFINITIVAMENTE il cantiere "${cantiere.nome}".`
+    // 3. Prepara messaggio elegante e informativo
+    let warningMessage = `Stai per eliminare il cantiere "${cantiere.nome}"`
     
     if (hasTimesheet || hasMateriali || hasVociAggiuntive || hasProgresso) {
-      warningMessage += '\n\n🚨 DATI CHE VERRANNO PERSI:'
+      warningMessage += '\n\nDati associati che verranno rimossi:'
       
       if (hasTimesheet) {
-        warningMessage += `\n• ${timesheetResult.data.length} registrazioni orarie timesheet`
+        warningMessage += `\n📊 ${timesheetResult.data.length} registrazioni timesheet`
       }
       if (hasMateriali) {
-        warningMessage += `\n• ${materialiResult.data.length} registrazioni materiali`
+        warningMessage += `\n📦 ${materialiResult.data.length} materiali utilizzati`
       }
       if (hasVociAggiuntive) {
         const vociTotali = (cantiere.vociAggiuntive?.length || 0) + (cantiere.vociAggiuntiveOriginali?.length || 0)
-        warningMessage += `\n• ${vociTotali} voci aggiuntive`
+        warningMessage += `\n📋 ${vociTotali} voci aggiuntive`
       }
       if (hasProgresso) {
-        warningMessage += `\n• Progresso cantiere: ${cantiere.progresso}%`
+        warningMessage += `\n📈 Progresso: ${cantiere.progresso}%`
       }
       
-      warningMessage += '\n\n💰 COSTI ACCUMULATI:'
-      if (cantiere.costiAccumulati) {
-        warningMessage += `\n• Materiali: €${cantiere.costiAccumulati.materiali || 0}`
-        warningMessage += `\n• Manodopera: €${cantiere.costiAccumulati.manodopera || 0}`
-        warningMessage += `\n• Voci aggiuntive: €${cantiere.costiAccumulati.vociAggiuntive || 0}`
-        warningMessage += `\n• TOTALE: €${cantiere.costiAccumulati.totale || 0}`
+      if (cantiere.costiAccumulati && cantiere.costiAccumulati.totale > 0) {
+        warningMessage += `\n💰 Costi totali: €${cantiere.costiAccumulati.totale}`
       }
     }
     
-    warningMessage += '\n\n❌ QUESTA OPERAZIONE NON È REVERSIBILE!'
-    warningMessage += '\n\nSe sei sicuro, procedi con le conferme:'
+    warningMessage += '\n\nQuesta operazione non può essere annullata.'
     
-    // 4. Prima conferma con dettagli
+    // 4. Prima conferma elegante
     const firstConfirm = await popup.confirm(
-      'Eliminazione Cantiere - Conferma Richiesta',
+      'Conferma Eliminazione',
       warningMessage
     )
     
@@ -1518,7 +1513,7 @@ const deleteCantiere = async (cantiere) => {
       return
     }
     
-    // 5. Seconda conferma: inserire nome cantiere
+    // 5. Controllo sicurezza: inserire nome cantiere
     const nomeConferma = window.prompt(
       `🔐 CONTROLLO DI SICUREZZA\n\nPer confermare l'eliminazione, scrivi esattamente il nome del cantiere:\n\n"${cantiere.nome}"`
     )
@@ -1529,18 +1524,7 @@ const deleteCantiere = async (cantiere) => {
       return
     }
     
-    // 6. Conferma finale assoluta
-    const finalConfirm = await popup.confirm(
-      'ULTIMA CONFERMA',
-      '🔥 Sei ASSOLUTAMENTE SICURO di voler eliminare questo cantiere?\n\n⚠️ Tutti i dati associati verranno eliminati DEFINITIVAMENTE.\n\n✅ Seleziona "Conferma" solo se sei sicuro al 100%.'
-    )
-    
-    if (!finalConfirm) {
-      loading.value = false
-      return
-    }
-    
-    // 7. Eliminazione con log di sicurezza
+    // 6. Eliminazione con log di sicurezza
     console.log('🔥 ELIMINAZIONE CANTIERE AUTORIZZATA:', {
       cantiere: cantiere.nome,
       id: cantiere.id,
