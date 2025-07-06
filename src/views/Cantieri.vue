@@ -963,11 +963,18 @@ const manageVociAggiuntive = async (cantiere) => {
     loading.value = true
     selectedCantiere.value = cantiere
     
+    console.log('🔍 Apertura modal voci aggiuntive per cantiere:', cantiere.nome)
+    console.log('🔍 Costi attuali cantiere:', cantiere.costiAccumulati)
+    console.log('🔍 Voci originali:', cantiere.vociAggiuntiveOriginali || [])
+    console.log('🔍 Voci aggiunte:', cantiere.vociAggiuntive || [])
+    
     // Carica le voci aggiuntive del cantiere (sia originali che aggiunte)
     vociAggiuntiveCantiere.value = [
       ...(cantiere.vociAggiuntiveOriginali || []),
       ...(cantiere.vociAggiuntive || [])
     ]
+    
+    console.log('🔍 Voci caricate nel modal:', vociAggiuntiveCantiere.value)
     
     showManageVociModal.value = true
     
@@ -1138,16 +1145,38 @@ const getTotalVociAggiuntive = () => {
   }, 0)
 }
 
-const closeManageVociModal = () => {
+const closeManageVociModal = async () => {
+  console.log('🔄 === CHIUSURA MODAL VOCI AGGIUNTIVE ===')
   showManageVociModal.value = false
   vociAggiuntiveCantiere.value = []
   
-  // Aggiorna selectedCantiere con i dati più recenti quando si chiude il modal
-  if (selectedCantiere.value) {
-    const cantiereAggiornato = firestoreStore.cantieri.find(c => c.id === selectedCantiere.value.id)
-    if (cantiereAggiornato) {
-      selectedCantiere.value = { ...cantiereAggiornato }
+  // Forza ricarica completa dei cantieri per essere sicuri che l'UI si aggiorni
+  try {
+    console.log('🔄 Ricaricamento store cantieri...')
+    await firestoreStore.loadCantieri()
+    console.log('🔄 Cantieri ricaricati, totale:', firestoreStore.cantieri.length)
+    
+    // Aggiorna selectedCantiere con i dati più recenti quando si chiude il modal
+    if (selectedCantiere.value) {
+      console.log('🔄 Cercando cantiere aggiornato con ID:', selectedCantiere.value.id)
+      const cantiereAggiornato = firestoreStore.cantieri.find(c => c.id === selectedCantiere.value.id)
+      
+      if (cantiereAggiornato) {
+        console.log('🔄 Cantiere trovato nel store:')
+        console.log('    - Voci aggiuntive:', cantiereAggiornato.costiAccumulati?.vociAggiuntive)
+        console.log('    - Totale:', cantiereAggiornato.costiAccumulati?.totale)
+        
+        selectedCantiere.value = { ...cantiereAggiornato }
+        
+        console.log('🔄 selectedCantiere aggiornato:')
+        console.log('    - Voci aggiuntive:', selectedCantiere.value.costiAccumulati?.vociAggiuntive)
+        console.log('    - Totale:', selectedCantiere.value.costiAccumulati?.totale)
+      } else {
+        console.log('❌ Cantiere non trovato nel store!')
+      }
     }
+  } catch (error) {
+    console.error('Errore ricarica cantieri:', error)
   }
 }
 
@@ -1158,10 +1187,10 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
   try {
     console.log('🔄 Aggiornamento costi cantiere con voci aggiuntive:', cantiereId)
     
-    // Carica timesheet per manodopera
+    // Carica timesheet per manodopera (senza ordinamento per evitare indice)
     const timesheetResult = await firestoreOperations.load('timesheet', [
       ['cantiereId', '==', cantiereId]
-    ])
+    ], null, null, null)
     
     let costoManodopera = 0
     if (timesheetResult.success && timesheetResult.data) {
@@ -1184,19 +1213,24 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
     }
     
     // Calcola costo voci aggiuntive (originali + aggiunte)
-    const cantiere = await firestoreOperations.loadById('cantieri', cantiereId)
+    const cantiereResult = await firestoreOperations.load('cantieri', [['id', '==', cantiereId]])
     let costoVociAggiuntive = 0
     
-    if (cantiere.success && cantiere.data) {
+    if (cantiereResult.success && cantiereResult.data && cantiereResult.data.length > 0) {
+      const cantiere = cantiereResult.data[0]
       // Voci originali dal preventivo
-      const vociOriginali = cantiere.data.vociAggiuntiveOriginali || []
+      const vociOriginali = cantiere.vociAggiuntiveOriginali || []
       const costoVociOriginali = vociOriginali.reduce((acc, voce) => acc + (voce.importo || 0), 0)
       
       // Voci aggiunte nel cantiere
-      const vociAggiunte = cantiere.data.vociAggiuntive || []
+      const vociAggiunte = cantiere.vociAggiuntive || []
       const costoVociAggiunte = vociAggiunte.reduce((acc, voce) => acc + (voce.importo || 0), 0)
       
       costoVociAggiuntive = costoVociOriginali + costoVociAggiunte
+      
+      console.log('🔍 Voci originali trovate:', vociOriginali.length, 'costo:', costoVociOriginali)
+      console.log('🔍 Voci aggiunte trovate:', vociAggiunte.length, 'costo:', costoVociAggiunte)
+      console.log('🔍 Totale voci aggiuntive:', costoVociAggiuntive)
     }
     
     // Calcola statistiche
@@ -1231,7 +1265,9 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
     if (selectedCantiere.value && selectedCantiere.value.id === cantiereId) {
       const cantiereAggiornato = firestoreStore.cantieri.find(c => c.id === cantiereId)
       if (cantiereAggiornato) {
+        console.log('🔄 Aggiornamento selectedCantiere PRIMA:', selectedCantiere.value.costiAccumulati)
         selectedCantiere.value = { ...cantiereAggiornato }
+        console.log('🔄 Aggiornamento selectedCantiere DOPO:', selectedCantiere.value.costiAccumulati)
       }
     }
     
@@ -2042,6 +2078,10 @@ const getMaterialStatusColor = (stato) => {
               <span class="text-gray-600">Voci Aggiuntive:</span>
               <span class="font-medium text-purple-600 block">
                 €{{ cantiere.costiAccumulati?.vociAggiuntive?.toLocaleString() || '0' }}
+              </span>
+              <!-- Debug: mostra il valore raw -->
+              <span class="text-xs text-gray-400 block">
+                Debug: {{ cantiere.costiAccumulati?.vociAggiuntive || 0 }}
               </span>
             </div>
           </div>
