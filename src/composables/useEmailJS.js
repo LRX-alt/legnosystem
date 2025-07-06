@@ -81,26 +81,178 @@ export const useEmailJS = () => {
       doc.text(`Tipo Lavoro: ${preventivo.tipoLavoro}`, 20, 188)
       
       // Descrizione se presente
+      let currentY = 196
       if (preventivo.descrizione) {
-        doc.text('Descrizione:', 20, 196)
+        doc.text('Descrizione:', 20, currentY)
         const splitDescription = doc.splitTextToSize(preventivo.descrizione, 170)
-        doc.text(splitDescription, 20, 204)
+        doc.text(splitDescription, 20, currentY + 8)
+        currentY += 8 + (splitDescription.length * 5)
+      }
+      
+      // Materiali se presenti
+      if (preventivo.materiali && preventivo.materiali.length > 0) {
+        currentY += 15
+        
+        // Titolo materiali
+        doc.setFontSize(14)
+        doc.setTextColor(40, 40, 40)
+        doc.text('MATERIALI', 20, currentY)
+        currentY += 15
+        
+        // Header tabella materiali
+        doc.setFontSize(10)
+        doc.setTextColor(80, 80, 80)
+        doc.text('Nome', 20, currentY)
+        doc.text('Qtà', 90, currentY)
+        doc.text('Prezzo Unit.', 110, currentY)
+        doc.text('Totale', 150, currentY)
+        
+        // Linea header
+        doc.setLineWidth(0.2)
+        doc.line(20, currentY + 2, 180, currentY + 2)
+        currentY += 8
+        
+        // Materiali
+        let totaleMateriali = 0
+        doc.setFontSize(9)
+        doc.setTextColor(60, 60, 60)
+        
+        preventivo.materiali.forEach(materiale => {
+          const quantita = materiale.quantitaRichiesta || materiale.quantita || 0
+          const prezzo = materiale.prezzoUnitario || 0
+          const totaleRiga = quantita * prezzo
+          totaleMateriali += totaleRiga
+          
+          // Tronca il nome se troppo lungo
+          const nomeDisplay = materiale.nome.length > 25 ? 
+            materiale.nome.substring(0, 22) + '...' : 
+            materiale.nome
+          
+          doc.text(nomeDisplay, 20, currentY)
+          doc.text(`${quantita} ${materiale.unita || ''}`, 90, currentY)
+          doc.text(`€ ${prezzo.toLocaleString('it-IT')}`, 110, currentY)
+          doc.text(`€ ${totaleRiga.toLocaleString('it-IT')}`, 150, currentY)
+          currentY += 6
+        })
+        
+        // Linea separatrice
+        doc.setLineWidth(0.2)
+        doc.line(20, currentY + 2, 180, currentY + 2)
+        currentY += 8
+        
+        // Totale materiali
+        doc.setFontSize(10)
+        doc.setTextColor(40, 40, 40)
+        doc.text('Totale Materiali:', 110, currentY)
+        doc.text(`€ ${totaleMateriali.toLocaleString('it-IT')}`, 150, currentY)
+        currentY += 15
+      }
+      
+      // Voci aggiuntive se presenti
+      let totaleVociAggiuntive = 0
+      if (preventivo.vociAggiuntive && preventivo.vociAggiuntive.length > 0) {
+        // Calcola lo spazio necessario per le voci aggiuntive
+        const spazioNecessario = 15 + 15 + 8 + (preventivo.vociAggiuntive.length * 6) + 8 + 15 + 15
+        
+        // Verifica se c'è spazio sufficiente nella pagina corrente
+        if (currentY + spazioNecessario > 270) {
+          // Aggiungi nuova pagina se necessario
+          doc.addPage()
+          currentY = 30
+        }
+        
+        currentY += 15
+        
+        // Titolo voci aggiuntive
+        doc.setFontSize(14)
+        doc.setTextColor(40, 40, 40)
+        doc.text('VOCI AGGIUNTIVE', 20, currentY)
+        currentY += 15
+        
+        // Header tabella voci aggiuntive
+        doc.setFontSize(10)
+        doc.setTextColor(80, 80, 80)
+        doc.text('Descrizione', 20, currentY)
+        doc.text('Importo', 150, currentY)
+        
+        // Linea header
+        doc.setLineWidth(0.2)
+        doc.line(20, currentY + 2, 180, currentY + 2)
+        currentY += 8
+        
+        // Voci aggiuntive
+        doc.setFontSize(9)
+        doc.setTextColor(60, 60, 60)
+        
+        preventivo.vociAggiuntive.forEach(voce => {
+          const importoVoce = voce.importo || 0
+          totaleVociAggiuntive += importoVoce
+          
+          // Tronca la descrizione se troppo lunga
+          const descrizioneDisplay = voce.descrizione.length > 45 ? 
+            voce.descrizione.substring(0, 42) + '...' : 
+            voce.descrizione
+          
+          doc.text(descrizioneDisplay, 20, currentY)
+          doc.text(`€ ${importoVoce.toLocaleString('it-IT')}`, 150, currentY)
+          currentY += 6
+        })
+        
+        // Linea separatrice
+        doc.setLineWidth(0.2)
+        doc.line(20, currentY + 2, 180, currentY + 2)
+        currentY += 8
+        
+        // Totale voci aggiuntive
+        doc.setFontSize(10)
+        doc.setTextColor(40, 40, 40)
+        doc.text('Totale Voci Aggiuntive:', 110, currentY)
+        doc.text(`€ ${totaleVociAggiuntive.toLocaleString('it-IT')}`, 150, currentY)
+        currentY += 15
+      }
+      
+      // Calcola il totale finale
+      const totaleMaterialiSafe = (preventivo.materiali && preventivo.materiali.length > 0) ? 
+        preventivo.materiali.reduce((acc, materiale) => {
+          const quantita = materiale.quantitaRichiesta || materiale.quantita || 0
+          const prezzo = materiale.prezzoUnitario || 0
+          return acc + (quantita * prezzo)
+        }, 0) : 0
+      
+      const totaleFinale = totaleMaterialiSafe + totaleVociAggiuntive
+      
+      // Verifica se c'è spazio sufficiente per importo e footer
+      if (currentY > 240) {
+        // Aggiungi nuova pagina se necessario
+        doc.addPage()
+        currentY = 30
       }
       
       // Importo (evidenziato)
+      currentY += 10
       doc.setFontSize(16)
       doc.setTextColor(40, 40, 40)
-      doc.text('IMPORTO TOTALE', 20, 240)
+      doc.text('IMPORTO TOTALE', 20, currentY)
       
       doc.setFontSize(20)
       doc.setTextColor(0, 120, 0)
-      doc.text(`€ ${preventivo.importo?.toLocaleString('it-IT')}`, 20, 255)
+      // Usa il totale calcolato se disponibile, altrimenti usa l'importo del preventivo
+      const importoFinale = totaleFinale > 0 ? totaleFinale : (preventivo.importo || 0)
+      doc.text(`€ ${importoFinale.toLocaleString('it-IT')}`, 20, currentY + 15)
       
       // Footer
+      currentY += 35
+      
+      // Verifica se c'è spazio per il footer
+      if (currentY > 270) {
+        doc.addPage()
+        currentY = 30
+      }
+      
       doc.setFontSize(10)
       doc.setTextColor(100, 100, 100)
-      doc.text('Preventivo valido fino alla data di scadenza indicata', 20, 280)
-      doc.text('Per accettare il preventivo, si prega di contattarci entro la scadenza', 20, 288)
+      doc.text('Preventivo valido fino alla data di scadenza indicata', 20, currentY)
+      doc.text('Per accettare il preventivo, si prega di contattarci entro la scadenza', 20, currentY + 8)
       
       return doc
     } catch (error) {

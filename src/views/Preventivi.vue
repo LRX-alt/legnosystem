@@ -400,6 +400,143 @@
             ></textarea>
           </div>
 
+          <!-- Sezione Materiali -->
+          <div class="border-t pt-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">📦 Materiali</h3>
+              <button 
+                type="button" 
+                @click="addMaterialToPreventivo"
+                class="btn-secondary text-sm"
+              >
+                + Aggiungi Materiale
+              </button>
+            </div>
+            
+            <!-- Lista Materiali -->
+            <div v-if="materialiPreventivo.length > 0" class="space-y-3">
+              <div v-for="materiale in materialiPreventivo" :key="materiale.id" 
+                   class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <h4 class="font-medium text-gray-900">{{ materiale.nome }}</h4>
+                    <p class="text-sm text-gray-600">{{ materiale.descrizione }}</p>
+                    <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                      <span>{{ materiale.quantitaRichiesta }} {{ materiale.unita }}</span>
+                      <span>€{{ materiale.prezzoUnitario.toFixed(2) }}/{{ materiale.unita }}</span>
+                      <span class="font-medium text-green-600">
+                        Tot: €{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button 
+                      type="button"
+                      @click="editMaterialInPreventivo(materiale)"
+                      class="text-blue-600 hover:text-blue-800"
+                      title="Modifica"
+                    >
+                      <PencilIcon class="w-4 h-4" />
+                    </button>
+                    <button 
+                      type="button"
+                      @click="removeMaterialFromPreventivo(materiale.id)"
+                      class="text-red-600 hover:text-red-800"
+                      title="Rimuovi"
+                    >
+                      <XMarkIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Totale Materiali -->
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-medium text-blue-900">Totale Materiali:</span>
+                  <span class="text-lg font-bold text-blue-900">€{{ getTotalMaterialsValue().toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Messaggio vuoto -->
+            <div v-else class="text-center py-6 text-gray-500">
+              <p>Nessun materiale aggiunto al preventivo</p>
+            </div>
+          </div>
+
+          <!-- Sezione Voci Aggiuntive -->
+          <div class="border-t pt-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">📋 Voci Aggiuntive</h3>
+              <button 
+                type="button" 
+                @click="addVoceAggiuntiva"
+                class="btn-secondary text-sm"
+              >
+                + Aggiungi Voce
+              </button>
+            </div>
+            
+            <!-- Lista Voci Aggiuntive -->
+            <div v-if="vociAggiuntive.length > 0" class="space-y-3">
+              <div v-for="voce in vociAggiuntive" :key="voce.id" 
+                   class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <h4 class="font-medium text-gray-900">{{ voce.descrizione }}</h4>
+                    <p v-if="voce.note" class="text-sm text-gray-600">{{ voce.note }}</p>
+                    <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                      <span class="font-medium text-green-600">
+                        €{{ voce.importo.toFixed(2) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button 
+                      type="button"
+                      @click="editVoceAggiuntiva(voce)"
+                      class="text-blue-600 hover:text-blue-800"
+                      title="Modifica"
+                    >
+                      <PencilIcon class="w-4 h-4" />
+                    </button>
+                    <button 
+                      type="button"
+                      @click="removeVoceAggiuntiva(voce.id)"
+                      class="text-red-600 hover:text-red-800"
+                      title="Rimuovi"
+                    >
+                      <XMarkIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Totale Voci Aggiuntive -->
+              <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-medium text-yellow-900">Totale Voci Aggiuntive:</span>
+                  <span class="text-lg font-bold text-yellow-900">€{{ getTotalVociAggiuntive().toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Messaggio vuoto -->
+            <div v-else class="text-center py-6 text-gray-500">
+              <p>Nessuna voce aggiuntiva inserita</p>
+              <p class="text-sm mt-1">Usa questa sezione per mezzi speciali, lavori particolari, ecc.</p>
+            </div>
+          </div>
+
+          <!-- Totale Generale -->
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4 mt-6">
+            <div class="flex justify-between items-center">
+              <span class="text-lg font-semibold text-green-900">TOTALE GENERALE:</span>
+              <span class="text-2xl font-bold text-green-900">€{{ getTotalGenerale().toFixed(2) }}</span>
+            </div>
+          </div>
+
           <div class="flex justify-end space-x-3 pt-4">
             <button type="button" @click="closeAddModal" class="btn-secondary">
               Annulla
@@ -523,6 +660,125 @@
           <div v-if="selectedPreventivo.descrizione" class="card">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Descrizione</h3>
             <p class="text-gray-700 leading-relaxed">{{ selectedPreventivo.descrizione }}</p>
+          </div>
+
+          <!-- Materiali -->
+          <div class="card">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">📦 Materiali</h3>
+            
+            <div v-if="materialiPreventivo.length > 0" class="space-y-4">
+              <div v-for="materiale in materialiPreventivo" :key="materiale.id" 
+                   class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <h4 class="font-medium text-gray-900 text-lg">{{ materiale.nome }}</h4>
+                    <p v-if="materiale.codice" class="text-sm text-gray-500 font-mono">{{ materiale.codice }}</p>
+                    <p v-if="materiale.descrizione" class="text-sm text-gray-600 mt-1">{{ materiale.descrizione }}</p>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+                      <div>
+                        <p class="text-xs text-gray-500">Quantità</p>
+                        <p class="font-medium">{{ materiale.quantitaRichiesta }} {{ materiale.unita }}</p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-gray-500">Prezzo Unitario</p>
+                        <p class="font-medium">€{{ materiale.prezzoUnitario.toFixed(2) }}</p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-gray-500">Fornitore</p>
+                        <p class="font-medium">{{ getFornitoreNome(materiale.fornitoreId) }}</p>
+                      </div>
+                      <div>
+                        <p class="text-xs text-gray-500">Totale</p>
+                        <p class="font-bold text-green-600">
+                          €{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <p v-if="materiale.note" class="text-sm text-gray-600 mt-2 italic">
+                      Note: {{ materiale.note }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Totale Materiali -->
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex justify-between items-center">
+                  <span class="text-lg font-semibold text-blue-900">Totale Materiali:</span>
+                  <span class="text-2xl font-bold text-blue-900">€{{ getTotalMaterialsValue().toFixed(2) }}</span>
+                </div>
+                
+                <!-- Percentuale sul totale preventivo -->
+                <div v-if="selectedPreventivo.importo > 0" class="mt-2 text-sm text-blue-700">
+                  {{ Math.round((getTotalMaterialsValue() / selectedPreventivo.importo) * 100) }}% del valore totale preventivo
+                </div>
+              </div>
+            </div>
+            
+            <!-- Messaggio vuoto -->
+            <div v-else class="text-center py-8 text-gray-500">
+              <p>Nessun materiale specificato per questo preventivo</p>
+            </div>
+          </div>
+
+          <!-- Voci Aggiuntive -->
+          <div class="card">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">📋 Voci Aggiuntive</h3>
+            
+            <div v-if="vociAggiuntive.length > 0" class="space-y-4">
+              <div v-for="voce in vociAggiuntive" :key="voce.id" 
+                   class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <h4 class="font-medium text-gray-900 text-lg">{{ voce.descrizione }}</h4>
+                    <p v-if="voce.note" class="text-sm text-gray-600 mt-1">{{ voce.note }}</p>
+                    
+                    <div class="mt-3">
+                      <div>
+                        <p class="text-xs text-gray-500">Importo</p>
+                        <p class="font-bold text-green-600 text-xl">€{{ voce.importo.toFixed(2) }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Totale Voci Aggiuntive -->
+              <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div class="flex justify-between items-center">
+                  <span class="text-lg font-semibold text-yellow-900">Totale Voci Aggiuntive:</span>
+                  <span class="text-2xl font-bold text-yellow-900">€{{ getTotalVociAggiuntive().toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Messaggio vuoto -->
+            <div v-else class="text-center py-8 text-gray-500">
+              <p>Nessuna voce aggiuntiva specificata per questo preventivo</p>
+            </div>
+          </div>
+
+          <!-- Totale Finale -->
+          <div class="card">
+            <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+              <div class="flex justify-between items-center">
+                <span class="text-xl font-bold text-green-900">TOTALE GENERALE:</span>
+                <span class="text-3xl font-bold text-green-900">€{{ getTotalGenerale().toFixed(2) }}</span>
+              </div>
+              
+              <div class="mt-3 text-sm text-green-700">
+                <div class="flex justify-between">
+                  <span>Materiali:</span>
+                  <span>€{{ getTotalMaterialsValue().toFixed(2) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Voci Aggiuntive:</span>
+                  <span>€{{ getTotalVociAggiuntive().toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Azioni -->
@@ -744,6 +1000,143 @@
             ></textarea>
           </div>
 
+          <!-- Sezione Materiali -->
+          <div class="border-t pt-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">📦 Materiali</h3>
+              <button 
+                type="button" 
+                @click="addMaterialToPreventivo"
+                class="btn-secondary text-sm"
+              >
+                + Aggiungi Materiale
+              </button>
+            </div>
+            
+            <!-- Lista Materiali -->
+            <div v-if="materialiPreventivo.length > 0" class="space-y-3">
+              <div v-for="materiale in materialiPreventivo" :key="materiale.id" 
+                   class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <h4 class="font-medium text-gray-900">{{ materiale.nome }}</h4>
+                    <p class="text-sm text-gray-600">{{ materiale.descrizione }}</p>
+                    <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                      <span>{{ materiale.quantitaRichiesta }} {{ materiale.unita }}</span>
+                      <span>€{{ materiale.prezzoUnitario.toFixed(2) }}/{{ materiale.unita }}</span>
+                      <span class="font-medium text-green-600">
+                        Tot: €{{ (materiale.quantitaRichiesta * materiale.prezzoUnitario).toFixed(2) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button 
+                      type="button"
+                      @click="editMaterialInPreventivo(materiale)"
+                      class="text-blue-600 hover:text-blue-800"
+                      title="Modifica"
+                    >
+                      <PencilIcon class="w-4 h-4" />
+                    </button>
+                    <button 
+                      type="button"
+                      @click="removeMaterialFromPreventivo(materiale.id)"
+                      class="text-red-600 hover:text-red-800"
+                      title="Rimuovi"
+                    >
+                      <XMarkIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Totale Materiali -->
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-medium text-blue-900">Totale Materiali:</span>
+                  <span class="text-lg font-bold text-blue-900">€{{ getTotalMaterialsValue().toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Messaggio vuoto -->
+            <div v-else class="text-center py-6 text-gray-500">
+              <p>Nessun materiale aggiunto al preventivo</p>
+            </div>
+          </div>
+
+          <!-- Sezione Voci Aggiuntive -->
+          <div class="border-t pt-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">📋 Voci Aggiuntive</h3>
+              <button 
+                type="button" 
+                @click="addVoceAggiuntiva"
+                class="btn-secondary text-sm"
+              >
+                + Aggiungi Voce
+              </button>
+            </div>
+            
+            <!-- Lista Voci Aggiuntive -->
+            <div v-if="vociAggiuntive.length > 0" class="space-y-3">
+              <div v-for="voce in vociAggiuntive" :key="voce.id" 
+                   class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <h4 class="font-medium text-gray-900">{{ voce.descrizione }}</h4>
+                    <p v-if="voce.note" class="text-sm text-gray-600">{{ voce.note }}</p>
+                    <div class="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                      <span class="font-medium text-green-600">
+                        €{{ voce.importo.toFixed(2) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button 
+                      type="button"
+                      @click="editVoceAggiuntiva(voce)"
+                      class="text-blue-600 hover:text-blue-800"
+                      title="Modifica"
+                    >
+                      <PencilIcon class="w-4 h-4" />
+                    </button>
+                    <button 
+                      type="button"
+                      @click="removeVoceAggiuntiva(voce.id)"
+                      class="text-red-600 hover:text-red-800"
+                      title="Rimuovi"
+                    >
+                      <XMarkIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Totale Voci Aggiuntive -->
+              <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm font-medium text-yellow-900">Totale Voci Aggiuntive:</span>
+                  <span class="text-lg font-bold text-yellow-900">€{{ getTotalVociAggiuntive().toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Messaggio vuoto -->
+            <div v-else class="text-center py-6 text-gray-500">
+              <p>Nessuna voce aggiuntiva inserita</p>
+              <p class="text-sm mt-1">Usa questa sezione per mezzi speciali, lavori particolari, ecc.</p>
+            </div>
+          </div>
+
+          <!-- Totale Generale -->
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4 mt-6">
+            <div class="flex justify-between items-center">
+              <span class="text-lg font-semibold text-green-900">TOTALE GENERALE:</span>
+              <span class="text-2xl font-bold text-green-900">€{{ getTotalGenerale().toFixed(2) }}</span>
+            </div>
+          </div>
+
           <div class="flex justify-between items-center pt-4">
             <button 
               type="button" 
@@ -765,6 +1158,404 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal Aggiungi Materiale -->
+  <div v-if="showAddMaterialModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-900">Aggiungi Materiale</h2>
+        <button @click="closeAddMaterialModal" class="text-gray-400 hover:text-gray-600">
+          <XMarkIcon class="w-6 h-6" />
+        </button>
+      </div>
+
+      <form @submit.prevent="saveMaterialToPreventivo" class="space-y-4">
+        <!-- Selezione Tipo Materiale -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Tipo Materiale</label>
+          <div class="flex space-x-4 mb-3">
+            <label class="flex items-center">
+              <input
+                v-model="materialSelectionMode"
+                type="radio"
+                value="existing"
+                class="mr-2"
+                @change="selectedMaterialFromStock = ''"
+              />
+              Dal Magazzino
+            </label>
+            <label class="flex items-center">
+              <input
+                v-model="materialSelectionMode"
+                type="radio"
+                value="new"
+                class="mr-2"
+              />
+              Nuovo Materiale
+            </label>
+          </div>
+        </div>
+
+        <!-- Selezione da Magazzino -->
+        <div v-if="materialSelectionMode === 'existing'" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Seleziona dal Magazzino</label>
+            <select
+              v-model="selectedMaterialFromStock"
+              @change="fillMaterialFromStock"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Seleziona materiale</option>
+              <option v-for="materiale in materialiMagazzino" :key="materiale.id" :value="materiale.id">
+                {{ materiale.nome }} - {{ materiale.codice }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Dati Materiale -->
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nome *</label>
+              <input
+                v-model="newMaterial.nome"
+                type="text"
+                required
+                :readonly="materialSelectionMode === 'existing'"
+                :class="[
+                  'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500',
+                  materialSelectionMode === 'existing' ? 'bg-gray-100' : ''
+                ]"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Codice</label>
+              <input
+                v-model="newMaterial.codice"
+                type="text"
+                :readonly="materialSelectionMode === 'existing'"
+                :class="[
+                  'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500',
+                  materialSelectionMode === 'existing' ? 'bg-gray-100' : ''
+                ]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione</label>
+            <textarea
+              v-model="newMaterial.descrizione"
+              rows="3"
+              :readonly="materialSelectionMode === 'existing'"
+              :class="[
+                'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500',
+                materialSelectionMode === 'existing' ? 'bg-gray-100' : ''
+              ]"
+            ></textarea>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Quantità *</label>
+              <input
+                v-model.number="newMaterial.quantitaRichiesta"
+                type="number"
+                min="0"
+                step="0.01"
+                required
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Unità</label>
+              <select
+                v-model="newMaterial.unita"
+                :disabled="materialSelectionMode === 'existing'"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="pz">Pezzi (pz)</option>
+                <option value="m">Metri (m)</option>
+                <option value="m²">Metri Quadri (m²)</option>
+                <option value="m³">Metri Cubi (m³)</option>
+                <option value="kg">Chilogrammi (kg)</option>
+                <option value="conf">Confezioni (conf)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Prezzo Unitario (€) *</label>
+            <input
+              v-model.number="newMaterial.prezzoUnitario"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Fornitore</label>
+            <select
+              v-model="newMaterial.fornitoreId"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Seleziona fornitore</option>
+              <option v-for="fornitore in fornitori" :key="fornitore.id" :value="fornitore.id">
+                {{ fornitore.nome }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+            <textarea
+              v-model="newMaterial.note"
+              rows="2"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" @click="closeAddMaterialModal" class="btn-secondary">
+            Annulla
+          </button>
+          <button type="submit" class="btn-primary">
+            Aggiungi Materiale
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Modifica Materiale -->
+  <div v-if="showEditMaterialModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-900">Modifica Materiale</h2>
+        <button @click="closeEditMaterialModal" class="text-gray-400 hover:text-gray-600">
+          <XMarkIcon class="w-6 h-6" />
+        </button>
+      </div>
+
+      <form @submit.prevent="saveMaterialChanges" class="space-y-4" v-if="editingMaterial">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Nome *</label>
+            <input
+              v-model="editingMaterial.nome"
+              type="text"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Codice</label>
+            <input
+              v-model="editingMaterial.codice"
+              type="text"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione</label>
+          <textarea
+            v-model="editingMaterial.descrizione"
+            rows="3"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          ></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Quantità *</label>
+            <input
+              v-model.number="editingMaterial.quantitaRichiesta"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Unità</label>
+            <select
+              v-model="editingMaterial.unita"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="pz">Pezzi (pz)</option>
+              <option value="m">Metri (m)</option>
+              <option value="m²">Metri Quadri (m²)</option>
+              <option value="m³">Metri Cubi (m³)</option>
+              <option value="kg">Chilogrammi (kg)</option>
+              <option value="conf">Confezioni (conf)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Prezzo Unitario (€) *</label>
+          <input
+            v-model.number="editingMaterial.prezzoUnitario"
+            type="number"
+            min="0"
+            step="0.01"
+            required
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Fornitore</label>
+          <select
+            v-model="editingMaterial.fornitoreId"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          >
+            <option value="">Seleziona fornitore</option>
+            <option v-for="fornitore in fornitori" :key="fornitore.id" :value="fornitore.id">
+              {{ fornitore.nome }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+          <textarea
+            v-model="editingMaterial.note"
+            rows="2"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          ></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" @click="closeEditMaterialModal" class="btn-secondary">
+            Annulla
+          </button>
+          <button type="submit" class="btn-primary">
+            Salva Modifiche
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Aggiungi Voce Aggiuntiva -->
+  <div v-if="showAddVoceModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-900">Aggiungi Voce Aggiuntiva</h2>
+        <button @click="closeAddVoceModal" class="text-gray-400 hover:text-gray-600">
+          <XMarkIcon class="w-6 h-6" />
+        </button>
+      </div>
+
+      <form @submit.prevent="saveVoceAggiuntiva" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione *</label>
+          <input
+            v-model="newVoce.descrizione"
+            type="text"
+            required
+            placeholder="Es. Uso escavatore, Trasporto materiali, Lavori straordinari..."
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Importo (€) *</label>
+          <input
+            v-model.number="newVoce.importo"
+            type="number"
+            min="0"
+            step="0.01"
+            required
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+          <textarea
+            v-model="newVoce.note"
+            rows="3"
+            placeholder="Dettagli aggiuntivi..."
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          ></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" @click="closeAddVoceModal" class="btn-secondary">
+            Annulla
+          </button>
+          <button type="submit" class="btn-primary">
+            Aggiungi Voce
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Modifica Voce Aggiuntiva -->
+  <div v-if="showEditVoceModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-bold text-gray-900">Modifica Voce Aggiuntiva</h2>
+        <button @click="closeEditVoceModal" class="text-gray-400 hover:text-gray-600">
+          <XMarkIcon class="w-6 h-6" />
+        </button>
+      </div>
+
+      <form @submit.prevent="saveVoceChanges" class="space-y-4" v-if="editingVoce">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione *</label>
+          <input
+            v-model="editingVoce.descrizione"
+            type="text"
+            required
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Importo (€) *</label>
+          <input
+            v-model.number="editingVoce.importo"
+            type="number"
+            min="0"
+            step="0.01"
+            required
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+          <textarea
+            v-model="editingVoce.note"
+            rows="3"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+          ></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" @click="closeEditVoceModal" class="btn-secondary">
+            Annulla
+          </button>
+          <button type="submit" class="btn-primary">
+            Salva Modifiche
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 </template>
 
 <script setup>
@@ -783,7 +1574,8 @@ import {
   ChartBarIcon,
   ClockIcon,
   XMarkIcon,
-  PencilIcon
+  PencilIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 
 const firestore = useFirestore()
@@ -813,6 +1605,25 @@ const preventivi = ref([])
 const availableClients = ref([])
 const unsubscribePreventivi = ref(null)
 
+// Gestione materiali preventivi
+const showAddMaterialModal = ref(false)
+const showEditMaterialModal = ref(false)
+const materialSelectionMode = ref('existing')
+const selectedMaterialFromStock = ref('')
+const selectedMaterial = ref(null)
+const editingMaterial = ref(null)
+const newMaterial = ref(null)
+const materialiMagazzino = ref([])
+const fornitori = ref([])
+const materialiPreventivo = ref([])
+
+// Gestione voci aggiuntive
+const showAddVoceModal = ref(false)
+const showEditVoceModal = ref(false)
+const editingVoce = ref(null)
+const newVoce = ref(null)
+const vociAggiuntive = ref([])
+
 // Nuovo preventivo
 const newPreventivo = ref({
   progetto: '',
@@ -826,7 +1637,8 @@ const newPreventivo = ref({
   importo: 0,
   scadenza: '',
   descrizione: '',
-  stato: 'bozza'
+  stato: 'bozza',
+  materiali: []
 })
 
 // Preventivo in modifica
@@ -842,7 +1654,8 @@ const editingPreventivo = ref({
   importo: 0,
   scadenza: '',
   descrizione: '',
-  stato: 'bozza'
+  stato: 'bozza',
+  materiali: []
 })
 
 // Computed
@@ -1030,6 +1843,8 @@ const savePreventivo = async () => {
     const preventivoData = {
       ...newPreventivo.value,
       numero: generateNumeroPreventivo(),
+      materiali: materialiPreventivo.value, // Salva i materiali
+      vociAggiuntive: vociAggiuntive.value, // Salva le voci aggiuntive
       createdAt: new Date(),
       updatedAt: new Date()
     }
@@ -1061,14 +1876,29 @@ const closeAddModal = () => {
     importo: 0,
     scadenza: '',
     descrizione: '',
-    stato: 'bozza'
+    stato: 'bozza',
+    materiali: []
   }
   clientSelectionMode.value = 'existing'
   selectedClientFromList.value = ''
+  materialiPreventivo.value = []
+  vociAggiuntive.value = []
 }
 
 const viewPreventivo = (preventivo) => {
   selectedPreventivo.value = preventivo
+  // Carica i materiali associati al preventivo
+  if (preventivo.materiali && preventivo.materiali.length > 0) {
+    materialiPreventivo.value = [...preventivo.materiali]
+  } else {
+    materialiPreventivo.value = []
+  }
+  // Carica le voci aggiuntive associate al preventivo
+  if (preventivo.vociAggiuntive && preventivo.vociAggiuntive.length > 0) {
+    vociAggiuntive.value = [...preventivo.vociAggiuntive]
+  } else {
+    vociAggiuntive.value = []
+  }
   showViewModal.value = true
 }
 
@@ -1092,7 +1922,22 @@ const editPreventivo = (preventivo) => {
     importo: preventivo.importo || 0,
     scadenza: preventivo.scadenza || '',
     descrizione: preventivo.descrizione || '',
-    stato: preventivo.stato
+    stato: preventivo.stato,
+    materiali: preventivo.materiali || []
+  }
+  
+  // Carica i materiali associati al preventivo
+  if (preventivo.materiali && preventivo.materiali.length > 0) {
+    materialiPreventivo.value = [...preventivo.materiali]
+  } else {
+    materialiPreventivo.value = []
+  }
+  
+  // Carica le voci aggiuntive associate al preventivo
+  if (preventivo.vociAggiuntive && preventivo.vociAggiuntive.length > 0) {
+    vociAggiuntive.value = [...preventivo.vociAggiuntive]
+  } else {
+    vociAggiuntive.value = []
   }
   
   // Imposta la modalità di selezione cliente
@@ -1121,10 +1966,13 @@ const closeEditModal = () => {
     importo: 0,
     scadenza: '',
     descrizione: '',
-    stato: 'bozza'
+    stato: 'bozza',
+    materiali: []
   }
   editClientSelectionMode.value = 'existing'
   editSelectedClientFromList.value = ''
+  materialiPreventivo.value = []
+  vociAggiuntive.value = []
 }
 
 const onEditClientSelected = () => {
@@ -1150,6 +1998,8 @@ const updatePreventivo = async () => {
       importo: editingPreventivo.value.importo,
       scadenza: editingPreventivo.value.scadenza,
       descrizione: editingPreventivo.value.descrizione,
+      materiali: materialiPreventivo.value, // Salva i materiali aggiornati
+      vociAggiuntive: vociAggiuntive.value, // Salva le voci aggiuntive aggiornate
       updatedAt: new Date()
     }
 
@@ -1200,8 +2050,15 @@ const sendPreventivo = async (preventivo) => {
     )
     if (!confirmed) return
 
+    // Crea una copia del preventivo con i dati aggiornati per l'invio email
+    const preventivoConDatiAggiornati = {
+      ...preventivo,
+      materiali: materialiPreventivo.value.length > 0 ? materialiPreventivo.value : preventivo.materiali,
+      vociAggiuntive: vociAggiuntive.value.length > 0 ? vociAggiuntive.value : preventivo.vociAggiuntive
+    }
+    
     // Invia email tramite EmailJS
-    const emailResult = await emailJS.sendPreventivoEmail(preventivo)
+    const emailResult = await emailJS.sendPreventivoEmail(preventivoConDatiAggiornati)
 
     if (emailResult.success) {
       // Aggiorna stato preventivo dopo invio riuscito
@@ -1319,7 +2176,14 @@ const markAsRejected = async (preventivo) => {
 
 const downloadPDF = (preventivo) => {
   try {
-    const pdfDoc = emailJS.generatePreventivoPDF(preventivo)
+    // Crea una copia del preventivo con i dati aggiornati
+    const preventivoConDatiAggiornati = {
+      ...preventivo,
+      materiali: materialiPreventivo.value.length > 0 ? materialiPreventivo.value : preventivo.materiali,
+      vociAggiuntive: vociAggiuntive.value.length > 0 ? vociAggiuntive.value : preventivo.vociAggiuntive
+    }
+    
+    const pdfDoc = emailJS.generatePreventivoPDF(preventivoConDatiAggiornati)
     pdfDoc.save(`Preventivo-${preventivo.numero}.pdf`)
     popup.success('PDF scaricato con successo')
   } catch (error) {
@@ -1519,10 +2383,277 @@ const handleDropdownAction = (action, preventivo) => {
   }
 }
 
+// 📦 FUNZIONI GESTIONE MATERIALI PREVENTIVI
+const addMaterialToPreventivo = async () => {
+  try {
+    // Carica materiali dal magazzino se non già caricati
+    if (materialiMagazzino.value.length === 0) {
+      await firestoreStore.loadMateriali()
+      materialiMagazzino.value = firestoreStore.materiali
+    }
+    
+    // Carica fornitori se non già caricati
+    if (fornitori.value.length === 0) {
+      await firestoreStore.loadFornitori()
+      fornitori.value = firestoreStore.fornitori
+    }
+    
+    // Inizializza nuovo materiale
+    newMaterial.value = {
+      nome: '',
+      codice: '',
+      descrizione: '',
+      quantitaRichiesta: 1,
+      unita: 'pz',
+      prezzoUnitario: 0,
+      fornitoreId: '',
+      note: ''
+    }
+    
+    // Reset selezioni
+    materialSelectionMode.value = 'existing'
+    selectedMaterialFromStock.value = ''
+    
+    // Apri modal
+    showAddMaterialModal.value = true
+    
+  } catch (err) {
+    console.error('Errore apertura modal materiali:', err)
+    popup.error('Impossibile aprire la gestione materiali: ' + err.message)
+  }
+}
+
+const getSelectedMaterialFromStock = () => {
+  if (!selectedMaterialFromStock.value) return null
+  return materialiMagazzino.value.find(m => m.id === selectedMaterialFromStock.value)
+}
+
+const fillMaterialFromStock = () => {
+  const selected = getSelectedMaterialFromStock()
+  if (selected && newMaterial.value) {
+    newMaterial.value = {
+      ...newMaterial.value,
+      nome: selected.nome,
+      codice: selected.codice,
+      descrizione: selected.descrizione,
+      unita: selected.unita,
+      prezzoUnitario: selected.prezzoUnitario || 0
+    }
+  }
+}
+
+const saveMaterialToPreventivo = () => {
+  try {
+    if (!newMaterial.value) {
+      popup.error('Dati materiale mancanti')
+      return
+    }
+    
+    let materialeData = { ...newMaterial.value }
+    
+    // Se selezione da magazzino, aggiunge reference al materiale originale
+    if (materialSelectionMode.value === 'existing' && selectedMaterialFromStock.value) {
+      materialeData.materialeId = selectedMaterialFromStock.value
+      materialeData.tipoMateriale = 'magazzino'
+    } else {
+      materialeData.tipoMateriale = 'preventivo'
+    }
+    
+    // Aggiungi ID temporaneo per gestione locale
+    materialeData.id = Date.now().toString()
+    
+    // Aggiungi alla lista materiali del preventivo
+    materialiPreventivo.value.push(materialeData)
+    
+    popup.success('Materiale aggiunto al preventivo')
+    closeAddMaterialModal()
+    
+  } catch (err) {
+    console.error('Errore salvataggio materiale:', err)
+    popup.error('Errore nel salvataggio del materiale')
+  }
+}
+
+const closeAddMaterialModal = () => {
+  showAddMaterialModal.value = false
+  newMaterial.value = null
+  materialSelectionMode.value = 'existing'
+  selectedMaterialFromStock.value = ''
+}
+
+const editMaterialInPreventivo = (materiale) => {
+  editingMaterial.value = { ...materiale }
+  showEditMaterialModal.value = true
+}
+
+const saveMaterialChanges = () => {
+  try {
+    if (!editingMaterial.value) {
+      popup.error('Nessun materiale in modifica')
+      return
+    }
+    
+    // Trova e aggiorna il materiale nella lista
+    const index = materialiPreventivo.value.findIndex(m => m.id === editingMaterial.value.id)
+    if (index !== -1) {
+      materialiPreventivo.value[index] = { ...editingMaterial.value }
+      popup.success('Materiale aggiornato')
+    }
+    
+    closeEditMaterialModal()
+    
+  } catch (err) {
+    console.error('Errore salvataggio modifiche materiale:', err)
+    popup.error('Errore nel salvataggio delle modifiche')
+  }
+}
+
+const closeEditMaterialModal = () => {
+  showEditMaterialModal.value = false
+  editingMaterial.value = null
+}
+
+const removeMaterialFromPreventivo = async (materialeId) => {
+  try {
+    const confirmed = await popup.confirm('Vuoi rimuovere questo materiale dal preventivo?')
+    if (!confirmed) return
+    
+    // Rimuovi dalla lista
+    materialiPreventivo.value = materialiPreventivo.value.filter(m => m.id !== materialeId)
+    
+    popup.success('Materiale rimosso dal preventivo')
+    
+  } catch (err) {
+    console.error('Errore rimozione materiale:', err)
+    popup.error('Errore nella rimozione del materiale')
+  }
+}
+
+const getTotalMaterialsValue = () => {
+  return materialiPreventivo.value.reduce((acc, materiale) => {
+    const quantita = materiale.quantitaRichiesta || 0
+    const prezzo = materiale.prezzoUnitario || 0
+    return acc + (quantita * prezzo)
+  }, 0)
+}
+
+const getFornitoreNome = (fornitoreId) => {
+  if (!fornitoreId) return 'Non specificato'
+  const fornitore = fornitori.value.find(f => f.id === fornitoreId)
+  return fornitore ? fornitore.nome : 'Non trovato'
+}
+
+// 📋 FUNZIONI GESTIONE VOCI AGGIUNTIVE
+const addVoceAggiuntiva = () => {
+  newVoce.value = {
+    descrizione: '',
+    importo: 0,
+    note: ''
+  }
+  showAddVoceModal.value = true
+}
+
+const saveVoceAggiuntiva = () => {
+  try {
+    if (!newVoce.value || !newVoce.value.descrizione || newVoce.value.importo <= 0) {
+      popup.error('Inserisci una descrizione valida e un importo maggiore di 0')
+      return
+    }
+    
+    const voceData = {
+      ...newVoce.value,
+      id: Date.now().toString()
+    }
+    
+    vociAggiuntive.value.push(voceData)
+    
+    popup.success('Voce aggiuntiva inserita')
+    closeAddVoceModal()
+    
+  } catch (err) {
+    console.error('Errore salvataggio voce aggiuntiva:', err)
+    popup.error('Errore nel salvataggio della voce aggiuntiva')
+  }
+}
+
+const closeAddVoceModal = () => {
+  showAddVoceModal.value = false
+  newVoce.value = null
+}
+
+const editVoceAggiuntiva = (voce) => {
+  editingVoce.value = { ...voce }
+  showEditVoceModal.value = true
+}
+
+const saveVoceChanges = () => {
+  try {
+    if (!editingVoce.value || !editingVoce.value.descrizione || editingVoce.value.importo <= 0) {
+      popup.error('Inserisci una descrizione valida e un importo maggiore di 0')
+      return
+    }
+    
+    const index = vociAggiuntive.value.findIndex(v => v.id === editingVoce.value.id)
+    if (index !== -1) {
+      vociAggiuntive.value[index] = { ...editingVoce.value }
+      popup.success('Voce aggiuntiva aggiornata')
+    }
+    
+    closeEditVoceModal()
+    
+  } catch (err) {
+    console.error('Errore salvataggio modifiche voce aggiuntiva:', err)
+    popup.error('Errore nel salvataggio delle modifiche')
+  }
+}
+
+const closeEditVoceModal = () => {
+  showEditVoceModal.value = false
+  editingVoce.value = null
+}
+
+const removeVoceAggiuntiva = async (voceId) => {
+  try {
+    const confirmed = await popup.confirm('Vuoi rimuovere questa voce aggiuntiva?')
+    if (!confirmed) return
+    
+    vociAggiuntive.value = vociAggiuntive.value.filter(v => v.id !== voceId)
+    popup.success('Voce aggiuntiva rimossa')
+    
+  } catch (err) {
+    console.error('Errore rimozione voce aggiuntiva:', err)
+    popup.error('Errore nella rimozione della voce aggiuntiva')
+  }
+}
+
+const getTotalVociAggiuntive = () => {
+  return vociAggiuntive.value.reduce((acc, voce) => {
+    return acc + (voce.importo || 0)
+  }, 0)
+}
+
+const getTotalGenerale = () => {
+  return getTotalMaterialsValue() + getTotalVociAggiuntive()
+}
+
 const convertToCantiere = async (preventivo) => {
   try {
     const confirmed = await popup.confirm('Confermi la conversione del preventivo in cantiere?')
     if (!confirmed) return
+
+    // Calcola costo iniziale materiali se presenti
+    const costoMateriali = (preventivo.materiali || []).reduce((acc, materiale) => {
+      const quantita = materiale.quantitaRichiesta || 0
+      const prezzo = materiale.prezzoUnitario || 0
+      return acc + (quantita * prezzo)
+    }, 0)
+
+    // Calcola costo voci aggiuntive se presenti
+    const costoVociAggiuntive = (preventivo.vociAggiuntive || []).reduce((acc, voce) => {
+      return acc + (voce.importo || 0)
+    }, 0)
+
+    const costoTotaleIniziale = costoMateriali + costoVociAggiuntive
 
     // Dati per il nuovo cantiere
     const cantiereData = {
@@ -1538,31 +2669,58 @@ const convertToCantiere = async (preventivo) => {
       progresso: 0,
       team: [],
       costiAccumulati: {
-        materiali: 0,
+        materiali: Math.round(costoMateriali * 100) / 100,
+        vociAggiuntive: Math.round(costoVociAggiuntive * 100) / 100,
         manodopera: 0,
-        totale: 0
+        totale: Math.round(costoTotaleIniziale * 100) / 100
       },
       descrizione: preventivo.descrizione,
       preventivoOriginale: preventivo.id,
+      vociAggiuntiveOriginali: preventivo.vociAggiuntive || [],
       createdAt: new Date(),
       updatedAt: new Date()
     }
 
     // Crea il cantiere
-    await firestoreStore.createDocument('cantieri', cantiereData)
+    const cantiereResult = await firestoreStore.createDocument('cantieri', cantiereData)
     
-    // Aggiorna il preventivo per contrassegnarlo come convertito
-    await firestoreStore.updateDocument('preventivi', preventivo.id, {
-      stato: 'convertito',
-      dataConversione: new Date(),
-      updatedAt: new Date()
-    })
+    if (cantiereResult.success) {
+      // Se ci sono materiali nel preventivo, trasferiscili al cantiere
+      if (preventivo.materiali && preventivo.materiali.length > 0) {
+        for (const materiale of preventivo.materiali) {
+          try {
+            const materialeCantiereData = {
+              ...materiale,
+              cantiereId: cantiereResult.id,
+              stato: 'pianificato',
+              quantitaUtilizzata: 0,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            }
+            
+            await firestoreStore.createMaterialeCantiere(cantiereResult.id, materialeCantiereData)
+          } catch (error) {
+            console.error('Errore trasferimento materiale:', error)
+          }
+        }
+      }
+      
+      // Aggiorna il preventivo per contrassegnarlo come convertito
+      await firestoreStore.updateDocument('preventivi', preventivo.id, {
+        stato: 'convertito',
+        dataConversione: new Date(),
+        updatedAt: new Date()
+      })
 
-    popup.success('Preventivo convertito in cantiere con successo')
-    
-    // Chiudi la modal se è aperta
-    if (showViewModal.value) {
-      closeViewModal()
+      const messaggioMateriali = preventivo.materiali?.length > 0 ? ` - ${preventivo.materiali.length} materiali trasferiti` : ''
+      const messaggioVoci = preventivo.vociAggiuntive?.length > 0 ? ` - ${preventivo.vociAggiuntive.length} voci aggiuntive trasferite` : ''
+      
+      popup.success('Preventivo convertito in cantiere con successo' + messaggioMateriali + messaggioVoci)
+      
+      // Chiudi la modal se è aperta
+      if (showViewModal.value) {
+        closeViewModal()
+      }
     }
     
   } catch (error) {
