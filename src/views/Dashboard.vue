@@ -99,6 +99,45 @@
             <div class="w-2 h-2 bg-gray-300 rounded-full mr-2"></div>
             <span>Nessun dipendente registrato oggi</span>
           </div>
+          
+          <!-- Pulsanti Controllo e Correzione Coerenza -->
+          <div class="pt-2 mt-2 border-t border-gray-100 space-y-2">
+            <button 
+              @click="eseguiControlloCoerenza"
+              :disabled="controlloInCorso || correzioneInCorso"
+              class="w-full flex items-center justify-center px-3 py-2 text-xs font-medium rounded-md transition-colors duration-200"
+              :class="controlloInCorso || correzioneInCorso
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                : 'bg-primary-50 text-primary-600 hover:bg-primary-100'"
+            >
+              <div v-if="controlloInCorso" class="flex items-center">
+                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-primary-600 mr-2"></div>
+                <span>Controllo in corso...</span>
+              </div>
+              <div v-else class="flex items-center">
+                <span class="mr-2">🔍</span>
+                <span>Verifica Coerenza</span>
+              </div>
+            </button>
+            
+            <button 
+              @click="eseguiCorrezioneAutomatica"
+              :disabled="controlloInCorso || correzioneInCorso"
+              class="w-full flex items-center justify-center px-3 py-2 text-xs font-medium rounded-md transition-colors duration-200"
+              :class="controlloInCorso || correzioneInCorso
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                : 'bg-green-50 text-green-600 hover:bg-green-100'"
+            >
+              <div v-if="correzioneInCorso" class="flex items-center">
+                <div class="animate-spin rounded-full h-3 w-3 border-b-2 border-green-600 mr-2"></div>
+                <span>Correzione in corso...</span>
+              </div>
+              <div v-else class="flex items-center">
+                <span class="mr-2">🔧</span>
+                <span>Correzione Auto</span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -314,6 +353,8 @@ import { useFirebaseAnalytics } from '@/composables/useFirebaseAnalytics'
 import { useFirestoreRealtime } from '@/composables/useFirestoreRealtime'
 import { useAuthStore } from '@/stores/auth'
 import { usePopup } from '@/composables/usePopup'
+import { executeHoursCoherenceCheck } from '@/utils/hoursCoherenceCheck'
+import { executeAutoCorrection } from '@/utils/hoursCoherenceCorrection'
 
 
 // Stores & Composables
@@ -322,12 +363,18 @@ const firestoreStore = useFirestoreStore()
 const firestore = useFirestore()
 const analytics = useFirebaseAnalytics()
 const realtime = useFirestoreRealtime()
-const { success, error, info } = usePopup()
+const { success, error, info, warning, confirm } = usePopup()
 
 // State per real-time
 const realtimeActive = ref(false)
 const dashboardListeners = ref(null)
 const lastSync = ref(null)
+
+// State per controllo coerenza
+const controlloInCorso = ref(false)
+const correzioneInCorso = ref(false)
+const ultimoControllo = ref(null)
+const ultimaCorrezione = ref(null)
 
 // KPI Data - Calcolati dinamicamente dai dati Firestore
 const kpis = computed(() => ({
@@ -565,6 +612,164 @@ const stopRealtimeSync = () => {
     dashboardListeners.value = null
     realtimeActive.value = false
     console.log('🔌 Real-time sync disattivato')
+  }
+}
+
+// Funzione per eseguire il controllo coerenza delle ore
+const eseguiControlloCoerenza = async () => {
+  if (controlloInCorso.value) return
+  
+  controlloInCorso.value = true
+  
+  try {
+    console.log('🔍 Avvio controllo coerenza ore...')
+    
+    // Esegue il controllo completo
+    const report = await executeHoursCoherenceCheck()
+    ultimoControllo.value = report
+    
+    // Mostra risultati tramite popup
+    const { summary, recommendations } = report
+    
+    if (summary.totalIssues === 0) {
+      success(
+        'Controllo Coerenza Completato',
+        `✅ Sistema completamente coerente!<br><br>
+        📊 <strong>Record analizzati:</strong> ${summary.totalRecords}<br>
+        👥 <strong>Dipendenti:</strong> ${summary.uniqueEmployees}<br>
+        🎯 <strong>Coerenza:</strong> ${summary.coherencePercentage}%<br><br>
+        <em>Nessun problema rilevato nei dati delle ore.</em>`
+      )
+    } else {
+      const issueText = summary.totalIssues === 1 ? 'problema rilevato' : 'problemi rilevati'
+      const topIssues = Object.entries(report.issueBreakdown.byType)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 3)
+        .map(([type, count]) => `• ${getIssueTypeLabel(type)}: ${count}`)
+        .join('<br>')
+      
+      const severity = report.issueBreakdown.bySeverity.high > 0 ? 'warning' : 'info'
+      
+      const popupContent = `
+        📊 <strong>Record analizzati:</strong> ${summary.totalRecords}<br>
+        🔍 <strong>Problemi rilevati:</strong> ${summary.totalIssues}<br>
+        👥 <strong>Dipendenti:</strong> ${summary.uniqueEmployees}<br>
+        🎯 <strong>Coerenza:</strong> ${summary.coherencePercentage}%<br><br>
+        <strong>Problemi principali:</strong><br>
+        ${topIssues}<br><br>
+        ${recommendations.length > 0 ? '<strong>Raccomandazioni:</strong><br>' + recommendations.slice(0, 2).map(r => `• ${r.action}`).join('<br>') + '<br><br>' : ''}
+        <em>Controlla la console per dettagli completi.</em>
+      `
+      
+      if (severity === 'warning') {
+        warning('Controllo Coerenza Completato', popupContent)
+      } else {
+        info('Controllo Coerenza Completato', popupContent)
+      }
+    }
+    
+    console.log('✅ Controllo coerenza completato')
+    
+  } catch (err) {
+    console.error('❌ Errore durante controllo coerenza:', err)
+    error(
+      'Errore Controllo Coerenza',
+      `Impossibile completare il controllo:<br><br><strong>${err.message}</strong><br><br>Verifica la connessione e riprova.`
+    )
+  } finally {
+    controlloInCorso.value = false
+  }
+}
+
+// Helper per le etichette dei problemi
+const getIssueTypeLabel = (type) => {
+  const labels = {
+    'field_inconsistency': 'Campi Inconsistenti',
+    'duplicate_records': 'Record Duplicati',
+    'zero_hours': 'Ore Mancanti',
+    'excessive_hours': 'Ore Eccessive', 
+    'insufficient_hours': 'Ore Insufficienti',
+    'source_conflicts': 'Conflitti Fonti',
+    'calculation_error': 'Errori Calcolo'
+  }
+  return labels[type] || type
+}
+
+// Funzione per eseguire la correzione automatica
+const eseguiCorrezioneAutomatica = async () => {
+  if (correzioneInCorso.value || controlloInCorso.value) return
+  
+  // Chiede conferma prima di procedere
+  const confermato = await confirm(
+    'Conferma Correzione Automatica',
+    `🔧 <strong>Correzione Automatica Coerenza</strong><br><br>
+    Questa operazione:<br>
+    • ✅ Creerà un backup automatico<br>
+    • 🔨 Correggerà gli errori di calcolo<br>
+    • 📊 Verificherà i risultati<br>
+    • 📝 Salverà un log delle modifiche<br><br>
+    <strong>Vuoi procedere?</strong>`,
+    'Procedi',
+    'Annulla'
+  )
+  
+  if (!confermato) return
+  
+  correzioneInCorso.value = true
+  
+  try {
+    console.log('🔧 Avvio correzione automatica...')
+    
+    // Esegue la correzione automatica
+    const risultato = await executeAutoCorrection()
+    ultimaCorrezione.value = risultato
+    
+    if (risultato.success) {
+      const { correctionsMade, preReport, postReport } = risultato
+      
+      if (correctionsMade === 0) {
+        success(
+          'Sistema Già Coerente',
+          `✅ <strong>Nessuna correzione necessaria!</strong><br><br>
+          Il sistema è già completamente coerente.<br><br>
+          📊 <strong>Coerenza:</strong> ${preReport.summary.coherencePercentage}%<br>
+          🔍 <strong>Problemi:</strong> ${preReport.summary.totalIssues}`
+        )
+      } else {
+        const miglioramento = postReport.summary.coherencePercentage - preReport.summary.coherencePercentage
+        
+        success(
+          'Correzione Automatica Completata',
+          `🎉 <strong>Correzioni applicate con successo!</strong><br><br>
+          🔨 <strong>Correzioni effettuate:</strong> ${correctionsMade}<br>
+          📈 <strong>Miglioramento:</strong> ${preReport.summary.coherencePercentage}% → ${postReport.summary.coherencePercentage}%<br>
+          📊 <strong>Coerenza finale:</strong> ${postReport.summary.coherencePercentage}%<br><br>
+          💾 <strong>Backup ID:</strong> ${risultato.backupId}<br>
+          📝 <strong>Log salvato:</strong> ✅<br><br>
+          <em>Tutti i dati originali sono stati salvati in backup.</em>`
+        )
+        
+        // Ricarica i dati per riflettere le modifiche
+        await loadDashboardData()
+      }
+    } else {
+      throw new Error(risultato.message || 'Errore durante correzione')
+    }
+    
+    console.log('✅ Correzione automatica completata')
+    
+  } catch (err) {
+    console.error('❌ Errore durante correzione automatica:', err)
+    error(
+      'Errore Correzione Automatica',
+      `❌ <strong>Impossibile completare la correzione:</strong><br><br>
+      ${err.message}<br><br>
+      🔒 <strong>Nessun dato è stato modificato.</strong><br>
+      💡 Verifica la connessione e riprova.<br><br>
+      <em>In caso di problemi persistenti, contatta l'assistenza.</em>`
+    )
+  } finally {
+    correzioneInCorso.value = false
   }
 }
 

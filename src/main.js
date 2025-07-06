@@ -41,6 +41,10 @@ authStore.initializeAuth().then(() => {
           .then(result => console.log('✅ Firestore test:', result))
           .catch(err => console.error('❌ Firestore test failed:', err))
       }, 2000)
+      
+      // Carica strumenti di test per il controllo coerenza
+      import('./utils/testCoherence.js').catch(console.error)
+      import('./utils/quickFix.js').catch(console.error)
     }
   }
 }).catch((error) => {
