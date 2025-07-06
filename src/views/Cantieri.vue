@@ -1442,8 +1442,117 @@ const deleteCantiere = async (cantiere) => {
   try {
     loading.value = true
     
+    // 🔒 CONTROLLI DI SICUREZZA AVANZATI
+    
+    // 1. Blocca eliminazione cantieri attivi
+    if (cantiere.stato === 'in_corso' || cantiere.stato === 'attivo') {
+      popup.error(
+        'Eliminazione Bloccata',
+        `⚠️ Non è possibile eliminare un cantiere con stato "${cantiere.stato}". \n\nPer eliminare questo cantiere:\n1. Cambia lo stato in "sospeso" o "completato"\n2. Riprova l'eliminazione`
+      )
+      loading.value = false
+      return
+    }
+    
+    // 2. Verifica dati associati al cantiere
+    console.log('🔍 Verifica dati associati al cantiere:', cantiere.nome)
+    
+    // Controlla timesheet associati
+    const timesheetResult = await firestoreOperations.load('timesheet', [
+      ['cantiereId', '==', cantiere.id]
+    ], null, null, null)
+    
+    const hasTimesheet = timesheetResult.success && timesheetResult.data && timesheetResult.data.length > 0
+    
+    // Controlla materiali associati
+    const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiere.id)
+    const hasMateriali = materialiResult.success && materialiResult.data && materialiResult.data.length > 0
+    
+    // Controlla voci aggiuntive
+    const hasVociAggiuntive = (cantiere.vociAggiuntive && cantiere.vociAggiuntive.length > 0) ||
+                              (cantiere.vociAggiuntiveOriginali && cantiere.vociAggiuntiveOriginali.length > 0)
+    
+    // Controlla progresso cantiere
+    const hasProgresso = cantiere.progresso && cantiere.progresso > 0
+    
+    // 3. Prepara messaggio di avvertimento dettagliato
+    let warningMessage = `⚠️ ATTENZIONE: Stai per eliminare DEFINITIVAMENTE il cantiere "${cantiere.nome}".`
+    
+    if (hasTimesheet || hasMateriali || hasVociAggiuntive || hasProgresso) {
+      warningMessage += '\n\n🚨 DATI CHE VERRANNO PERSI:'
+      
+      if (hasTimesheet) {
+        warningMessage += `\n• ${timesheetResult.data.length} registrazioni orarie timesheet`
+      }
+      if (hasMateriali) {
+        warningMessage += `\n• ${materialiResult.data.length} registrazioni materiali`
+      }
+      if (hasVociAggiuntive) {
+        const vociTotali = (cantiere.vociAggiuntive?.length || 0) + (cantiere.vociAggiuntiveOriginali?.length || 0)
+        warningMessage += `\n• ${vociTotali} voci aggiuntive`
+      }
+      if (hasProgresso) {
+        warningMessage += `\n• Progresso cantiere: ${cantiere.progresso}%`
+      }
+      
+      warningMessage += '\n\n💰 COSTI ACCUMULATI:'
+      if (cantiere.costiAccumulati) {
+        warningMessage += `\n• Materiali: €${cantiere.costiAccumulati.materiali || 0}`
+        warningMessage += `\n• Manodopera: €${cantiere.costiAccumulati.manodopera || 0}`
+        warningMessage += `\n• Voci aggiuntive: €${cantiere.costiAccumulati.vociAggiuntive || 0}`
+        warningMessage += `\n• TOTALE: €${cantiere.costiAccumulati.totale || 0}`
+      }
+    }
+    
+    warningMessage += '\n\n❌ QUESTA OPERAZIONE NON È REVERSIBILE!'
+    warningMessage += '\n\nSe sei sicuro, procedi con le conferme:'
+    
+    // 4. Prima conferma con dettagli
+    const firstConfirm = await popup.confirm(
+      'Eliminazione Cantiere - Conferma Richiesta',
+      warningMessage
+    )
+    
+    if (!firstConfirm) {
+      loading.value = false
+      return
+    }
+    
+    // 5. Seconda conferma: inserire nome cantiere
+    const nomeConferma = window.prompt(
+      `🔐 CONTROLLO DI SICUREZZA\n\nPer confermare l'eliminazione, scrivi esattamente il nome del cantiere:\n\n"${cantiere.nome}"`
+    )
+    
+    if (!nomeConferma || nomeConferma.trim() !== cantiere.nome) {
+      popup.error('Eliminazione Annullata', 'Il nome inserito non corrisponde. Operazione annullata per sicurezza.')
+      loading.value = false
+      return
+    }
+    
+    // 6. Conferma finale assoluta
+    const finalConfirm = await popup.confirm(
+      'ULTIMA CONFERMA',
+      '🔥 Sei ASSOLUTAMENTE SICURO di voler eliminare questo cantiere?\n\n⚠️ Tutti i dati associati verranno eliminati DEFINITIVAMENTE.\n\n✅ Seleziona "Conferma" solo se sei sicuro al 100%.'
+    )
+    
+    if (!finalConfirm) {
+      loading.value = false
+      return
+    }
+    
+    // 7. Eliminazione con log di sicurezza
+    console.log('🔥 ELIMINAZIONE CANTIERE AUTORIZZATA:', {
+      cantiere: cantiere.nome,
+      id: cantiere.id,
+      timestamp: new Date().toISOString(),
+      hasTimesheet,
+      hasMateriali,
+      hasVociAggiuntive,
+      hasProgresso
+    })
+    
     await firestoreOperations.delete('cantieri', cantiere.id)
-    popup.success('Cantiere Eliminato', 'Il cantiere è stato eliminato con successo')
+    popup.success('Cantiere Eliminato', 'Il cantiere è stato eliminato definitivamente')
     
   } catch (err) {
     popup.error('Errore Eliminazione', err.message)
