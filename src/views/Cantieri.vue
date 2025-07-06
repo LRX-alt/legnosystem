@@ -50,6 +50,9 @@ const showManageMaterialsModal = ref(false)
 const showAddMaterialModal = ref(false)
 const showEditMaterialModal = ref(false)
 const showMaterialAttachmentsModal = ref(false)
+const showManageVociModal = ref(false)
+const showAddVoceModal = ref(false)
+const showEditVoceModal = ref(false)
 
 const selectedCantiere = ref(null)
 const editingCantiere = ref(null)
@@ -87,6 +90,9 @@ const materialiCantiere = ref([])
 const materialiMagazzino = ref([])
 const fornitori = ref([])
 const availableClients = ref([])
+const vociAggiuntiveCantiere = ref([])
+const newVoce = ref(null)
+const editingVoce = ref(null)
 
 // Oggetto per l'aggiornamento progresso
 const progressUpdate = ref({
@@ -947,12 +953,212 @@ const saveMaterialChanges = async () => {
 
 // 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere quando si modificano i materiali
 const autoUpdateCantiereCosts = async (cantiereId) => {
+  // Usa la nuova funzione che include le voci aggiuntive
+  await autoUpdateCantiereCostsWithVoci(cantiereId)
+}
+
+// 📋 FUNZIONI GESTIONE VOCI AGGIUNTIVE
+const manageVociAggiuntive = async (cantiere) => {
+  try {
+    loading.value = true
+    selectedCantiere.value = cantiere
+    
+    // Carica le voci aggiuntive del cantiere (sia originali che aggiunte)
+    vociAggiuntiveCantiere.value = [
+      ...(cantiere.vociAggiuntiveOriginali || []),
+      ...(cantiere.vociAggiuntive || [])
+    ]
+    
+    showManageVociModal.value = true
+    
+  } catch (err) {
+    console.error('Errore caricamento voci aggiuntive cantiere:', err)
+    popup.error('Errore', `Impossibile caricare le voci aggiuntive: ${err.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+const addVoceAggiuntiva = () => {
+  newVoce.value = {
+    descrizione: '',
+    importo: 0,
+    note: '',
+    tipo: 'aggiunta' // distingue dalle voci originali del preventivo
+  }
+  showAddVoceModal.value = true
+}
+
+const saveVoceAggiuntiva = async () => {
+  try {
+    if (!newVoce.value || !newVoce.value.descrizione || newVoce.value.importo <= 0) {
+      popup.error('Inserisci una descrizione valida e un importo maggiore di 0')
+      return
+    }
+    
+    loading.value = true
+    
+    const voceData = {
+      ...newVoce.value,
+      id: Date.now().toString(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+    
+    // Aggiungi alla lista locale
+    vociAggiuntiveCantiere.value.push(voceData)
+    
+    // Prepara le voci aggiuntive per il salvataggio (solo quelle aggiunte, non quelle originali)
+    const vociAggiunte = vociAggiuntiveCantiere.value.filter(v => v.tipo === 'aggiunta')
+    
+    // Aggiorna il cantiere con le nuove voci aggiuntive
+    await firestoreOperations.update('cantieri', selectedCantiere.value.id, {
+      vociAggiuntive: vociAggiunte,
+      updatedAt: new Date()
+    })
+    
+    // Ricalcola i costi includendo le voci aggiuntive
+    await autoUpdateCantiereCostsWithVoci(selectedCantiere.value.id)
+    
+    popup.success('Voce aggiuntiva inserita con successo')
+    closeAddVoceModal()
+    
+  } catch (err) {
+    console.error('Errore salvataggio voce aggiuntiva:', err)
+    popup.error('Errore nel salvataggio della voce aggiuntiva')
+  } finally {
+    loading.value = false
+  }
+}
+
+const closeAddVoceModal = () => {
+  showAddVoceModal.value = false
+  newVoce.value = null
+}
+
+const editVoceAggiuntiva = (voce) => {
+  // Solo le voci aggiunte possono essere modificate (non quelle originali del preventivo)
+  if (voce.tipo !== 'aggiunta') {
+    popup.warning('Le voci originali del preventivo non possono essere modificate')
+    return
+  }
+  
+  editingVoce.value = { ...voce }
+  showEditVoceModal.value = true
+}
+
+const saveVoceChanges = async () => {
+  try {
+    if (!editingVoce.value || !editingVoce.value.descrizione || editingVoce.value.importo <= 0) {
+      popup.error('Inserisci una descrizione valida e un importo maggiore di 0')
+      return
+    }
+    
+    loading.value = true
+    
+    // Aggiorna nella lista locale
+    const index = vociAggiuntiveCantiere.value.findIndex(v => v.id === editingVoce.value.id)
+    if (index !== -1) {
+      vociAggiuntiveCantiere.value[index] = { 
+        ...editingVoce.value, 
+        updatedAt: new Date() 
+      }
+    }
+    
+    // Prepara le voci aggiuntive per il salvataggio (solo quelle aggiunte)
+    const vociAggiunte = vociAggiuntiveCantiere.value.filter(v => v.tipo === 'aggiunta')
+    
+    // Aggiorna il cantiere
+    await firestoreOperations.update('cantieri', selectedCantiere.value.id, {
+      vociAggiuntive: vociAggiunte,
+      updatedAt: new Date()
+    })
+    
+    // Ricalcola i costi
+    await autoUpdateCantiereCostsWithVoci(selectedCantiere.value.id)
+    
+    popup.success('Voce aggiuntiva aggiornata con successo')
+    closeEditVoceModal()
+    
+  } catch (err) {
+    console.error('Errore salvataggio modifiche voce aggiuntiva:', err)
+    popup.error('Errore nel salvataggio delle modifiche')
+  } finally {
+    loading.value = false
+  }
+}
+
+const closeEditVoceModal = () => {
+  showEditVoceModal.value = false
+  editingVoce.value = null
+}
+
+const removeVoceAggiuntiva = async (voceId) => {
+  try {
+    const voce = vociAggiuntiveCantiere.value.find(v => v.id === voceId)
+    
+    if (voce && voce.tipo !== 'aggiunta') {
+      popup.warning('Le voci originali del preventivo non possono essere rimosse')
+      return
+    }
+    
+    const confirmed = await popup.confirm('Vuoi rimuovere questa voce aggiuntiva?')
+    if (!confirmed) return
+    
+    loading.value = true
+    
+    // Rimuovi dalla lista locale
+    vociAggiuntiveCantiere.value = vociAggiuntiveCantiere.value.filter(v => v.id !== voceId)
+    
+    // Prepara le voci aggiuntive per il salvataggio (solo quelle aggiunte)
+    const vociAggiunte = vociAggiuntiveCantiere.value.filter(v => v.tipo === 'aggiunta')
+    
+    // Aggiorna il cantiere
+    await firestoreOperations.update('cantieri', selectedCantiere.value.id, {
+      vociAggiuntive: vociAggiunte,
+      updatedAt: new Date()
+    })
+    
+    // Ricalcola i costi
+    await autoUpdateCantiereCostsWithVoci(selectedCantiere.value.id)
+    
+    popup.success('Voce aggiuntiva rimossa con successo')
+    
+  } catch (err) {
+    console.error('Errore rimozione voce aggiuntiva:', err)
+    popup.error('Errore nella rimozione della voce aggiuntiva')
+  } finally {
+    loading.value = false
+  }
+}
+
+const getTotalVociAggiuntive = () => {
+  return vociAggiuntiveCantiere.value.reduce((acc, voce) => {
+    return acc + (voce.importo || 0)
+  }, 0)
+}
+
+const closeManageVociModal = () => {
+  showManageVociModal.value = false
+  vociAggiuntiveCantiere.value = []
+  
+  // Aggiorna selectedCantiere con i dati più recenti quando si chiude il modal
+  if (selectedCantiere.value) {
+    const cantiereAggiornato = firestoreStore.cantieri.find(c => c.id === selectedCantiere.value.id)
+    if (cantiereAggiornato) {
+      selectedCantiere.value = { ...cantiereAggiornato }
+    }
+  }
+}
+
+// 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere includendo le voci aggiuntive
+const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
   if (!cantiereId) return
   
   try {
-    console.log('🔄 Aggiornamento automatico costi dopo modifica materiali:', cantiereId)
+    console.log('🔄 Aggiornamento costi cantiere con voci aggiuntive:', cantiereId)
     
-    // Carica i timesheet per questo cantiere
+    // Carica timesheet per manodopera
     const timesheetResult = await firestoreOperations.load('timesheet', [
       ['cantiereId', '==', cantiereId]
     ])
@@ -966,7 +1172,7 @@ const autoUpdateCantiereCosts = async (cantiereId) => {
       }, 0)
     }
     
-    // Carica i materiali per questo cantiere
+    // Carica materiali del cantiere
     const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiereId)
     let costoMateriali = 0
     if (materialiResult.success && materialiResult.data) {
@@ -975,6 +1181,22 @@ const autoUpdateCantiereCosts = async (cantiereId) => {
         const prezzo = materiale.prezzoUnitario || 0
         return acc + (quantita * prezzo)
       }, 0)
+    }
+    
+    // Calcola costo voci aggiuntive (originali + aggiunte)
+    const cantiere = await firestoreOperations.loadById('cantieri', cantiereId)
+    let costoVociAggiuntive = 0
+    
+    if (cantiere.success && cantiere.data) {
+      // Voci originali dal preventivo
+      const vociOriginali = cantiere.data.vociAggiuntiveOriginali || []
+      const costoVociOriginali = vociOriginali.reduce((acc, voce) => acc + (voce.importo || 0), 0)
+      
+      // Voci aggiunte nel cantiere
+      const vociAggiunte = cantiere.data.vociAggiuntive || []
+      const costoVociAggiunte = vociAggiunte.reduce((acc, voce) => acc + (voce.importo || 0), 0)
+      
+      costoVociAggiuntive = costoVociOriginali + costoVociAggiunte
     }
     
     // Calcola statistiche
@@ -988,12 +1210,14 @@ const autoUpdateCantiereCosts = async (cantiereId) => {
       costiAccumulati: {
         manodopera: Math.round(costoManodopera * 100) / 100,
         materiali: Math.round(costoMateriali * 100) / 100,
-        totale: Math.round((costoManodopera + costoMateriali) * 100) / 100
+        vociAggiuntive: Math.round(costoVociAggiuntive * 100) / 100,
+        totale: Math.round((costoManodopera + costoMateriali + costoVociAggiuntive) * 100) / 100
       },
       statisticheCosti: {
         giorniLavorativi,
         oreTotaliLavorate: oreTotali,
-        costoMedioGiornaliero: giorniLavorativi > 0 ? Math.round(((costoManodopera + costoMateriali) / giorniLavorativi) * 100) / 100 : 0
+        costoMedioGiornaliero: giorniLavorativi > 0 ? 
+          Math.round(((costoManodopera + costoMateriali + costoVociAggiuntive) / giorniLavorativi) * 100) / 100 : 0
       },
       updatedAt: new Date()
     }
@@ -1003,14 +1227,23 @@ const autoUpdateCantiereCosts = async (cantiereId) => {
     // Ricarica i cantieri per aggiornare l'UI
     await firestoreStore.loadCantieri()
     
-    console.log('✅ Costi aggiornati automaticamente:', {
+    // Aggiorna anche selectedCantiere se è lo stesso cantiere aggiornato
+    if (selectedCantiere.value && selectedCantiere.value.id === cantiereId) {
+      const cantiereAggiornato = firestoreStore.cantieri.find(c => c.id === cantiereId)
+      if (cantiereAggiornato) {
+        selectedCantiere.value = { ...cantiereAggiornato }
+      }
+    }
+    
+    console.log('✅ Costi aggiornati con voci aggiuntive:', {
       manodopera: costoManodopera,
       materiali: costoMateriali,
-      totale: costoManodopera + costoMateriali
+      vociAggiuntive: costoVociAggiuntive,
+      totale: costoManodopera + costoMateriali + costoVociAggiuntive
     })
     
   } catch (error) {
-    console.error('Errore aggiornamento automatico costi:', error)
+    console.error('Errore aggiornamento costi con voci aggiuntive:', error)
   }
 }
 
@@ -1792,7 +2025,7 @@ const getMaterialStatusColor = (stato) => {
           </div>
           
           <!-- Costi Dettagliati -->
-          <div class="grid grid-cols-2 gap-3 text-sm mb-3">
+          <div class="grid grid-cols-3 gap-3 text-sm mb-3">
             <div>
               <span class="text-gray-600">Materiali:</span>
               <span class="font-medium text-blue-600 block">
@@ -1803,6 +2036,12 @@ const getMaterialStatusColor = (stato) => {
               <span class="text-gray-600">Manodopera:</span>
               <span class="font-medium text-orange-600 block">
                 €{{ cantiere.costiAccumulati?.manodopera?.toLocaleString() || '0' }}
+              </span>
+            </div>
+            <div>
+              <span class="text-gray-600">Voci Aggiuntive:</span>
+              <span class="font-medium text-purple-600 block">
+                €{{ cantiere.costiAccumulati?.vociAggiuntive?.toLocaleString() || '0' }}
               </span>
             </div>
           </div>
@@ -1944,6 +2183,17 @@ const getMaterialStatusColor = (stato) => {
               </button>
               <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                 Visualizza materiali
+                <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
+              </div>
+            </div>
+            <div class="relative group">
+              <button @click="manageVociAggiuntive(cantiere)" class="text-purple-500 hover:text-purple-700">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                </svg>
+              </button>
+              <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                Gestisci voci aggiuntive
                 <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-2 border-transparent border-t-gray-900"></div>
               </div>
             </div>
@@ -3711,6 +3961,220 @@ const getMaterialStatusColor = (stato) => {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal Gestione Voci Aggiuntive -->
+    <div v-if="showManageVociModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeManageVociModal">
+      <div class="relative top-4 mx-auto border w-full max-w-4xl shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+              <div class="p-2 bg-purple-100 rounded-lg">
+                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="text-xl font-semibold text-gray-900">📋 Voci Aggiuntive</h3>
+                <p class="text-sm text-gray-600 mt-1" v-if="selectedCantiere">
+                  {{ selectedCantiere.nome }}
+                </p>
+              </div>
+            </div>
+            <button @click="closeManageVociModal" class="text-gray-400 hover:text-gray-600 p-2 -m-2">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+          
+          <div class="space-y-6">
+            <!-- Pulsante Aggiungi -->
+            <div class="flex justify-between items-center">
+              <h4 class="font-semibold text-gray-900">Lista Voci Aggiuntive</h4>
+              <button @click="addVoceAggiuntiva" class="btn-primary">
+                + Aggiungi Voce
+              </button>
+            </div>
+
+            <!-- Lista Voci Aggiuntive -->
+            <div v-if="vociAggiuntiveCantiere.length > 0" class="space-y-4">
+              <div v-for="voce in vociAggiuntiveCantiere" :key="voce.id" 
+                   class="border rounded-lg p-4 bg-gray-50">
+                <div class="flex justify-between items-start">
+                  <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-2">
+                      <h4 class="font-medium text-gray-900">{{ voce.descrizione }}</h4>
+                      <span v-if="voce.tipo === 'aggiunta'" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Aggiunta
+                      </span>
+                      <span v-else class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Preventivo
+                      </span>
+                    </div>
+                    <p v-if="voce.note" class="text-sm text-gray-600 mb-2">{{ voce.note }}</p>
+                    <div class="flex items-center space-x-4 text-sm text-gray-500">
+                      <span class="font-medium text-purple-600 text-lg">
+                        €{{ voce.importo.toFixed(2) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex space-x-2" v-if="voce.tipo === 'aggiunta'">
+                    <button 
+                      type="button"
+                      @click="editVoceAggiuntiva(voce)"
+                      class="text-blue-600 hover:text-blue-800"
+                      title="Modifica"
+                    >
+                      <PencilIcon class="w-4 h-4" />
+                    </button>
+                    <button 
+                      type="button"
+                      @click="removeVoceAggiuntiva(voce.id)"
+                      class="text-red-600 hover:text-red-800"
+                      title="Rimuovi"
+                    >
+                      <XMarkIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Totale Voci Aggiuntive -->
+              <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div class="flex justify-between items-center">
+                  <span class="text-lg font-semibold text-purple-900">Totale Voci Aggiuntive:</span>
+                  <span class="text-2xl font-bold text-purple-900">€{{ getTotalVociAggiuntive().toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Messaggio vuoto -->
+            <div v-else class="text-center py-8 text-gray-500">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+              <p class="text-lg font-medium text-gray-400">Nessuna voce aggiuntiva</p>
+              <p class="text-sm text-gray-400">Aggiungi servizi extra, noleggi o lavori speciali</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+              <button @click="closeManageVociModal" class="btn-secondary">
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Aggiungi Voce Aggiuntiva -->
+    <div v-if="showAddVoceModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-gray-900">Aggiungi Voce Aggiuntiva</h2>
+          <button @click="closeAddVoceModal" class="text-gray-400 hover:text-gray-600">
+            <XMarkIcon class="w-6 h-6" />
+          </button>
+        </div>
+
+        <form @submit.prevent="saveVoceAggiuntiva" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione *</label>
+            <input
+              v-model="newVoce.descrizione"
+              type="text"
+              required
+              placeholder="Es. Noleggio escavatore, Trasporto speciale, Lavori extra..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Importo (€) *</label>
+            <input
+              v-model.number="newVoce.importo"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+            <textarea
+              v-model="newVoce.note"
+              rows="3"
+              placeholder="Dettagli aggiuntivi..."
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            ></textarea>
+          </div>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" @click="closeAddVoceModal" class="btn-secondary">
+              Annulla
+            </button>
+            <button type="submit" class="btn-primary">
+              Aggiungi Voce
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Modifica Voce Aggiuntiva -->
+    <div v-if="showEditVoceModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-gray-900">Modifica Voce Aggiuntiva</h2>
+          <button @click="closeEditVoceModal" class="text-gray-400 hover:text-gray-600">
+            <XMarkIcon class="w-6 h-6" />
+          </button>
+        </div>
+
+        <form @submit.prevent="saveVoceChanges" class="space-y-4" v-if="editingVoce">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione *</label>
+            <input
+              v-model="editingVoce.descrizione"
+              type="text"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Importo (€) *</label>
+            <input
+              v-model.number="editingVoce.importo"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Note</label>
+            <textarea
+              v-model="editingVoce.note"
+              rows="3"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+            ></textarea>
+          </div>
+
+          <div class="flex justify-end space-x-3 pt-4">
+            <button type="button" @click="closeEditVoceModal" class="btn-secondary">
+              Annulla
+            </button>
+            <button type="submit" class="btn-primary">
+              Salva Modifiche
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
