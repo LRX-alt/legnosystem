@@ -1013,22 +1013,17 @@ const saveVoceAggiuntiva = async () => {
       updatedAt: new Date()
     }
     
-    console.log('💾 Salvando voce aggiuntiva:', voceData)
-    
     // Aggiungi alla lista locale
     vociAggiuntiveCantiere.value.push(voceData)
     
     // Prepara le voci aggiuntive per il salvataggio (solo quelle aggiunte, non quelle originali)
     const vociAggiunte = vociAggiuntiveCantiere.value.filter(v => v.tipo === 'aggiunta')
-    console.log('💾 Voci aggiunte da salvare:', vociAggiunte.length, vociAggiunte)
     
     // Aggiorna il cantiere con le nuove voci aggiuntive
     await firestoreOperations.update('cantieri', selectedCantiere.value.id, {
       vociAggiuntive: vociAggiunte,
       updatedAt: new Date()
     })
-    
-    console.log('✅ Cantiere aggiornato con voci aggiuntive')
     
     // Ricalcola i costi includendo le voci aggiuntive
     await autoUpdateCantiereCostsWithVoci(selectedCantiere.value.id)
@@ -1152,33 +1147,20 @@ const getTotalVociAggiuntive = () => {
 }
 
 const closeManageVociModal = async () => {
-  console.log('🔄 === CHIUSURA MODAL VOCI AGGIUNTIVE ===')
   showManageVociModal.value = false
   vociAggiuntiveCantiere.value = []
   
   // Forza ricarica completa dei cantieri per essere sicuri che l'UI si aggiorni
   try {
-    console.log('🔄 Ricaricamento store cantieri...')
     await firestoreStore.loadCantieri()
-    console.log('🔄 Cantieri ricaricati, totale:', firestoreStore.cantieri.length)
     
     // Aggiorna selectedCantiere con i dati più recenti quando si chiude il modal
     if (selectedCantiere.value) {
-      console.log('🔄 Cercando cantiere aggiornato con ID:', selectedCantiere.value.id)
       const cantiereAggiornato = firestoreStore.cantieri.find(c => c.id === selectedCantiere.value.id)
       
       if (cantiereAggiornato) {
-        console.log('🔄 Cantiere trovato nel store:')
-        console.log('    - Voci aggiuntive:', cantiereAggiornato.costiAccumulati?.vociAggiuntive)
-        console.log('    - Totale:', cantiereAggiornato.costiAccumulati?.totale)
-        
         selectedCantiere.value = { ...cantiereAggiornato }
-        
-        console.log('🔄 selectedCantiere aggiornato:')
-        console.log('    - Voci aggiuntive:', selectedCantiere.value.costiAccumulati?.vociAggiuntive)
-        console.log('    - Totale:', selectedCantiere.value.costiAccumulati?.totale)
-      } else {
-        console.log('❌ Cantiere non trovato nel store!')
+        console.log('🔄 UI aggiornata - Voci aggiuntive:', selectedCantiere.value.costiAccumulati?.vociAggiuntive)
       }
     }
   } catch (error) {
@@ -1191,10 +1173,7 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
   if (!cantiereId) return
   
   try {
-    console.log('🔄 Aggiornamento costi cantiere con voci aggiuntive:', cantiereId)
-    
     // IMPORTANTE: Ricarica i cantieri dallo store per avere i dati aggiornati
-    console.log('🔄 Ricaricamento cantieri per avere dati aggiornati...')
     await firestoreStore.loadCantieri()
     
     // Carica timesheet per manodopera (senza ordinamento per evitare indice)
@@ -1223,14 +1202,10 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
     }
     
     // Calcola costo voci aggiuntive (originali + aggiunte)
-    console.log('🔍 Cercando cantiere nel store con ID:', cantiereId)
     const cantiere = firestoreStore.cantieri.find(c => c.id === cantiereId)
     let costoVociAggiuntive = 0
     
     if (cantiere) {
-      console.log('🔍 Cantiere trovato nel store')
-      console.log('🔍 Dati cantiere completi:', cantiere)
-      
       // Voci originali dal preventivo
       const vociOriginali = cantiere.vociAggiuntiveOriginali || []
       const costoVociOriginali = vociOriginali.reduce((acc, voce) => acc + (voce.importo || 0), 0)
@@ -1241,11 +1216,7 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
       
       costoVociAggiuntive = costoVociOriginali + costoVociAggiunte
       
-      console.log('🔍 Voci originali trovate:', vociOriginali.length, 'costo:', costoVociOriginali)
-      console.log('🔍 Voci originali dettaglio:', vociOriginali)
-      console.log('🔍 Voci aggiunte trovate:', vociAggiunte.length, 'costo:', costoVociAggiunte)
-      console.log('🔍 Voci aggiunte dettaglio:', vociAggiunte)
-      console.log('🔍 Totale voci aggiuntive:', costoVociAggiuntive)
+      console.log('🔍 Voci aggiuntive - Originali:', costoVociOriginali, 'Aggiunte:', costoVociAggiunte, 'Totale:', costoVociAggiuntive)
     } else {
       console.log('❌ Cantiere non trovato nel store!')
     }
@@ -1282,9 +1253,7 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
     if (selectedCantiere.value && selectedCantiere.value.id === cantiereId) {
       const cantiereAggiornato = firestoreStore.cantieri.find(c => c.id === cantiereId)
       if (cantiereAggiornato) {
-        console.log('🔄 Aggiornamento selectedCantiere PRIMA:', selectedCantiere.value.costiAccumulati)
         selectedCantiere.value = { ...cantiereAggiornato }
-        console.log('🔄 Aggiornamento selectedCantiere DOPO:', selectedCantiere.value.costiAccumulati)
       }
     }
     
