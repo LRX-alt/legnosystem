@@ -16,6 +16,8 @@ const createPopup = (config) => {
     duration: config.duration || 2000,
     visible: false,
     isConfirm: config.isConfirm || false,
+    confirmText: config.confirmText || 'Conferma',
+    cancelText: config.cancelText || 'Annulla',
     onConfirm: config.onConfirm || null,
     onCancel: config.onCancel || null
   }
@@ -108,16 +110,18 @@ export function usePopup() {
   }
   
   // Funzione di conferma che restituisce una Promise
-  const confirm = (title, message = '') => {
-    console.log('❓ Confirm popup chiamato:', { title, message }) // Debug
+  const confirm = (title, message = '', options = {}) => {
+    console.log('❓ Confirm popup chiamato:', { title, message, options }) // Debug
     return new Promise((resolve) => {
       const popupId = createPopup({
-        type: 'warning',
+        type: options.type || 'warning',
         title,
         message,
-        icon: '❓',
+        icon: options.icon || '❓',
         duration: 0, // Non auto-dismiss per popup di conferma
         isConfirm: true,
+        confirmText: options.confirmText || 'Conferma',
+        cancelText: options.cancelText || 'Annulla',
         onConfirm: () => {
           removePopup(popupId)
           resolve(true)

@@ -88,9 +88,15 @@
               </div>
               
               <div class="border-t border-gray-100 py-1">
-                <button @click="handleLogout" class="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50">
-                  <span class="mr-3">🚪</span>
-                  Esci
+                <button @click="handleLogout" 
+                        :disabled="logoutLoading"
+                        class="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200">
+                  <span class="mr-3">
+                    <span v-if="logoutLoading" class="inline-block animate-spin">⏳</span>
+                    <span v-else>🚪</span>
+                  </span>
+                                     <span v-if="logoutLoading">Disconnessione...</span>
+                   <span v-else>Esci</span>
                 </button>
               </div>
             </div>
@@ -131,7 +137,7 @@ defineEmits(['toggle-sidebar'])
 
 // Firebase Auth Store
 const authStore = useAuthStore()
-const { success, error } = usePopup()
+const { success, error, confirm } = usePopup()
 const router = useRouter()
 
 // UI State
@@ -172,14 +178,73 @@ const notifications = ref([
   { id: 3, message: 'Nuovo preventivo richiesto', time: '2 ore fa' }
 ])
 
+// State per logout
+const logoutLoading = ref(false)
+
 // Methods
 const handleLogout = async () => {
   try {
-    await authStore.logout()
+    // 1. Conferma logout con popup elegante
+    const confirmed = await confirm(
+      'Conferma Logout',
+      `Ciao <strong>${userName.value}</strong>! 👋<br><br>
+      Sei sicuro di voler uscire da <strong>Legnosystem</strong>?<br><br>
+      <small style="color: #6B7280;">Dovrai accedere nuovamente per continuare a lavorare.</small>`,
+      {
+        confirmText: 'Sì, esci',
+        cancelText: 'Rimani',
+        type: 'info'
+      }
+    )
+    
+    if (!confirmed) return
+    
+    // 2. Chiudi menu e mostra loading
     showUserMenu.value = false
-    success('Logout Effettuato', 'Arrivederci!')
+    logoutLoading.value = true
+    
+    // 3. Feedback visivo immediato
+    success('Disconnessione in corso...', 'Preparando l\'uscita sicura 🔒')
+    
+    // 4. Aggiungi animazione fade-out
+    document.body.style.transition = 'opacity 0.3s ease'
+    document.body.style.opacity = '0.7'
+    
+    // 5. Cleanup listeners per evitare memory leaks
+    window.dispatchEvent(new CustomEvent('before-logout'))
+    
+    // 6. Breve delay per l'animazione
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // 7. Esegui logout
+    const result = await authStore.logout()
+    
+    if (result.success) {
+      // 8. Reset finale UI
+      document.body.style.opacity = '1'
+      document.body.style.transition = ''
+      
+      // 9. Redirect elegante
+      await router.push('/auth')
+      
+      // 10. Messaggio finale
+      success('Logout Completato', `Grazie per aver usato Legnosystem, ${userName.value}! 🏗️`)
+    } else {
+      // Ripristina UI in caso di errore
+      document.body.style.opacity = '1'
+      document.body.style.transition = ''
+      error('Errore Logout', result.error || 'Errore durante la disconnessione')
+    }
+    
   } catch (error) {
     console.error('Errore logout:', error)
+    error('Errore Logout', 'Si è verificato un errore inaspettato')
+    
+    // Ripristina UI
+    document.body.style.opacity = '1'
+    document.body.style.transition = ''
+  } finally {
+    logoutLoading.value = false
   }
 }
 
@@ -219,5 +284,26 @@ document.addEventListener('click', (e) => {
     showNotifications.value = false
     showUserMenu.value = false
   }
+})
+
+// Cleanup durante logout
+window.addEventListener('auth-logout-cleanup', () => {
+  // Chiudi tutti i menu aperti
+  showNotifications.value = false
+  showUserMenu.value = false
+  
+  // Nascondi eventuali tooltip o popover
+  document.querySelectorAll('[data-tippy-root]').forEach(el => el.remove())
+  
+  console.log('🧹 AppHeader cleanup completato')
+})
+
+// Cleanup automatico prima del logout
+window.addEventListener('before-logout', () => {
+  // Chiudi tutti i menu immediatamente
+  showNotifications.value = false
+  showUserMenu.value = false
+  
+  console.log('🚪 AppHeader preparato per logout')
 })
 </script> 

@@ -89,11 +89,62 @@ const handleResize = () => {
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
   
+  // Listener per cleanup globale durante logout
+  window.addEventListener('auth-logout-cleanup', () => {
+    // Chiudi sidebar automaticamente
+    sidebarOpen.value = false
+    
+    // Reset scroll globale
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+    
+    // Rimuovi eventuali classi di stato
+    document.body.classList.remove('modal-open', 'sidebar-open')
+    
+    console.log('🧹 App cleanup globale completato')
+  })
+  
+  // Listener per preparazione logout
+  window.addEventListener('before-logout', () => {
+    // Chiudi sidebar immediatamente
+    sidebarOpen.value = false
+    
+    // Prepara l'UI per il logout
+    document.body.classList.add('logging-out')
+    
+    console.log('🚪 App preparato per logout')
+  })
+  
   // Inizializza l'autenticazione Firebase
   await authStore.initializeAuth()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('auth-logout-cleanup', () => {})
+  window.removeEventListener('before-logout', () => {})
 })
 </script>
+
+<style scoped>
+/* Stili per migliorare l'esperienza di logout */
+:deep(.logging-out) {
+  pointer-events: none;
+  user-select: none;
+}
+
+:deep(.logging-out *) {
+  cursor: wait !important;
+}
+
+/* Animazioni smooth per i popup */
+:deep(.popup-container) {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Migliora la transition del loading */
+:deep(.loading-overlay) {
+  backdrop-filter: blur(2px);
+  transition: backdrop-filter 0.3s ease;
+}
+</style>

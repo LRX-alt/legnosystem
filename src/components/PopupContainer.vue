@@ -43,8 +43,7 @@
               <div class="font-semibold text-lg" :class="getTitleClasses(popup.type)">
                 {{ popup.title }}
               </div>
-              <div v-if="popup.message" class="text-sm whitespace-pre-line" :class="getMessageClasses(popup.type)">
-                {{ popup.message }}
+              <div v-if="popup.message" class="text-sm leading-relaxed" :class="getMessageClasses(popup.type)" v-html="popup.message">
               </div>
             </div>
 
@@ -54,13 +53,16 @@
                 @click="popup.onCancel && popup.onCancel()"
                 class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-medium"
               >
-                Annulla
+                {{ popup.cancelText }}
               </button>
               <button 
                 @click="popup.onConfirm && popup.onConfirm()"
-                class="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+                :class="[
+                  'flex-1 px-4 py-2 rounded-lg transition-colors font-medium',
+                  popup.type === 'info' ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'
+                ]"
               >
-                Conferma
+                {{ popup.confirmText }}
               </button>
             </div>
           </div>

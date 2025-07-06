@@ -269,21 +269,80 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Logout
+   * Logout Completo con Cleanup
    */
-  const logout = async (message = 'Logout effettuato con successo') => {
+  const logout = async (message = 'Logout effettuato con successo', skipConfirm = false) => {
     try {
+      // 1. Cleanup completo dello stato
+      await performLogoutCleanup()
+      
+      // 2. Logout da Firebase
       await signOut(auth)
+      
+      // 3. Reset finale dello stato
+      await resetAuthState()
+      
+      console.log('✅ Logout completato con successo')
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Errore logout:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Cleanup Pre-Logout
+   */
+  const performLogoutCleanup = async () => {
+    try {
+      // Stop session timeout
       if (sessionTimeout.value) {
         clearTimeout(sessionTimeout.value)
         sessionTimeout.value = null
       }
-      toast.success(message, '👋 Arrivederci')
-      return { success: true }
+
+      // Cleanup localStorage specifici (mantieni solo le impostazioni essenziali)
+      const keysToKeep = ['legnosystem-theme', 'legnosystem-language']
+      const allKeys = Object.keys(localStorage)
+      allKeys.forEach(key => {
+        if (key.startsWith('legnosystem-') && !keysToKeep.includes(key)) {
+          localStorage.removeItem(key)
+        }
+      })
+
+      // Reset scroll position
+      if (typeof window !== 'undefined') {
+        window.scrollTo(0, 0)
+      }
+
+      // Dispatch cleanup event per altri componenti
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('auth-logout-cleanup'))
+      }
+
+      console.log('🧹 Cleanup pre-logout completato')
     } catch (error) {
-      console.error('Errore logout:', error)
-      toast.error('Errore durante il logout', '❌ Errore')
-      return { success: false, error: error.message }
+      console.error('Errore cleanup pre-logout:', error)
+    }
+  }
+
+  /**
+   * Reset Stato Autenticazione
+   */
+  const resetAuthState = async () => {
+    try {
+      // Reset tutti i reactive state
+      user.value = null
+      userProfile.value = null
+      isAuthenticated.value = false
+      loading.value = false
+      
+      // Reset session data
+      sessionTimeout.value = null
+      
+      console.log('🔄 Stato autenticazione resettato')
+    } catch (error) {
+      console.error('Errore reset stato auth:', error)
     }
   }
 

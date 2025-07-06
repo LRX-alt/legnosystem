@@ -151,5 +151,19 @@ defineProps({
 })
 
 // Emit per comunicare con il componente padre
-defineEmits(['close-sidebar'])
+const emit = defineEmits(['close-sidebar'])
+
+// Cleanup automatico durante logout
+window.addEventListener('auth-logout-cleanup', () => {
+  // Chiudi la sidebar immediatamente
+  emit('close-sidebar')
+  console.log('🧹 AppSidebar cleanup completato')
+})
+
+// Preparazione per logout
+window.addEventListener('before-logout', () => {
+  // Chiudi la sidebar prima del logout
+  emit('close-sidebar')
+  console.log('🚪 AppSidebar preparato per logout')
+})
 </script> 

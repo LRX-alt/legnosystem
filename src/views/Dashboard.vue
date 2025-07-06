@@ -61,14 +61,43 @@
               ⏰
             </div>
           </div>
-          <div class="ml-4">
+          <div class="ml-4 flex-1">
             <p class="text-sm font-medium text-gray-600">Ore Lavorate</p>
-            <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ kpis.oreLavorate }}</p>
+            <div class="flex items-baseline space-x-2">
+              <p class="text-xl sm:text-2xl font-bold text-gray-900">{{ kpis.oreLavorate }}h</p>
+              <span class="text-sm text-gray-500">settimana</span>
+            </div>
           </div>
         </div>
-        <div class="mt-3 sm:mt-4">
-          <div class="flex items-center text-xs sm:text-sm">
-            <span class="text-gray-600">Questa settimana</span>
+        
+        <!-- Dettagli ore -->
+        <div class="mt-3 sm:mt-4 space-y-2">
+          <div class="grid grid-cols-2 gap-4 text-xs sm:text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-500">Oggi:</span>
+              <span class="font-medium text-gray-900">{{ dettagliOre.oggi }}h</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Ieri:</span>
+              <span class="font-medium text-gray-900">{{ dettagliOre.ieri }}h</span>
+            </div>
+          </div>
+          
+          <div class="pt-2 border-t border-gray-100">
+            <div class="flex justify-between items-center text-xs sm:text-sm">
+              <span class="text-gray-500">Questo mese:</span>
+              <span class="font-semibold text-primary-600">{{ dettagliOre.mese }}h</span>
+            </div>
+          </div>
+          
+          <div v-if="dettagliOre.dipendentiOggi > 0" class="flex items-center text-xs text-green-600">
+            <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+            <span>{{ dettagliOre.dipendentiOggi }} dipendenti attivi oggi</span>
+          </div>
+          
+          <div v-else class="flex items-center text-xs text-gray-500">
+            <div class="w-2 h-2 bg-gray-300 rounded-full mr-2"></div>
+            <span>Nessun dipendente registrato oggi</span>
           </div>
         </div>
       </div>
@@ -304,9 +333,93 @@ const lastSync = ref(null)
 const kpis = computed(() => ({
   cantieriAttivi: firestoreStore.cantieriAttivi.length,
   valoreMagazzino: firestoreStore.materiali.reduce((total, m) => total + ((m.prezzoUnitario || 0) * (m.quantita || 0)), 0),
-  oreLavorate: firestoreStore.dipendenti.reduce((total, d) => total + (d.ore_settimana || 0), 0),
+  oreLavorate: calcolaOreLavorate(),
   mezziDisponibili: firestoreStore.mezzi.filter(m => m.stato === 'disponibile').length
 }))
+
+// Calcolo delle ore lavorate basato sui timesheet reali
+const calcolaOreLavorate = () => {
+  const oggi = new Date()
+  const inizioSettimana = new Date(oggi)
+  
+  // Imposta l'inizio della settimana a Lunedì
+  const day = oggi.getDay()
+  const diff = oggi.getDate() - day + (day === 0 ? -6 : 1)
+  inizioSettimana.setDate(diff)
+  inizioSettimana.setHours(0, 0, 0, 0)
+  
+  const fineSettimana = new Date(inizioSettimana)
+  fineSettimana.setDate(inizioSettimana.getDate() + 5) // Lun-Sab (6 giorni)
+  fineSettimana.setHours(23, 59, 59, 999)
+  
+  // Filtra i timesheet per questa settimana
+  const timesheetSettimana = firestoreStore.timesheet.filter(t => {
+    const dataTimesheet = new Date(t.data || t.date)
+    return dataTimesheet >= inizioSettimana && dataTimesheet <= fineSettimana
+  })
+  
+  // Calcola il totale delle ore
+  return timesheetSettimana.reduce((total, t) => {
+    return total + (t.ore || t.oreLavorate || 0)
+  }, 0)
+}
+
+// Dettagli ore lavorate per la card espansa
+const dettagliOre = computed(() => {
+  const oggi = new Date()
+  const ieri = new Date(oggi)
+  ieri.setDate(ieri.getDate() - 1)
+  
+  const inizioMese = new Date(oggi.getFullYear(), oggi.getMonth(), 1)
+  const fineMese = new Date(oggi.getFullYear(), oggi.getMonth() + 1, 0)
+  
+  const inizioSettimana = new Date(oggi)
+  const day = oggi.getDay()
+  const diff = oggi.getDate() - day + (day === 0 ? -6 : 1)
+  inizioSettimana.setDate(diff)
+  inizioSettimana.setHours(0, 0, 0, 0)
+  
+  const oggi_str = oggi.toISOString().split('T')[0]
+  const ieri_str = ieri.toISOString().split('T')[0]
+  
+  // Calcola ore per periodo
+  const oreOggi = firestoreStore.timesheet
+    .filter(t => (t.data || t.date) === oggi_str)
+    .reduce((total, t) => total + (t.ore || t.oreLavorate || 0), 0)
+    
+  const oreIeri = firestoreStore.timesheet
+    .filter(t => (t.data || t.date) === ieri_str)
+    .reduce((total, t) => total + (t.ore || t.oreLavorate || 0), 0)
+  
+  const oreSettimana = firestoreStore.timesheet
+    .filter(t => {
+      const dataTimesheet = new Date(t.data || t.date)
+      return dataTimesheet >= inizioSettimana
+    })
+    .reduce((total, t) => total + (t.ore || t.oreLavorate || 0), 0)
+    
+  const oreMese = firestoreStore.timesheet
+    .filter(t => {
+      const dataTimesheet = new Date(t.data || t.date)
+      return dataTimesheet >= inizioMese && dataTimesheet <= fineMese
+    })
+    .reduce((total, t) => total + (t.ore || t.oreLavorate || 0), 0)
+  
+  // Calcola dipendenti attivi oggi
+  const dipendentiOggi = new Set(
+    firestoreStore.timesheet
+      .filter(t => (t.data || t.date) === oggi_str && (t.ore || t.oreLavorate || 0) > 0)
+      .map(t => t.dipendenteId || t.dipendente_id)
+  ).size
+  
+  return {
+    oggi: Math.round(oreOggi * 2) / 2,
+    ieri: Math.round(oreIeri * 2) / 2,
+    settimana: Math.round(oreSettimana * 2) / 2,
+    mese: Math.round(oreMese * 2) / 2,
+    dipendentiOggi
+  }
+})
 
 // Cantieri attivi - Filtrati da Firestore (primi 3)
 const cantieri = computed(() => 
@@ -463,9 +576,20 @@ const loadDashboardData = async () => {
     // Carica tutti i dati da Firestore
     await firestore.loadAllData()
     
+    // 🕒 Carica specificamente i timesheet per il calcolo delle ore
+    console.log('📊 Caricamento timesheet per dashboard...')
+    await firestoreStore.loadTimesheet()
+    
+    // Log per debug ore lavorate
+    console.log('📈 Timesheet caricati:', firestoreStore.timesheet.length)
+    console.log('🔢 Ore calcolate questa settimana:', calcolaOreLavorate())
+    
     // Analytics: track dashboard view
     const widgets = ['cantieri', 'clienti', 'materiali']
-    if (authStore.canManagePersonnel) widgets.push('dipendenti')
+    if (authStore.canManagePersonnel) {
+      widgets.push('dipendenti')
+      widgets.push('timesheet')
+    }
     
     await analytics.logDashboardViewed(widgets)
     
