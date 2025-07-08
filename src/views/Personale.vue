@@ -13,6 +13,10 @@
           </svg>
           Aggiorna
         </button>
+        <button @click="fixBuggedDates" class="btn-secondary text-base font-medium bg-red-100 text-red-800 border-red-300" title="Correggi date sbagliate (01/01/2025)">
+          🔧 Fix Date
+        </button>
+
         <button @click="showTimesheetModal = true" class="btn-secondary text-base font-medium">
           <ClockIcon class="w-5 h-5 mr-2" />
           Registra Ore
@@ -188,10 +192,20 @@
           </div>
         </div>
 
-        <!-- Cantiere Attuale -->
-        <div v-if="dipendente.cantiereAttuale" class="mb-4 p-3 bg-accent-50 rounded-lg">
-          <p class="text-sm text-accent-600 font-medium mb-1">Cantiere Attuale</p>
-          <p class="text-base font-semibold text-gray-900">{{ dipendente.cantiereAttuale }}</p>
+        <!-- 🚀 MULTI-ASSIGNMENT: Cantieri Assegnati -->
+        <div class="mb-4 p-3 bg-accent-50 rounded-lg">
+          <p class="text-sm text-accent-600 font-medium mb-1">Cantieri Assegnati</p>
+          <div v-if="getCantieriAssegnati(dipendente.id).length > 0" class="space-y-1">
+            <div v-for="cantiere in getCantieriAssegnati(dipendente.id)" :key="cantiere" 
+                 class="flex items-center space-x-2">
+              <span class="text-accent-500">🏗️</span>
+              <span class="text-base font-medium text-gray-900">{{ cantiere }}</span>
+            </div>
+          </div>
+          <div v-else class="flex items-center space-x-2">
+            <span class="text-green-500">✅</span>
+            <span class="text-base text-gray-600">Disponibile per assegnazione</span>
+          </div>
         </div>
 
         <!-- Ore Settimana -->
@@ -240,11 +254,22 @@
       <div class="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <h3 class="text-xl font-semibold text-gray-900">Registro Ore</h3>
         <div class="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
-          <select v-model="selectedWeek" class="w-full sm:w-52 px-3 py-2 border border-gray-300 rounded-lg text-base">
+          <select v-model="selectedWeek" @change="onWeekChange" class="w-full sm:w-52 px-3 py-2 border border-gray-300 rounded-lg text-base">
             <option value="current">Settimana Corrente</option>
             <option value="last">Settimana Scorsa</option>
             <option value="two-weeks">2 Settimane Fa</option>
+            <option value="three-weeks">3 Settimane Fa</option>
+            <option value="month">1 Mese Fa</option>
           </select>
+          <button @click="debugAllTimesheetDates" class="btn-secondary text-sm bg-blue-100 text-blue-800 border-blue-300" title="Mostra tutte le date dei timesheet">
+            📅 Date
+          </button>
+          <button @click="performCompleteAudit" class="btn-secondary text-sm bg-red-100 text-red-800 border-red-300" title="Audit completo e correzione automatica">
+            🔍 Audit Completo
+          </button>
+          <button @click="runSystemTests" class="btn-secondary text-sm bg-green-100 text-green-800 border-green-300" title="Test sistema validazione">
+            🧪 Test Sistema
+          </button>
         </div>
       </div>
 
@@ -445,7 +470,13 @@
               <div class="flex-1">
                 <h4 class="font-semibold text-gray-900 text-base">{{ dipendente.nome }} {{ dipendente.cognome }}</h4>
                 <p class="text-base text-gray-600">{{ getRuoloLabel(dipendente.ruolo) }}</p>
-                <p class="text-sm text-gray-500">{{ dipendente.cantiereAttuale || 'Nessun cantiere' }}</p>
+                <!-- 🚀 MULTI-ASSIGNMENT: Mostra cantieri multipli -->
+                <p class="text-sm text-gray-500">
+                  <span v-if="getCantieriAssegnati(dipendente.id).length > 0">
+                    🏗️ {{ getCantieriAssegnati(dipendente.id).join(', ') }}
+                  </span>
+                  <span v-else>✅ Disponibile</span>
+                </p>
               </div>
               <div class="text-right">
                 <p class="text-xl font-bold" :class="calcolaOreTotali(dipendente.id) >= 8 ? 'text-green-600' : 'text-gray-900'">
@@ -1076,6 +1107,7 @@
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Costo</th>
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Fonte</th>
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Note</th>
+                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
@@ -1112,6 +1144,24 @@
                       </td>
                       <td class="px-6 py-4 text-sm text-gray-900 max-w-xs">
                         <div class="truncate" :title="entry.note">{{ entry.note || '-' }}</div>
+                      </td>
+                      <!-- 🚀 NUOVO: Colonna Azioni per modifica/eliminazione -->
+                      <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <div v-if="entry.fonte === 'manuale'" class="flex items-center space-x-2">
+                          <button @click="editTimesheetEntry(entry)" 
+                                  class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                                  title="Modifica registrazione">
+                            <PencilIcon class="w-4 h-4" />
+                          </button>
+                          <button @click="deleteTimesheetEntry(entry)" 
+                                  class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50 transition-colors"
+                                  title="Elimina registrazione">
+                            <TrashIcon class="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div v-else class="text-xs text-gray-400 italic">
+                          Auto-generato
+                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -1234,6 +1284,80 @@
       </div>
     </div>
 
+    <!-- 🚀 NUOVO: Modal Modifica Timesheet -->
+    <div v-if="showEditTimesheetModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeEditTimesheetModal">
+      <div class="relative top-4 mx-auto border w-full max-w-md shadow-lg rounded-md bg-white" @click.stop>
+        <div class="p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-semibold text-gray-900">Modifica Ore</h3>
+            <button @click="closeEditTimesheetModal" 
+                    class="text-gray-400 hover:text-gray-600 p-2 -m-2"
+                    title="Chiudi finestra">
+              <XMarkIcon class="w-6 h-6" />
+            </button>
+          </div>
+          
+          <form @submit.prevent="updateTimesheet" class="space-y-6">
+            <div>
+              <label class="block text-base font-medium text-gray-700 mb-2">Dipendente</label>
+              <input v-model="editingTimesheetDipendenteName" readonly
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-base text-gray-600">
+            </div>
+            
+            <div>
+              <label class="block text-base font-medium text-gray-700 mb-2">Data</label>
+              <input v-model="editingTimesheet.data" type="date" 
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-base font-medium text-gray-700 mb-2">Orario Inizio</label>
+                <input v-model="editingTimesheet.orarioInizio" type="time" 
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+              </div>
+              
+              <div>
+                <label class="block text-base font-medium text-gray-700 mb-2">Orario Fine</label>
+                <input v-model="editingTimesheet.orarioFine" type="time" 
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+              </div>
+            </div>
+            
+            <div>
+              <label class="block text-base font-medium text-gray-700 mb-2">Ore Lavorate</label>
+              <input v-model="editingTimesheet.ore" type="number" step="0.5" min="0" max="12" 
+                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+            </div>
+            
+            <div>
+              <label class="block text-base font-medium text-gray-700 mb-2">Cantiere</label>
+              <select v-model="editingTimesheet.cantiere" 
+                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
+                <option value="">Seleziona cantiere</option>
+                <option v-for="cantiere in cantieriDisponibili" :key="cantiere" :value="cantiere">{{ cantiere }}</option>
+              </select>
+            </div>
+            
+            <div>
+              <label class="block text-base font-medium text-gray-700 mb-2">Note (opzionale)</label>
+              <textarea v-model="editingTimesheet.note" rows="3" 
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base resize-none"></textarea>
+            </div>
+            
+            <div class="flex flex-col space-y-3 pt-4">
+              <button type="submit" class="w-full btn-primary py-3 text-base font-medium">
+                ✅ Salva Modifiche
+              </button>
+              <button type="button" @click="closeEditTimesheetModal" class="w-full btn-secondary py-3 text-base font-medium">
+                Annulla
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal Planning/Calendario Dipendente -->
     <div v-if="showScheduleModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 p-4" @click="closeScheduleModal">
       <div class="relative top-4 mx-auto border w-full max-w-4xl shadow-lg rounded-md bg-white" @click.stop>
@@ -1257,7 +1381,13 @@
                 <div class="flex-1">
                   <h4 class="font-semibold text-gray-900 text-lg">{{ selectedDipendente?.nome }} {{ selectedDipendente?.cognome }}</h4>
                   <p class="text-base text-gray-600">{{ getRuoloLabel(selectedDipendente?.ruolo) }}</p>
-                  <p class="text-sm text-gray-500">{{ selectedDipendente?.cantiereAttuale || 'Nessun cantiere assegnato' }}</p>
+                  <!-- 🚀 MULTI-ASSIGNMENT: Mostra tutti i cantieri -->
+                  <p class="text-sm text-gray-500">
+                    <span v-if="getCantieriAssegnati(selectedDipendente?.id).length > 0">
+                      🏗️ {{ getCantieriAssegnati(selectedDipendente?.id).join(', ') }}
+                    </span>
+                    <span v-else>✅ Disponibile per assegnazione</span>
+                  </p>
                 </div>
                 <div class="text-right">
                   <p class="text-base text-gray-600">Paga Oraria</p>
@@ -1268,26 +1398,34 @@
 
             <!-- Pianificazione Settimanale -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <!-- Assegnazioni Cantieri -->
+              <!-- 🚀 MULTI-ASSIGNMENT: Assegnazioni Cantieri -->
               <div class="card">
                 <h5 class="font-semibold text-gray-900 mb-4">📍 Assegnazioni Cantieri</h5>
                 <div class="space-y-3">
-                  <div v-if="selectedDipendente?.cantiereAttuale" class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div>
-                      <p class="font-medium text-green-900">{{ selectedDipendente.cantiereAttuale }}</p>
-                      <p class="text-sm text-green-600">Cantiere principale</p>
+                  <!-- Mostra tutti i cantieri assegnati -->
+                  <div v-if="getCantieriAssegnati(selectedDipendente?.id).length > 0">
+                    <div v-for="(cantiere, index) in getCantieriAssegnati(selectedDipendente?.id)" :key="cantiere" 
+                         class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div>
+                        <p class="font-medium text-green-900">{{ cantiere }}</p>
+                        <p class="text-sm text-green-600">
+                          {{ index === 0 ? 'Cantiere assegnato' : `Cantiere ${index + 1}` }}
+                        </p>
+                      </div>
+                      <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">Attivo</span>
                     </div>
-                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm font-medium">Attivo</span>
                   </div>
+                  <!-- Nessun cantiere assegnato -->
                   <div v-else class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <div>
                       <p class="font-medium text-gray-900">Non assegnato</p>
-                      <p class="text-sm text-gray-600">Dipendente disponibile per assegnazione</p>
+                      <p class="text-sm text-gray-600">Dipendente disponibile per assegnazione multipla</p>
                     </div>
                     <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm font-medium">Disponibile</span>
                   </div>
-                  <div class="text-center text-gray-500 py-4">
-                    <p class="text-sm">Altre assegnazioni verranno visualizzate qui</p>
+                  <!-- Info multi-assignment -->
+                  <div class="text-center text-blue-50 bg-blue-50 rounded-lg py-3 px-4">
+                    <p class="text-sm text-blue-700">🚀 I dipendenti possono ora essere assegnati a più cantieri contemporaneamente</p>
                   </div>
                 </div>
               </div>
@@ -1329,7 +1467,11 @@
                     <div class="bg-primary-100 text-primary-800 px-2 py-1 rounded text-sm">
                       08:00 - 17:00
                     </div>
-                    <p class="text-xs text-gray-500">{{ selectedDipendente?.cantiereAttuale || 'TBD' }}</p>
+                    <p class="text-xs text-gray-500">
+                      {{ getCantieriAssegnati(selectedDipendente?.id).length > 0 
+                        ? getCantieriAssegnati(selectedDipendente?.id)[0] 
+                        : 'TBD' }}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1366,7 +1508,7 @@ import { it } from 'date-fns/locale'
 
 // Firestore store
 const firestoreStore = useFirestoreStore()
-const { success, error, confirm } = usePopup()
+const { success, error, confirm, warning, info } = usePopup()
 
 // Stato della pagina
 const activeTab = ref('dipendenti')
@@ -1375,6 +1517,7 @@ const showEditModal = ref(false)
 const showTimesheetModal = ref(false)
 const showDetailModal = ref(false)
 const showScheduleModal = ref(false)
+const showEditTimesheetModal = ref(false)
 const searchTerm = ref('')
 const selectedRuolo = ref('')
 const selectedStato = ref('')
@@ -1471,6 +1614,20 @@ const editingDipendente = ref({
   note: ''
 })
 
+// 🚀 NUOVO: Timesheet in modifica
+const editingTimesheet = ref({
+  id: null,
+  dipendenteId: '',
+  data: '',
+  ore: '',
+  cantiere: '',
+  note: '',
+  orarioInizio: '08:00',
+  orarioFine: '17:00'
+})
+
+const editingTimesheetDipendenteName = ref('')
+
 // Funzioni per la gestione dei cantieri - ora usa Firestore
 const loadCantieri = async () => {
   try {
@@ -1546,17 +1703,10 @@ const loadTimesheet = async (dipendenteId = null) => {
 // Aggiorna le ore settimanali dei dipendenti basandosi sui timesheet
 const updateDipendentiOreFromTimesheet = () => {
   console.log('🔄 Aggiornamento ore settimanali dipendenti...')
+  console.log('📅 Settimana selezionata:', selectedWeek.value)
   
-  const now = new Date()
-  // Imposta l'inizio della settimana a Lunedì
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1))
-  startOfWeek.setHours(0, 0, 0, 0)
-  
-  // Imposta la fine della settimana a Sabato (6 giorni lavorativi: Lun-Sab)
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 5) // +5 per arrivare a Sabato
-  endOfWeek.setHours(23, 59, 59, 999)
+  // 🔧 FIX: Usa il nuovo sistema di calcolo periodo
+  const { startOfWeek, endOfWeek } = getSelectedWeekPeriod()
   
   console.log('📅 Periodo analizzato:', {
     start: startOfWeek.toISOString().split('T')[0],
@@ -1624,6 +1774,479 @@ const forceRefreshAllData = async () => {
   }
 }
 
+// 🔍 DEBUG: Funzione per ispezionare lo stato dei dati timesheet
+const debugTimesheetData = async () => {
+  console.log('🔍 =================================')
+  console.log('🔍 DEBUG TIMESHEET DATA')
+  console.log('🔍 =================================')
+  
+  // 1. Stato generale
+  console.log('📊 STATO GENERALE:')
+  console.log(`  - Dipendenti caricati: ${dipendenti.value.length}`)
+  console.log(`  - Timesheet dettagli: ${timesheetDettagli.value.length}`)
+  console.log(`  - Timesheet data (visualizzazione): ${timesheetData.value.length}`)
+  console.log(`  - Stato loading: ${firestoreStore.loading}`)
+  console.log(`  - Errori: ${firestoreStore.error}`)
+  
+  // 2. Test caricamento diretto da Firestore
+  console.log('🔄 TEST CARICAMENTO DIRETTO:')
+  try {
+    const directResult = await firestoreStore.loadTimesheet()
+    console.log('  - Risultato caricamento diretto:', directResult)
+    console.log('  - Dati nello store dopo caricamento:', firestoreStore.timesheet.length)
+    if (firestoreStore.timesheet.length > 0) {
+      console.log('  - Primi 3 timesheet:', firestoreStore.timesheet.slice(0, 3))
+    }
+  } catch (err) {
+    console.error('  - Errore caricamento diretto:', err)
+  }
+  
+  // 3. Analisi periodo settimana corrente
+  const now = new Date()
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1))
+  startOfWeek.setHours(0, 0, 0, 0)
+  
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 5)
+  endOfWeek.setHours(23, 59, 59, 999)
+  
+  console.log('📅 PERIODO SETTIMANA CORRENTE:')
+  console.log(`  - Inizio: ${startOfWeek.toISOString().split('T')[0]}`)
+  console.log(`  - Fine: ${endOfWeek.toISOString().split('T')[0]}`)
+  
+  // 4. Analisi timesheet per periodo
+  const timesheetSettimana = timesheetDettagli.value.filter(t => {
+    const dataTimesheet = new Date(t.data)
+    return dataTimesheet >= startOfWeek && dataTimesheet <= endOfWeek
+  })
+  
+  console.log('📋 TIMESHEET SETTIMANA CORRENTE:')
+  console.log(`  - Totali timesheet: ${timesheetDettagli.value.length}`)
+  console.log(`  - Timesheet questa settimana: ${timesheetSettimana.length}`)
+  
+  if (timesheetSettimana.length > 0) {
+    console.log('  - Esempi timesheet settimana:')
+    timesheetSettimana.slice(0, 5).forEach((t, i) => {
+      console.log(`    ${i+1}. ${t.data} - ${t.dipendenteId} - ${t.ore || t.oreLavorate || 0}h - ${t.cantiere || 'N/A'}`)
+    })
+    
+    // Raggruppa per dipendente
+    const perDipendente = {}
+    timesheetSettimana.forEach(t => {
+      if (!perDipendente[t.dipendenteId]) {
+        perDipendente[t.dipendenteId] = []
+      }
+      perDipendente[t.dipendenteId].push(t)
+    })
+    
+    console.log('👥 RIEPILOGO PER DIPENDENTE:')
+    Object.entries(perDipendente).forEach(([dipendenteId, timesheet]) => {
+      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
+      const nome = dipendente ? `${dipendente.nome} ${dipendente.cognome}` : `ID: ${dipendenteId}`
+      const oreTotali = timesheet.reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
+      console.log(`  - ${nome}: ${oreTotali}h (${timesheet.length} registrazioni)`)
+    })
+  }
+  
+  // 5. Test creazione manuale di un timesheet
+  console.log('🧪 TEST CREAZIONE TIMESHEET:')
+  if (dipendenti.value.length > 0) {
+    const primoDipendente = dipendenti.value[0]
+    console.log(`  - Creando timesheet test per: ${primoDipendente.nome} ${primoDipendente.cognome}`)
+    
+    const testTimesheet = {
+      dipendenteId: primoDipendente.id,
+      data: new Date().toISOString().split('T')[0],
+      cantiere: 'Test Cantiere',
+      ore: 8,
+      orarioInizio: '08:00',
+      orarioFine: '17:00',
+      note: 'Timesheet di test per debug',
+      costoOrario: primoDipendente.pagaOraria || 25,
+      costoTotale: 8 * (primoDipendente.pagaOraria || 25),
+      fonte: 'debug_test',
+      createdAt: new Date().toISOString()
+    }
+    
+    console.log('  - Dati timesheet test:', testTimesheet)
+    
+    try {
+      const createResult = await firestoreStore.registraTimesheet(testTimesheet)
+      console.log('  - Risultato creazione:', createResult)
+      
+      if (createResult.success) {
+        // Ricarica e ricontrolla
+        console.log('  - Ricaricando dati dopo test...')
+        await loadTimesheet()
+        console.log(`  - Timesheet dopo ricaricamento: ${timesheetDettagli.value.length}`)
+      }
+    } catch (err) {
+      console.error('  - Errore creazione timesheet test:', err)
+    }
+  }
+  
+  console.log('🔍 =================================')
+  console.log('🔍 FINE DEBUG')
+  console.log('🔍 =================================')
+  
+  // Mostra popup con risultato
+  const report = `
+🔍 DEBUG TIMESHEET REPORT
+
+📊 Dati caricati:
+• Dipendenti: ${dipendenti.value.length}
+• Timesheet totali: ${timesheetDettagli.value.length}
+• Timesheet settimana: ${timesheetSettimana.length}
+
+📅 Periodo: ${startOfWeek.toISOString().split('T')[0]} → ${endOfWeek.toISOString().split('T')[0]}
+
+${timesheetDettagli.value.length === 0 ? 
+  '⚠️ PROBLEMA: Nessun timesheet trovato in Firestore!' : 
+  timesheetSettimana.length === 0 ? 
+    '⚠️ PROBLEMA: Nessun timesheet per questa settimana!' :
+    '✅ Timesheet presenti - problema nella logica di visualizzazione'
+}
+
+Controlla la console per dettagli completi.
+  `
+  
+  info('Debug Timesheet Completato', report)
+}
+
+// 🔧 FIX: Gestione cambio settimana
+const onWeekChange = () => {
+  console.log('📅 Cambio settimana:', selectedWeek.value)
+  updateDipendentiOreFromTimesheet()
+}
+
+// 🔍 AUDIT COMPLETO: Esegue controllo sistematico e correzione
+const performCompleteAudit = async () => {
+  try {
+    console.log('🔍 Avvio audit completo timesheet...')
+    
+    const { default: CompleteTimesheetAuditor } = await import('../utils/completeTimesheetAudit.js')
+    const auditor = new CompleteTimesheetAuditor(firestoreStore)
+    
+    // Mostra loading
+    info('Audit in Corso...', 'Scansionando tutti i timesheet per identificare problemi...')
+    
+    // Esegui audit completo
+    const auditResults = await auditor.performCompleteAudit()
+    
+    if (auditResults.problematicRecords === 0) {
+      success('Database Pulito!', `✅ Audit completato: ${auditResults.totalRecords} record analizzati, nessun problema trovato.`)
+      return
+    }
+    
+    // Se ci sono problemi, chiedi conferma per la correzione automatica
+    const shouldFix = await confirm(
+      `Problemi Trovati: ${auditResults.problematicRecords}`,
+      `L'audit ha trovato ${auditResults.problematicRecords} problemi su ${auditResults.totalRecords} record totali.\n\nVuoi avviare la correzione automatica?`
+    )
+    
+    if (shouldFix) {
+      info('Correzione in Corso...', 'Applicando correzioni automatiche ai problemi trovati...')
+      
+      // Esegui correzione automatica
+      const fixResults = await auditor.performCompleteFix()
+      
+      // Genera report finale
+      const userReport = auditor.generateUserReport()
+      
+      // Ricarica i dati aggiornati
+      await loadTimesheet()
+      
+      success('Correzione Completata!', userReport)
+      
+    } else {
+      // Mostra solo il report dei problemi trovati
+      const userReport = auditor.generateUserReport()
+      warning('Problemi Identificati', userReport)
+    }
+    
+  } catch (err) {
+    console.error('❌ Errore durante audit completo:', err)
+    error('Errore Audit', `Impossibile completare l'audit: ${err.message}`)
+  }
+}
+
+// 🧪 TEST SISTEMA: Verifica che le correzioni funzionino
+const runSystemTests = async () => {
+  try {
+    console.log('🧪 Avvio test sistema timesheet...')
+    
+    const { default: TimesheetSystemTester } = await import('../utils/testTimesheetSystem.js')
+    const tester = new TimesheetSystemTester()
+    
+    // Mostra loading
+    info('Test in Corso...', 'Eseguendo test di validazione del sistema...')
+    
+    // Esegui tutti i test
+    const testResults = await tester.runAllTests()
+    
+    // Genera report per l'utente
+    const userReport = tester.generateUserReport()
+    
+    if (testResults.success) {
+      success('Test Completati!', userReport)
+    } else {
+      warning('Test Parzialmente Falliti', userReport)
+    }
+    
+  } catch (err) {
+    console.error('❌ Errore durante test sistema:', err)
+    error('Errore Test', `Impossibile eseguire i test: ${err.message}`)
+  }
+}
+
+// 📅 DEBUG: Mostra tutte le date disponibili nei timesheet  
+const debugAllTimesheetDates = () => {
+  console.log('📅 =================================')
+  console.log('📅 DEBUG DATE TIMESHEET')
+  console.log('📅 =================================')
+  
+  if (timesheetDettagli.value.length === 0) {
+    console.log('❌ Nessun timesheet trovato!')
+    info('Date Timesheet', '❌ Nessun timesheet trovato in Firestore!')
+    return
+  }
+  
+  // Raggruppa per data
+  const dateMap = new Map()
+  timesheetDettagli.value.forEach(t => {
+    const data = t.data
+    if (!dateMap.has(data)) {
+      dateMap.set(data, { count: 0, dipendenti: new Set(), ore: 0 })
+    }
+    const dataInfo = dateMap.get(data)
+    dataInfo.count++
+    dataInfo.dipendenti.add(t.dipendenteId)
+    dataInfo.ore += (t.ore || t.oreLavorate || 0)
+  })
+  
+  // Ordina per data
+  const sortedDates = Array.from(dateMap.entries()).sort(([a], [b]) => new Date(b) - new Date(a))
+  
+  console.log(`📊 Timesheet distribuiti su ${sortedDates.length} date diverse:`)
+  
+  let report = `📅 DATE TIMESHEET DISPONIBILI (${sortedDates.length} date)\n\n`
+  
+  sortedDates.slice(0, 20).forEach(([data, info]) => {
+    const dateObj = new Date(data)
+    const dayName = dateObj.toLocaleDateString('it-IT', { weekday: 'short' })
+    const formattedDate = dateObj.toLocaleDateString('it-IT')
+    
+    console.log(`  📅 ${data} (${dayName}): ${info.count} timesheet, ${info.dipendenti.size} dipendenti, ${info.ore}h totali`)
+    report += `${formattedDate} (${dayName}): ${info.count} timesheet, ${info.ore}h\n`
+  })
+  
+  if (sortedDates.length > 20) {
+    report += `\n... e altre ${sortedDates.length - 20} date`
+  }
+  
+  // Trova la settimana con più dati
+  const weekMap = new Map()
+  sortedDates.forEach(([data, info]) => {
+    const dateObj = new Date(data)
+    const startOfWeek = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate())
+    const dayOfWeek = startOfWeek.getDay()
+    const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+    startOfWeek.setDate(startOfWeek.getDate() - daysToSubtract)
+    
+    const weekKey = startOfWeek.toISOString().split('T')[0]
+    if (!weekMap.has(weekKey)) {
+      weekMap.set(weekKey, { ore: 0, giorni: new Set() })
+    }
+    const weekInfo = weekMap.get(weekKey)
+    weekInfo.ore += info.ore
+    weekInfo.giorni.add(data)
+  })
+  
+  const topWeeks = Array.from(weekMap.entries())
+    .sort(([, a], [, b]) => b.ore - a.ore)
+    .slice(0, 5)
+  
+  console.log('\n🏆 TOP 5 SETTIMANE PER ORE:')
+  report += '\n\n🏆 SETTIMANE CON PIÙ ORE:\n'
+  topWeeks.forEach(([weekStart, info], index) => {
+    console.log(`  ${index + 1}. Settimana ${weekStart}: ${info.ore}h su ${info.giorni.size} giorni`)
+    report += `${index + 1}. ${weekStart}: ${info.ore}h\n`
+  })
+  
+  console.log('📅 =================================')
+  
+  info('Date Timesheet', report)
+}
+
+// 🔧 FIX: Calcola periodo settimana basato su selezione
+const getSelectedWeekPeriod = () => {
+  const now = new Date()
+  let weeksBack = 0
+  
+  switch (selectedWeek.value) {
+    case 'current': weeksBack = 0; break
+    case 'last': weeksBack = 1; break
+    case 'two-weeks': weeksBack = 2; break
+    case 'three-weeks': weeksBack = 3; break
+    case 'month': weeksBack = 4; break
+    default: weeksBack = 0
+  }
+  
+  // Calcola l'inizio della settimana target
+  const targetDate = new Date(now)
+  targetDate.setDate(now.getDate() - (weeksBack * 7))
+  
+  const startOfWeek = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate())
+  const dayOfWeek = startOfWeek.getDay()
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  startOfWeek.setDate(startOfWeek.getDate() - daysToSubtract)
+  startOfWeek.setHours(0, 0, 0, 0)
+  
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 5)
+  endOfWeek.setHours(23, 59, 59, 999)
+  
+  return { startOfWeek, endOfWeek }
+}
+
+// 🔧 CORREZIONE CRITICA: Fix per timesheet con date sbagliate (01/01/2025)
+const fixBuggedDates = async () => {
+  try {
+    console.log('🔧 =================================')
+    console.log('🔧 CORREZIONE DATE TIMESHEET')
+    console.log('🔧 =================================')
+    
+    // Conferma dall'utente
+    const confirmed = await confirm(
+      'Correggere Date Timesheet?', 
+      'Questa operazione correggerà automaticamente tutti i timesheet con data 01/01/2025 impostandoli alla settimana scorsa (1-5 luglio 2025).\n\nVuoi procedere?'
+    )
+    
+    if (!confirmed) {
+      console.log('❌ Operazione annullata dall\'utente')
+      return
+    }
+    
+    info('Correzione in corso...', 'Analizzando e correggendo i timesheet con date sbagliate...')
+    
+    // 1. Trova tutti i timesheet con data 01/01/2025
+    const timesheetBuggati = timesheetDettagli.value.filter(t => t.data === '2025-01-01')
+    
+    console.log(`🔍 Trovati ${timesheetBuggati.length} timesheet con data sbagliata (01/01/2025)`)
+    
+    if (timesheetBuggati.length === 0) {
+      info('Nessun Problema', 'Non sono stati trovati timesheet con date sbagliate da correggere.')
+      return
+    }
+    
+    // 2. Calcola le date della settimana scorsa (1-5 luglio 2025)
+    const oggi = new Date() // 8 luglio 2025
+    const settimanaScorsa = []
+    
+    // Genera le date della settimana lavorativa scorsa (1-5 luglio)
+    for (let i = 1; i <= 5; i++) {
+      const data = new Date(2025, 6, i) // 6 = luglio (0-indexed), 1-5 = giorni
+      settimanaScorsa.push(data.toISOString().split('T')[0])
+    }
+    
+    console.log('📅 Date settimana scorsa da usare:', settimanaScorsa)
+    
+    // 3. Raggruppa i timesheet per dipendente
+    const perDipendente = {}
+    timesheetBuggati.forEach(t => {
+      if (!perDipendente[t.dipendenteId]) {
+        perDipendente[t.dipendenteId] = []
+      }
+      perDipendente[t.dipendenteId].push(t)
+    })
+    
+    // 4. Distribuzione intelligente delle date
+    let correzioniEffettuate = 0
+    const reportCorrezioni = []
+    
+    for (const [dipendenteId, timesheet] of Object.entries(perDipendente)) {
+      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
+      const nomeDipendente = dipendente ? `${dipendente.nome} ${dipendente.cognome}` : `ID: ${dipendenteId}`
+      
+      console.log(`👤 Correggendo ${timesheet.length} timesheet per ${nomeDipendente}`)
+      
+      for (let i = 0; i < timesheet.length; i++) {
+        const t = timesheet[i]
+        
+        // Distribuisci i timesheet sui giorni della settimana scorsa
+        const dataCorretta = settimanaScorsa[i % settimanaScorsa.length]
+        
+        console.log(`  🔧 ${t.id}: 2025-01-01 → ${dataCorretta}`)
+        
+        try {
+          // Aggiorna il timesheet con la data corretta
+          const updateResult = await firestoreStore.updateDocument('timesheet', t.id, {
+            data: dataCorretta,
+            note: (t.note || '') + ' [Data corretta automaticamente]',
+            fixedDate: true,
+            originalDate: '2025-01-01'
+          })
+          
+          if (updateResult.success) {
+            correzioniEffettuate++
+            reportCorrezioni.push({
+              dipendente: nomeDipendente,
+              ore: t.ore || t.oreLavorate || 0,
+              dataOriginale: '2025-01-01',
+              dataCorretta: dataCorretta
+            })
+          } else {
+            console.error(`❌ Errore aggiornamento timesheet ${t.id}:`, updateResult.error)
+          }
+          
+        } catch (err) {
+          console.error(`❌ Errore correzione timesheet ${t.id}:`, err)
+        }
+      }
+    }
+    
+    console.log(`✅ Correzioni completate: ${correzioniEffettuate}/${timesheetBuggati.length}`)
+    
+    // 5. Ricarica i dati
+    console.log('🔄 Ricaricamento dati...')
+    await loadTimesheet()
+    
+    // 6. Report finale
+    console.log('🔧 =================================')
+    console.log('🔧 FINE CORREZIONE')
+    console.log('🔧 =================================')
+    
+    const reportText = `
+🔧 CORREZIONE DATE COMPLETATA
+
+✅ Timesheet corretti: ${correzioniEffettuate}
+📅 Date ripristinate: ${reportCorrezioni.length}
+
+📋 DETTAGLI CORREZIONI:
+${reportCorrezioni.slice(0, 10).map(r => 
+  `• ${r.dipendente}: ${r.ore}h → ${r.dataCorretta}`
+).join('\n')}
+${reportCorrezioni.length > 10 ? `\n... e altri ${reportCorrezioni.length - 10}` : ''}
+
+🎯 Ora i timesheet sono distribuiti correttamente sulla settimana scorsa (1-5 luglio 2025).
+    `
+    
+         success('Date Corrette!', reportText)
+     
+     // 7. Cambia automaticamente alla settimana scorsa per vedere i dati corretti
+     selectedWeek.value = 'last'
+     console.log('📅 Cambiata visualizzazione alla settimana scorsa')
+     
+     // Aggiorna la visualizzazione
+     updateDipendentiOreFromTimesheet()
+     
+   } catch (error) {
+     console.error('❌ Errore durante correzione date:', error)
+     error('Errore Correzione', `Impossibile correggere le date: ${error.message}`)
+   }
+ }
+
 // 🚀 NUOVA: Popola timesheetData con i dati reali per la visualizzazione settimanale
 const updateTimesheetDataFromDetails = (startOfWeek, endOfWeek) => {
   const weeklyData = []
@@ -1634,6 +2257,12 @@ const updateTimesheetDataFromDetails = (startOfWeek, endOfWeek) => {
     dipendenti: dipendenti.value.length,
     timesheetTotali: timesheetDettagli.value.length
   })
+  
+  // 🔧 FIX: Debug periodo per verificare correttezza
+  console.log('🗓️ Debug periodo settimana:')
+  console.log('  - Oggi:', new Date().toISOString().split('T')[0])
+  console.log('  - Inizio settimana:', startOfWeek.toISOString().split('T')[0])
+  console.log('  - Fine settimana:', endOfWeek.toISOString().split('T')[0])
   
   dipendenti.value.forEach(dipendente => {
     // Filtra i timesheet per questa settimana
@@ -1765,6 +2394,15 @@ const getRuoloLabel = (ruolo) => {
   return labels[ruolo] || ruolo
 }
 
+// 🚀 MULTI-ASSIGNMENT: Ottiene tutti i cantieri dove il dipendente è assegnato
+const getCantieriAssegnati = (dipendenteId) => {
+  if (!firestoreStore.cantieri || !dipendenteId) return []
+  
+  return firestoreStore.cantieri
+    .filter(cantiere => cantiere.team?.some(membro => membro.id === dipendenteId))
+    .map(cantiere => cantiere.nome)
+}
+
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('it-IT')
 }
@@ -1847,7 +2485,10 @@ const saveTimesheet = async () => {
       throw new Error('Dipendente non trovato!')
     }
 
-    const timesheetData = {
+    // 🔧 VALIDAZIONE CENTRALIZZATA per timesheet manuali
+    const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
+
+    const timesheetDataRaw = {
       dipendenteId: newTimesheet.value.dipendenteId,
       data: newTimesheet.value.data,
       cantiere: newTimesheet.value.cantiere,
@@ -1861,11 +2502,22 @@ const saveTimesheet = async () => {
       createdAt: new Date().toISOString()
     }
 
-    // Valida il timesheet
-    await validateTimesheet(timesheetData)
+    // 🔧 DOPPIA VALIDAZIONE: centralizzata + esistente
+    const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
+    
+    if (!timesheetValidation.isValid) {
+      throw new Error(`Dati non validi: ${timesheetValidation.errors.join(', ')}`)
+    }
+
+    if (timesheetValidation.warnings.length > 0) {
+      console.warn('⚠️ TIMESHEET MANUALE warnings:', timesheetValidation.warnings)
+    }
+
+    // Valida anche con il metodo esistente
+    await validateTimesheet(timesheetValidation.correctedData)
 
     // Salva in Firestore
-    const result = await firestoreStore.registraTimesheet(timesheetData)
+    const result = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
     
     if (result.success) {
       // Ricarica i timesheet
@@ -2001,6 +2653,146 @@ const closeTimesheetModal = () => {
   }
 }
 
+// 🚀 NUOVO: Funzioni per gestire modifica/eliminazione timesheet
+const editTimesheetEntry = (entry) => {
+  // Verifica che sia una registrazione manuale
+  if (entry.fonte !== 'manuale') {
+    warning('Modifica Non Permessa', 'Puoi modificare solo le registrazioni inserite manualmente. Le registrazioni auto-generate dal Giornale Cantiere non possono essere modificate.')
+    return
+  }
+
+  // Trova il dipendente
+  const dipendente = dipendenti.value.find(d => d.id === entry.dipendenteId)
+  if (!dipendente) {
+    error('Errore', 'Dipendente non trovato')
+    return
+  }
+
+  // Popola i dati per la modifica
+  editingTimesheet.value = {
+    id: entry.id,
+    dipendenteId: entry.dipendenteId,
+    data: entry.data,
+    ore: entry.ore || entry.oreLavorate || '',
+    cantiere: entry.cantiere || entry.cantiereNome || '',
+    note: entry.note || '',
+    orarioInizio: entry.orarioInizio || '08:00',
+    orarioFine: entry.orarioFine || '17:00'
+  }
+  
+  editingTimesheetDipendenteName.value = `${dipendente.nome} ${dipendente.cognome}`
+  showEditTimesheetModal.value = true
+}
+
+const updateTimesheet = async () => {
+  try {
+    const dipendente = dipendenti.value.find(d => d.id === editingTimesheet.value.dipendenteId)
+    if (!dipendente) {
+      throw new Error('Dipendente non trovato!')
+    }
+
+    // 🔧 VALIDAZIONE CENTRALIZZATA per update timesheet
+    const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
+
+    const timesheetDataRaw = {
+      dipendenteId: editingTimesheet.value.dipendenteId,
+      data: editingTimesheet.value.data,
+      cantiere: editingTimesheet.value.cantiere,
+      ore: parseFloat(editingTimesheet.value.ore),
+      oreLavorate: parseFloat(editingTimesheet.value.ore), // Entrambi i campi per compatibilità
+      orarioInizio: editingTimesheet.value.orarioInizio,
+      orarioFine: editingTimesheet.value.orarioFine,
+      note: editingTimesheet.value.note,
+      costoOrario: dipendente.pagaOraria || 25,
+      costoTotale: parseFloat(editingTimesheet.value.ore) * (dipendente.pagaOraria || 25),
+      fonte: 'manuale',
+      updatedAt: new Date().toISOString()
+    }
+
+    // 🔧 DOPPIA VALIDAZIONE: centralizzata + esistente
+    const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
+    
+    if (!timesheetValidation.isValid) {
+      throw new Error(`Dati non validi: ${timesheetValidation.errors.join(', ')}`)
+    }
+
+    if (timesheetValidation.warnings.length > 0) {
+      console.warn('⚠️ UPDATE TIMESHEET warnings:', timesheetValidation.warnings)
+    }
+
+    // Valida anche con il metodo esistente
+    await validateTimesheet(timesheetValidation.correctedData)
+
+    // Aggiorna in Firestore
+    const result = await firestoreStore.updateDocument('timesheet', editingTimesheet.value.id, timesheetValidation.correctedData)
+    
+    if (result.success) {
+      // Ricarica i timesheet
+      await loadTimesheet()
+      
+      closeEditTimesheetModal()
+      success('Ore Aggiornate', `Timesheet per ${dipendente?.nome} ${dipendente?.cognome} aggiornato con successo!`)
+    } else {
+      throw new Error(result.error || 'Errore sconosciuto')
+    }
+  } catch (err) {
+    console.error('Errore aggiornamento timesheet:', err)
+    error('Errore Aggiornamento', err.message)
+  }
+}
+
+const deleteTimesheetEntry = async (entry) => {
+  // Verifica che sia una registrazione manuale
+  if (entry.fonte !== 'manuale') {
+    warning('Eliminazione Non Permessa', 'Puoi eliminare solo le registrazioni inserite manualmente. Le registrazioni auto-generate dal Giornale Cantiere non possono essere eliminate.')
+    return
+  }
+
+  try {
+    const dipendente = dipendenti.value.find(d => d.id === entry.dipendenteId)
+    if (!dipendente) {
+      error('Errore', 'Dipendente non trovato')
+      return
+    }
+
+    const confermato = await confirm(
+      'Elimina Registrazione',
+      `Sei sicuro di voler eliminare la registrazione di ${entry.ore || entry.oreLavorate}h per ${dipendente.nome} ${dipendente.cognome} del ${formatDate(entry.data)}?\n\nQuesta azione non può essere annullata.`
+    )
+
+    if (confermato) {
+      const result = await firestoreStore.deleteDocument('timesheet', entry.id)
+      
+      if (result.success) {
+        // Ricarica i timesheet
+        await loadTimesheet()
+        
+        success('Registrazione Eliminata', `Timesheet per ${dipendente.nome} ${dipendente.cognome} eliminato con successo!`)
+      } else {
+        throw new Error(result.error || 'Errore sconosciuto')
+      }
+    }
+  } catch (err) {
+    console.error('Errore eliminazione timesheet:', err)
+    error('Errore Eliminazione', err.message)
+  }
+}
+
+const closeEditTimesheetModal = () => {
+  showEditTimesheetModal.value = false
+  editingTimesheet.value = {
+    id: null,
+    dipendenteId: '',
+    data: '',
+    ore: '',
+    cantiere: '',
+    note: '',
+    orarioInizio: '08:00',
+    orarioFine: '17:00'
+  }
+  editingTimesheetDipendenteName.value = ''
+}
+
 const closeDetailModal = () => {
   showDetailModal.value = false
   selectedDipendente.value = null
@@ -2093,9 +2885,11 @@ const savePresenza = async (dipendenteId) => {
       // Calcola le ore effettive considerando la pausa
       const oreEffettive = ((uscita - entrata) / 60) - (presenza.pausa / 60)
       
-      // Crea il timesheet corrispondente
+      // 🔧 VALIDAZIONE CENTRALIZZATA per timesheet da presenza
+      const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
+      
       const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
-      const timesheetData = {
+      const timesheetDataRaw = {
         dipendenteId: dipendenteId,
         data: selectedDate.value,
         cantiere: dipendente?.cantiereAttuale || 'Non Assegnato',
@@ -2110,8 +2904,18 @@ const savePresenza = async (dipendenteId) => {
         createdAt: new Date().toISOString()
       }
 
+      const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
+      
+      if (!timesheetValidation.isValid) {
+        throw new Error(`Timesheet presenza non valido: ${timesheetValidation.errors.join(', ')}`)
+      }
+
+      if (timesheetValidation.warnings.length > 0) {
+        console.warn('⚠️ TIMESHEET PRESENZA warnings:', timesheetValidation.warnings)
+      }
+
       // Salva il timesheet in Firestore
-      const timesheetResult = await firestoreStore.registraTimesheet(timesheetData)
+      const timesheetResult = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
       
       if (timesheetResult.success) {
         // Ricarica i timesheet
@@ -2573,7 +3377,10 @@ const risolviIncoerenza = async (incoerenza) => {
             const presenza = presenzeResult.data[0]
             const oreEffettive = presenza.oreEffettive || 8 // Default 8 ore
             
-            const timesheetData = {
+            // 🔧 VALIDAZIONE CENTRALIZZATA per risoluzione automatica
+            const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
+            
+            const timesheetDataRaw = {
               dipendenteId: dipendente.id,
               data: incoerenza.data,
               cantiere: dipendente.cantiereAttuale || 'Non Assegnato',
@@ -2586,7 +3393,17 @@ const risolviIncoerenza = async (incoerenza) => {
               fonte: 'risoluzione_automatica'
             }
             
-            const result = await firestoreStore.registraTimesheet(timesheetData)
+            const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
+            
+            if (!timesheetValidation.isValid) {
+              throw new Error(`Timesheet risoluzione automatica non valido: ${timesheetValidation.errors.join(', ')}`)
+            }
+
+            if (timesheetValidation.warnings.length > 0) {
+              console.warn('⚠️ TIMESHEET RISOLUZIONE warnings:', timesheetValidation.warnings)
+            }
+            
+            const result = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
             if (!result.success) {
               throw new Error(result.error || 'Errore creazione timesheet')
             }

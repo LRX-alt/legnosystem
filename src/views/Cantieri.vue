@@ -1656,23 +1656,25 @@ const getAvailableEmployees = () => {
   // Se non ci sono dipendenti caricati, ritorna array vuoto
   if (!firestoreStore.dipendenti) return []
   
-  // Filtra i dipendenti attivi che non sono già nel team del cantiere
+  // 🚀 MULTI-ASSIGNMENT: Permette ai dipendenti di essere assegnati a più cantieri
   return firestoreStore.dipendenti.filter(dipendente => {
     // Verifica che il dipendente sia attivo
     const isActive = dipendente.stato === 'attivo'
     
-    // Verifica che non sia già nel team
+    // Verifica che non sia già nel team di QUESTO cantiere specifico
     const notInTeam = !selectedCantiere.value?.team?.some(membro => membro.id === dipendente.id)
     
-    // Verifica che non sia assegnato ad altri cantieri
-    const isAvailable = !dipendente.cantiereAttuale || 
-                       dipendente.cantiereAttuale === selectedCantiere.value?.nome ||
-                       dipendente.cantiereAttuale === ''
+    // 🔓 RIMOSSO BLOCCO: I dipendenti possono ora essere aggiunti a più cantieri
+    // Non controlliamo più cantiereAttuale per permettere multi-assegnazione
     
-    return isActive && notInTeam && isAvailable
+    return isActive && notInTeam
   }).map(dipendente => ({
     ...dipendente,
-    iniziali: getIniziali(dipendente.nome, dipendente.cognome)
+    iniziali: getIniziali(dipendente.nome, dipendente.cognome),
+    // 📋 INFO CANTIERI: Mostra tutti i cantieri dove è assegnato
+    cantieriAssegnati: firestoreStore.cantieri
+      .filter(cantiere => cantiere.team?.some(membro => membro.id === dipendente.id))
+      .map(cantiere => cantiere.nome)
   }))
 }
 
@@ -1705,37 +1707,27 @@ const addMemberToTeam = async (dipendente) => {
       pagaOraria: dipendente.pagaOraria
     }
 
-    // Aggiorna il cantiere
+    // Aggiorna il cantiere con il nuovo membro
     const cantiereUpdate = {
       team: [...(selectedCantiere.value.team || []), nuovoMembro]
     }
 
-    // Aggiorna il dipendente
-    const dipendenteUpdate = {
-      cantiereAttuale: selectedCantiere.value.nome
-    }
-
-    // Esegui gli aggiornamenti in modo atomico usando la transazione di Firebase
+    // 🚀 MULTI-ASSIGNMENT: Non aggiorniamo più cantiereAttuale per permettere multi-assegnazione
+    // Il dipendente può ora essere presente in più team contemporaneamente
+    
+    // Aggiorna solo il cantiere (non il dipendente per evitare blocchi)
     const cantiereRef = doc(db, 'cantieri', selectedCantiere.value.id)
-    const dipendenteRef = doc(db, 'dipendenti', dipendente.id)
 
     await runTransaction(db, async (transaction) => {
-      // Verifica che i documenti esistano
+      // Verifica che il cantiere esista
       const cantiereDoc = await transaction.get(cantiereRef)
-      const dipendenteDoc = await transaction.get(dipendenteRef)
 
       if (!cantiereDoc.exists()) {
         throw new Error('Il cantiere non esiste più')
       }
-      if (!dipendenteDoc.exists()) {
-        throw new Error('Il dipendente non esiste più')
-      }
 
-      // Aggiorna il cantiere
+      // Aggiorna solo il cantiere - il dipendente rimane libero per altri cantieri
       transaction.update(cantiereRef, cantiereUpdate)
-
-      // Aggiorna il dipendente
-      transaction.update(dipendenteRef, dipendenteUpdate)
     })
 
     // Aggiorna lo stato locale
@@ -1758,36 +1750,27 @@ const removeMemberFromTeam = async (membroId) => {
       return
     }
 
-    // Prepara gli aggiornamenti
+    // Rimuovi il membro dal team del cantiere
     const cantiereUpdate = {
       team: selectedCantiere.value.team.filter(m => m.id !== membroId)
     }
 
-    const dipendenteUpdate = {
-      cantiereAttuale: null
-    }
-
-    // Esegui gli aggiornamenti in modo atomico usando la transazione di Firebase
+    // 🚀 MULTI-ASSIGNMENT: Non rimuoviamo cantiereAttuale perché potrebbe essere in altri team
+    // Il dipendente rimane disponibile per tutti gli altri cantieri dove è assegnato
+    
+    // Aggiorna solo il cantiere
     const cantiereRef = doc(db, 'cantieri', selectedCantiere.value.id)
-    const dipendenteRef = doc(db, 'dipendenti', membroId)
 
     await runTransaction(db, async (transaction) => {
-      // Verifica che i documenti esistano
+      // Verifica che il cantiere esista
       const cantiereDoc = await transaction.get(cantiereRef)
-      const dipendenteDoc = await transaction.get(dipendenteRef)
 
       if (!cantiereDoc.exists()) {
         throw new Error('Il cantiere non esiste più')
       }
-      if (!dipendenteDoc.exists()) {
-        throw new Error('Il dipendente non esiste più')
-      }
 
-      // Aggiorna il cantiere
+      // Aggiorna solo il cantiere - il dipendente rimane disponibile per altri cantieri
       transaction.update(cantiereRef, cantiereUpdate)
-
-      // Aggiorna il dipendente
-      transaction.update(dipendenteRef, dipendenteUpdate)
     })
 
     // Aggiorna lo stato locale
@@ -3258,9 +3241,13 @@ const getMaterialStatusColor = (stato) => {
                     <div>
                       <p class="font-medium text-gray-900">{{ dipendente.nome }} {{ dipendente.cognome }}</p>
                       <p class="text-sm text-gray-600">{{ getRuoloLabel(dipendente.ruolo) }}</p>
-                      <p class="text-xs text-gray-500">
-                        {{ dipendente.cantiereAttuale || 'Disponibile' }}
-                      </p>
+                      <!-- 🚀 MULTI-ASSIGNMENT: Mostra tutti i cantieri assegnati -->
+                      <div class="text-xs text-gray-500">
+                        <span v-if="dipendente.cantieriAssegnati?.length > 0">
+                          🏗️ {{ dipendente.cantieriAssegnati.join(', ') }}
+                        </span>
+                        <span v-else class="text-green-600">✅ Disponibile</span>
+                      </div>
                     </div>
                   </div>
                   <button @click="addMemberToTeam(dipendente)" 
@@ -3271,7 +3258,8 @@ const getMaterialStatusColor = (stato) => {
                 </div>
               </div>
               <div v-if="getAvailableEmployees().length === 0" class="text-center py-8 text-gray-500">
-                <p>Tutti i dipendenti sono già assegnati</p>
+                <p>🚀 Tutti i dipendenti attivi sono già nel team di questo cantiere</p>
+                <p class="text-xs mt-1">I dipendenti possono ora essere assegnati a più cantieri contemporaneamente</p>
               </div>
             </div>
 

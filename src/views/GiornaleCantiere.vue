@@ -694,23 +694,35 @@ const toggleTeamMember = async (membro) => {
     newEntryData.value.teamPresente.splice(index, 1)
     console.log(`👤 Rimosso ${membro.nome} dal team presente`)
   } else {
-    // 🚀 VALIDAZIONE: Controlla se il dipendente è già assegnato altrove
+    // 🚀 MULTI-ASSIGNMENT: Validazione smart con warning
     const validationResult = await validateDipendenteAssignment(membro.id, newEntryData.value.data)
     
+    // ❌ BLOCCO: Solo per errori gravi (dipendente non attivo, non trovato, ecc.)
     if (!validationResult.canAssign) {
-      popup.warning('Attenzione!', validationResult.message)
-      
-      // Chiedi conferma se vuoi procedere comunque
-      const confirmed = await popup.confirm('Confermare Assegnazione?', 
-        `${membro.nome} ${validationResult.message}\n\nVuoi procedere comunque?`)
-      
-      if (!confirmed) {
-        console.log(`⚠️ Assegnazione annullata per ${membro.nome}`)
-        return
-      }
+      popup.error('Impossibile Assegnare', validationResult.message)
+      console.log(`❌ Assegnazione bloccata per ${membro.nome}: ${validationResult.message}`)
+      return
     }
     
-    // Aggiungi il membro se non presente
+    // ⚠️ WARNING: Mostra avvisi ma permette l'assegnazione
+    if (validationResult.type === 'warning' && validationResult.warnings?.length > 0) {
+      // Mostra popup informativo per i warning
+      const confirmed = await popup.confirm('Assegnazione con Avvertimenti', 
+        `${membro.nome}:\n\n${validationResult.warnings.map(w => `• ${w}`).join('\n')}\n\nVuoi procedere con l'assegnazione?`)
+      
+      if (!confirmed) {
+        console.log(`⚠️ Assegnazione annullata dall'utente per ${membro.nome}`)
+        return
+      }
+      
+      // Procedi con info per l'utente
+      console.log(`⚠️ Assegnazione confermata per ${membro.nome} con warning:`, validationResult.warnings)
+    } else {
+      // Nessun warning - assegnazione diretta
+      console.log(`✅ Assegnazione diretta per ${membro.nome} - nessun conflitto rilevato`)
+    }
+    
+    // Aggiungi il membro al team presente
     const pagaOraria = getDipendentePagaOraria(membro.id)
     newEntryData.value.teamPresente.push({
       id: membro.id,
@@ -794,38 +806,37 @@ const calculateDayCost = () => {
   return costoTotale
 }
 
-// 🚀 NUOVA: Validazione assegnazione dipendente
+// 🚀 MULTI-ASSIGNMENT: Validazione smart per assegnazione dipendente
 const validateDipendenteAssignment = async (dipendenteId, dataAssegnazione) => {
   try {
     const dipendente = firestoreStore.dipendenti.find(d => d.id === dipendenteId)
     if (!dipendente) {
-      return { canAssign: false, message: 'Dipendente non trovato' }
+      return { canAssign: false, message: 'Dipendente non trovato', type: 'error' }
     }
 
-    // Controlla se il dipendente è in uno stato che permette l'assegnazione
+    // ❌ BLOCCO: Solo per dipendenti non attivi
     if (dipendente.stato !== 'attivo') {
       return { 
         canAssign: false, 
-        message: `è in stato: ${dipendente.stato.toUpperCase()}` 
+        message: `è in stato: ${dipendente.stato.toUpperCase()}`, 
+        type: 'error'
       }
     }
 
-    // Controlla se il dipendente è già assegnato a un altro cantiere in corso
+    let warnings = []
+
+    // ⚠️ WARNING: Dipendente già assegnato ad altri cantieri (non blocca più)
     if (dipendente.cantiereAttuale && dipendente.cantiereAttuale !== cantiere.value.nome) {
-      return { 
-        canAssign: false, 
-        message: `è già assegnato al cantiere: ${dipendente.cantiereAttuale}` 
-      }
+      warnings.push(`Già assegnato al cantiere: ${dipendente.cantiereAttuale}`)
     }
 
-    // Controlla se il dipendente ha già presenze in altri cantieri nello stesso giorno
+    // ⚠️ WARNING: Verifica presenze in altri cantieri nello stesso giorno
     const presenzeGiorno = await firestoreOperations.load('presenze', [
       ['dipendenteId', '==', dipendenteId],
       ['data', '==', dataAssegnazione]
     ])
 
     if (presenzeGiorno.success && presenzeGiorno.data?.length > 0) {
-      // Filtra presenze di altri cantieri
       const presenzeAltriCantieri = presenzeGiorno.data.filter(p => 
         p.cantiereId !== cantiere.value.id && 
         p.stato === 'presente'
@@ -833,21 +844,17 @@ const validateDipendenteAssignment = async (dipendenteId, dataAssegnazione) => {
 
       if (presenzeAltriCantieri.length > 0) {
         const altriCantieri = presenzeAltriCantieri.map(p => p.cantiereNome).join(', ')
-        return { 
-          canAssign: false, 
-          message: `ha già presenze in altri cantieri: ${altriCantieri}` 
-        }
+        warnings.push(`Ha già presenze registrate in: ${altriCantieri}`)
       }
     }
 
-    // Controlla se il dipendente ha già timesheet in altri cantieri nello stesso giorno
+    // ⚠️ WARNING: Verifica timesheet in altri cantieri nello stesso giorno
     const timesheetGiorno = await firestoreOperations.load('timesheet', [
       ['dipendenteId', '==', dipendenteId],
       ['data', '==', dataAssegnazione]
     ])
 
     if (timesheetGiorno.success && timesheetGiorno.data?.length > 0) {
-      // Filtra timesheet di altri cantieri
       const timesheetAltriCantieri = timesheetGiorno.data.filter(t => 
         t.cantiereId !== cantiere.value.id
       )
@@ -855,25 +862,27 @@ const validateDipendenteAssignment = async (dipendenteId, dataAssegnazione) => {
       if (timesheetAltriCantieri.length > 0) {
         const oreTotali = timesheetAltriCantieri.reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
         if (oreTotali > 0) {
-          return { 
-            canAssign: false, 
-            message: `ha già ${oreTotali}h registrate in altri cantieri` 
-          }
+          warnings.push(`Ha già ${oreTotali}h di lavoro registrate in altri cantieri oggi`)
         }
       }
     }
 
-    // Tutto OK, può essere assegnato
+    // 🚀 SEMPRE PERMESSO: L'assegnazione è sempre consentita con eventuali warning
     return { 
       canAssign: true, 
-      message: 'Disponibile per assegnazione' 
+      message: warnings.length > 0 
+        ? `⚠️ ATTENZIONE: ${warnings.join(' • ')}`
+        : '✅ Disponibile per assegnazione',
+      type: warnings.length > 0 ? 'warning' : 'success',
+      warnings: warnings
     }
 
   } catch (error) {
     console.error('Errore validazione assegnazione dipendente:', error)
     return { 
       canAssign: false, 
-      message: 'Errore durante la validazione' 
+      message: 'Errore durante la validazione', 
+      type: 'error'
     }
   }
 }
@@ -899,10 +908,17 @@ const updateRealTimePresences = async () => {
         // Verifica se la presenza esiste già
         const presenzaEsistente = await firestoreStore.getDocument('presenze', presenzaKey)
         
+        // 🔧 FIX: Validazione data anche per presenze realtime
+        let dataValidataPresenza = dataRegistrazione
+        if (!dataValidataPresenza || dataValidataPresenza === '' || dataValidataPresenza === '1970-01-01' || dataValidataPresenza === '2025-01-01') {
+          console.warn(`⚠️ Data non valida in presenza realtime: "${dataValidataPresenza}", usando oggi`)
+          dataValidataPresenza = new Date().toISOString().split('T')[0]
+        }
+        
         const presenzaData = {
           id: presenzaKey,
           dipendenteId: membro.id,
-          data: dataRegistrazione,
+          data: dataValidataPresenza, // 🔧 Usa data validata
           orarioInizio: orarioInizio,
           orarioFine: orarioFine,
           oreEffettive: newEntryData.value.oreTotali / newEntryData.value.teamPresente.length,
@@ -912,6 +928,7 @@ const updateRealTimePresences = async () => {
           stato: 'presente',
           note: `Presenza da giornale cantiere - ${cantiere.value.nome}`,
           fonte: 'giornale_cantiere_realtime',
+          dataOriginale: dataRegistrazione, // 🔧 Salva la data originale per debug
           updatedAt: new Date().toISOString()
         }
 
@@ -1087,15 +1104,24 @@ const syncTimesheetFromGiornale = async (entryData, registrazioneId) => {
       return
     }
 
+    // 🔧 NUOVA VALIDAZIONE CENTRALIZZATA: Valida la data prima di procedere
+    const { validateTimesheetDate } = await import('../utils/timesheetValidation.js')
+    const dateValidation = validateTimesheetDate(entryData.data)
+    
+    if (dateValidation.wasFixed) {
+      console.warn(`🔧 GIORNALE CANTIERE: Data corretta da "${dateValidation.originalDate}" a "${dateValidation.correctedDate}"`)
+    }
+
+    const dataValidata = dateValidation.correctedDate
     const orePerPersona = entryData.oreTotali / entryData.teamPresente.length
 
     // 🚀 PARALLELIZE: Crea tutte le operazioni in parallelo
     const operazioniTimesheet = entryData.teamPresente.map(async (membro) => {
       try {
-        // Crea presenza
+        // Crea presenza con data validata
         const presenzaData = {
           dipendenteId: membro.id,
-          data: entryData.data,
+          data: dataValidata, // 🔧 Usa data validata
           orarioInizio: entryData.orarioInizio,
           orarioFine: entryData.orarioFine,
           oreEffettive: orePerPersona,
@@ -1105,6 +1131,7 @@ const syncTimesheetFromGiornale = async (entryData, registrazioneId) => {
           note: `Presenza registrata da giornale cantiere - ${entryData.attivita?.join(', ') || 'Attività cantiere'}`,
           fonte: 'giornale_cantiere',
           registrazioneGiornaleId: registrazioneId,
+          dataOriginale: entryData.data, // 🔧 Salva la data originale per debug
           createdAt: new Date().toISOString()
         }
 
@@ -1115,19 +1142,42 @@ const syncTimesheetFromGiornale = async (entryData, registrazioneId) => {
           return
         }
 
-        // Crea timesheet
-        const timesheetData = {
+        // 🔧 VALIDAZIONE COMPLETA TIMESHEET con utility centralizzata
+        const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
+        
+        console.log(`📅 Data timesheet per ${membro.nome}: ${entryData.data} → ${dataValidata}`)
+        
+        // Crea timesheet con validazione completa
+        const timesheetDataRaw = {
           dipendenteId: membro.id,
-          data: entryData.data,
+          data: dataValidata, // 🔧 Usa la data validata centralizzata
+          ore: orePerPersona,
           oreLavorate: orePerPersona,
+          cantiere: cantiere.value.nome,
           cantiereId: cantiere.value.id,
+          orarioInizio: entryData.orarioInizio,
+          orarioFine: entryData.orarioFine,
+          note: `Auto-generato da Giornale Cantiere - ${entryData.attivita?.join(', ') || 'Attività cantiere'}`,
+          costoOrario: membro.pagaOraria || 25,
+          costoTotale: orePerPersona * (membro.pagaOraria || 25),
           fonte: 'giornale_cantiere',
           registrazioneGiornaleId: registrazioneId,
-          descrizione: `Lavoro su cantiere ${cantiere.value.nome}`,
-          validato: false
+          dataOriginale: entryData.data, // 🔧 Salva la data originale per debug
+          createdAt: new Date().toISOString()
         }
 
-        const result = await firestoreStore.registraTimesheet(timesheetData)
+        const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
+        
+        if (!timesheetValidation.isValid) {
+          console.error(`❌ Timesheet validation failed for ${membro.nome}:`, timesheetValidation.errors)
+          return
+        }
+
+        if (timesheetValidation.warnings.length > 0) {
+          console.warn(`⚠️ Timesheet warnings for ${membro.nome}:`, timesheetValidation.warnings)
+        }
+
+        const result = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
         
         if (!result.success) {
           console.error(`❌ Errore creazione timesheet per ${membro.nome}:`, result.error)
@@ -1424,22 +1474,36 @@ const syncTimesheet = async () => {
         const dipendente = firestoreStore.dipendenti.find(d => d.id === membro.id)
         if (!dipendente) return null
         
+        // 🔧 VALIDAZIONE CENTRALIZZATA anche nella sincronizzazione
+        const { validateTimesheetDate } = await import('../utils/timesheetValidation.js')
+        const syncDateValidation = validateTimesheetDate(entry.data)
+        
+        if (syncDateValidation.wasFixed) {
+          console.warn(`🔧 SYNC TIMESHEET: Data corretta da "${syncDateValidation.originalDate}" a "${syncDateValidation.correctedDate}"`)
+        }
+        
+        const dataValidata = syncDateValidation.correctedDate
+        
         // Crea timesheet
         const timesheetData = {
           dipendenteId: membro.id,
           cantiereId: cantiere.value.id,
-          data: entry.data,
+          data: dataValidata, // 🔧 Usa data validata
           oreLavorate: membro.oreLavorate || 8,
-          costoOrario: dipendente.pagaOraria || 0
+          costoOrario: dipendente.pagaOraria || 0,
+          fonte: 'giornale_cantiere_sync', // 🔧 Distingui la fonte
+          dataOriginale: entry.data // 🔧 Salva originale per debug
         }
         
         // Crea presenza
         const presenzaData = {
           dipendenteId: membro.id,
           cantiereId: cantiere.value.id,
-          data: entry.data,
+          data: dataValidata, // 🔧 Usa stessa data validata del timesheet
           tipo: 'cantiere',
-          note: `Cantiere: ${cantiere.value.nome}`
+          note: `Cantiere: ${cantiere.value.nome}`,
+          fonte: 'giornale_cantiere_sync', // 🔧 Distingui la fonte
+          dataOriginale: entry.data // 🔧 Salva originale per debug
         }
         
         return Promise.all([
