@@ -627,42 +627,60 @@
               
               <!-- Giorni -->
               <div v-for="day in week" 
-                   :key="day.dateStr"
-                   class="min-h-[120px] p-2"
+                   :key="day ? day.dateStr : `empty-${weekIndex}-${Math.random()}`"
+                   class="min-h-[180px] p-2 transition-all duration-150 ease-in-out"
                    :class="{
-                     'bg-gray-50': day.isWeekend,
-                     'bg-primary-50': day.dateStr === selectedDate
-                   }">
+                     'bg-gray-50 hover:bg-gray-100': day && day.isWeekend,
+                     'bg-blue-50 hover:bg-blue-100': day && day.dateStr === selectedDate,
+                     'bg-white hover:bg-gray-50': day && !day.isWeekend && day.dateStr !== selectedDate,
+                     'bg-gray-100': !day
+                   }"
+                   @mouseenter="showDayDetails(day, $event)"
+                   @mouseleave="hideDayDetails">
                 
-                <!-- Numero Giorno -->
-                <div class="text-right">
-                  <span class="text-sm" :class="{
-                    'text-gray-400': day.isWeekend,
-                    'font-bold text-primary-600': day.dateStr === selectedDate,
-                    'text-gray-900': !day.isWeekend && day.dateStr !== selectedDate
-                  }">
-                    {{ format(day.date, 'd') }}
-                  </span>
-                </div>
-                
-                <!-- Statistiche Giorno -->
-                <div v-if="day.stats.dipendentiPresenti > 0" 
-                     class="mt-2 space-y-1 text-xs">
-                  <div class="flex items-center text-gray-600">
-                    <span class="font-medium">👥 {{ day.stats.dipendentiPresenti }}</span>
-                    <span class="mx-1">•</span>
-                    <span>{{ day.stats.oreTotali }}h</span>
+                <template v-if="day">
+                  <!-- Container flessibile per gestire il layout interno -->
+                  <div class="flex flex-col h-full">
+                    <!-- Numero del giorno in alto -->
+                    <div class="text-right flex-shrink-0">
+                      <span class="text-sm" :class="{
+                        'text-gray-400': day.isWeekend,
+                        'font-bold text-blue-600': day.dateStr === selectedDate,
+                        'text-gray-900': !day.isWeekend && day.dateStr !== selectedDate
+                      }">
+                        {{ format(day.date, 'd') }}
+                      </span>
+                    </div>
+
+                    <!-- Elenco dipendenti (cresce per riempire lo spazio) -->
+                    <div v-if="day.stats.dipendentiPresenti > 0" class="flex-grow mt-1 space-y-1 overflow-y-auto text-xs pr-1">
+                      <div v-for="dipendente in day.dipendenti" :key="dipendente.id"
+                           class="flex items-center justify-between">
+                        <span class="font-medium text-gray-800 truncate" :title="dipendente.nome">{{ dipendente.nome }}</span>
+                        <span class="text-gray-600 flex-shrink-0 ml-2">{{ dipendente.ore.toFixed(1) }}h</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Indicatore per giorni lavorativi vuoti -->
+                    <div v-else-if="!day.isWeekend" class="flex-grow flex items-center justify-center text-center text-xs text-gray-400">
+                      <span>Nessuna registrazione</span>
+                    </div>
+
+                    <!-- Spaziatore per i weekend vuoti -->
+                    <div v-else class="flex-grow"></div>
+
+                    <!-- Riepilogo in basso -->
+                    <div v-if="day.stats.dipendentiPresenti > 0" class="flex-shrink-0 pt-1 mt-auto border-t border-gray-200">
+                      <div class="flex items-center justify-between text-gray-700 text-xs">
+                        <span class="font-semibold" title="Dipendenti presenti">👥 {{ day.stats.dipendentiPresenti }}</span>
+                        <span class="font-bold" title="Ore totali">{{ day.stats.oreTotali.toFixed(1) }}h</span>
+                      </div>
+                      <div class="text-green-600 font-semibold text-right text-xs" title="Costo totale">
+                        €{{ day.stats.costoTotale.toFixed(0) }}
+                      </div>
+                    </div>
                   </div>
-                  <div class="text-green-600 font-medium">
-                    €{{ day.stats.costoTotale.toFixed(0) }}
-                  </div>
-                </div>
-                
-                <!-- Indicatore Giorno Vuoto -->
-                <div v-else-if="!day.isWeekend" 
-                     class="mt-2 text-xs text-gray-400">
-                  Nessuna registrazione
-                </div>
+                </template>
               </div>
               
             </div>
@@ -691,6 +709,36 @@
               </p>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popover Dettagli Giorno -->
+    <div v-if="popoverVisible && hoveredDayDetails"
+         ref="popoverRef"
+         @mouseenter="onPopoverEnter"
+         @mouseleave="hideDayDetails"
+         class="fixed z-50 p-4 bg-white rounded-lg shadow-xl border border-gray-200 w-72"
+         :style="popoverPosition">
+      <div class="flex items-center justify-between pb-2 border-b border-gray-200 mb-2">
+        <h4 class="font-bold text-gray-800">
+          Dettagli {{ format(hoveredDayDetails.date, 'eeee d MMMM', { locale: it }) }}
+        </h4>
+      </div>
+      <ul class="space-y-2 max-h-60 overflow-y-auto">
+        <li v-for="dipendente in hoveredDayDetails.dipendenti" :key="dipendente.id"
+            class="flex items-center justify-between text-base">
+          <span class="text-gray-700">{{ dipendente.nome }}</span>
+          <div class="text-right flex-shrink-0 ml-2">
+            <span class="font-semibold text-gray-900">{{ dipendente.ore.toFixed(1) }}h</span>
+            <span class="text-sm font-medium text-green-600 ml-2">€{{ dipendente.costo.toFixed(2) }}</span>
+          </div>
+        </li>
+      </ul>
+      <div class="mt-3 pt-2 border-t border-gray-100 text-right">
+        <div class="text-lg">
+          <span class="text-gray-600">Totale: </span>
+          <span class="font-bold text-green-700">€{{ hoveredDayDetails.stats.costoTotale.toFixed(2) }}</span>
         </div>
       </div>
     </div>
@@ -1490,7 +1538,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { 
   PlusIcon, 
   UsersIcon, 
@@ -1524,6 +1572,13 @@ const selectedStato = ref('')
 const selectedWeek = ref('current')
 const selectedDipendente = ref(null)
 const selectedDate = ref(new Date().toISOString().split('T')[0])
+
+// Stato per il popover dei dettagli giornalieri
+const hoveredDayDetails = ref(null)
+const popoverVisible = ref(false)
+const popoverPosition = ref({ top: '0px', left: '0px' })
+const popoverTimeout = ref(null)
+const popoverRef = ref(null)
 
 // Stats - calcolate dinamicamente dai dati Firestore
 const stats = computed(() => {
@@ -3045,43 +3100,87 @@ onMounted(async () => {
   }
 })
 
-// Computed per il calendario
+// Funzione di utilità per il calendario
+const getCalendarDays = (date) => {
+  const start = startOfMonth(date)
+  const end = endOfMonth(date)
+  return eachDayOfInterval({ start, end })
+}
+
 const calendarDays = computed(() => {
-  const start = startOfMonth(new Date(selectedDate.value))
-  const end = endOfMonth(start)
-  
-  return eachDayOfInterval({ start, end }).map(date => {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    const dayNum = getDay(date)
+  if (!timesheetDettagli.value || timesheetDettagli.value.length === 0) {
+    return getCalendarDays(new Date(selectedDate.value)).map(day => ({
+      date: day,
+      dateStr: format(day, 'yyyy-MM-dd'),
+      isWeekend: getDay(day) === 0 || getDay(day) === 6,
+      stats: {
+        dipendentiPresenti: 0,
+        oreTotali: 0,
+        costoTotale: 0
+      },
+      dipendenti: []
+    }))
+  }
+
+  const days = getCalendarDays(new Date(selectedDate.value))
+  return days.map(day => {
+    const dateStr = format(day, 'yyyy-MM-dd')
+    const timesheetDelGiorno = timesheetDettagli.value.filter(t => t.data === dateStr)
     
-    // Trova tutti i timesheet per questo giorno
-    const timesheetGiorno = timesheetDettagli.value.filter(t => t.data === dateStr)
-    
-    // Calcola statistiche del giorno
+    const dipendentiMap = new Map()
+
+    timesheetDelGiorno.forEach(t => {
+      const dipendente = dipendenti.value.find(d => d.id === t.dipendenteId)
+      if (!dipendente) return
+
+      if (!dipendentiMap.has(t.dipendenteId)) {
+        dipendentiMap.set(t.dipendenteId, {
+          id: t.dipendenteId,
+          nome: `${dipendente.nome} ${dipendente.cognome}`,
+          iniziali: dipendente.iniziali,
+          ore: 0,
+          costo: 0
+        })
+      }
+      const empData = dipendentiMap.get(t.dipendenteId)
+      empData.ore += (t.ore || t.oreLavorate || 0)
+      empData.costo += (t.costoTotale || 0)
+    })
+
+    const dipendentiLavoranti = Array.from(dipendentiMap.values())
+
     const stats = {
-      dipendentiPresenti: new Set(timesheetGiorno.map(t => t.dipendenteId)).size,
-      oreTotali: timesheetGiorno.reduce((sum, t) => sum + (t.ore || 0), 0),
-      costoTotale: timesheetGiorno.reduce((sum, t) => sum + (t.costoTotale || 0), 0)
+      dipendentiPresenti: dipendentiLavoranti.length,
+      oreTotali: dipendentiLavoranti.reduce((sum, d) => sum + d.ore, 0),
+      costoTotale: timesheetDelGiorno.reduce((sum, t) => sum + (t.costoTotale || 0), 0)
     }
-    
+
     return {
-      date,
+      date: day,
       dateStr,
-      dayNum,
-      isWeekend: dayNum === 0 || dayNum === 6,
-      stats
+      isWeekend: getDay(day) === 0, // Solo Domenica è weekend
+      stats,
+      dipendenti: dipendentiLavoranti
     }
   })
 })
 
 const calendarWeeks = computed(() => {
-  const days = [...calendarDays.value]
+  const days = calendarDays.value
   const weeks = []
+  let week = Array(7).fill(null)
   
-  while (days.length) {
-    weeks.push(days.splice(0, 7))
+  days.forEach(day => {
+    const dayIndex = getDay(day.date)
+    week[dayIndex] = day
+    if (dayIndex === 6) {
+      weeks.push(week)
+      week = Array(7).fill(null)
+    }
+  })
+  if (week.some(d => d)) {
+    weeks.push(week)
   }
-  
   return weeks
 })
 
@@ -3470,5 +3569,51 @@ const ignoraIncoerenza = async (incoerenza) => {
     console.error('❌ Errore ignorando incoerenza:', error)
     error('Errore', 'Impossibile ignorare l\'incoerenza')
   }
+}
+
+// Funzione per gestire il popover
+const showDayDetails = async (day, event) => {
+  if (popoverTimeout.value) clearTimeout(popoverTimeout.value)
+  if (day && day.dipendenti && day.dipendenti.length > 0) {
+    hoveredDayDetails.value = day
+    popoverVisible.value = true
+    
+    await nextTick()
+    
+    if (popoverRef.value) {
+      const popoverRect = popoverRef.value.getBoundingClientRect()
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      
+      let top = event.clientY + 10
+      let left = event.clientX + 10
+
+      // Controlla se sfora a destra
+      if (left + popoverRect.width > viewportWidth) {
+        left = event.clientX - popoverRect.width - 10
+      }
+      
+      // Controlla se sfora in basso
+      if (top + popoverRect.height > viewportHeight) {
+        top = event.clientY - popoverRect.height - 10
+      }
+      
+      // Assicura che non vada fuori a sinistra o in alto
+      if (left < 10) left = 10
+      if (top < 10) top = 10
+
+      popoverPosition.value = { top: `${top}px`, left: `${left}px` }
+    }
+  }
+}
+
+const hideDayDetails = () => {
+  popoverTimeout.value = setTimeout(() => {
+    popoverVisible.value = false
+  }, 200)
+}
+
+const onPopoverEnter = () => {
+  if (popoverTimeout.value) clearTimeout(popoverTimeout.value)
 }
 </script> 
