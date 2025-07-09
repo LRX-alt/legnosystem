@@ -491,6 +491,41 @@ export const useFirestoreStore = defineStore('firestore', () => {
     return await createDocument(firestoreConfig.collections.timesheet, timesheetData)
   }
 
+  const loadPresenzeForDate = async (dateStr) => {
+    try {
+      const q = query(collection(db, 'presenze'), where('data', '==', dateStr))
+      const querySnapshot = await getDocs(q)
+      const presenzeResult = []
+      querySnapshot.forEach((doc) => {
+        presenzeResult.push({ id: doc.id, ...doc.data() })
+      })
+      // Aggiorna lo stato globale se necessario, ma restituisce i dati filtrati
+      presenze.value = presenzeResult
+      return { success: true, data: presenzeResult }
+    } catch (err) {
+      console.error(`Errore caricamento presenze per la data ${dateStr}:`, err)
+      return { success: false, error: err.message }
+    }
+  }
+
+  const savePresenza = async (presenzaData) => {
+    try {
+      if (presenzaData.id) {
+        // Aggiorna
+        const { id, ...dataToUpdate } = presenzaData
+        await updateDocument('presenze', id, dataToUpdate)
+        return { success: true, id }
+      } else {
+        // Crea
+        const result = await createDocument('presenze', presenzaData)
+        return result
+      }
+    } catch (err) {
+      console.error('Errore salvataggio presenza:', err)
+      return { success: false, error: err.message }
+    }
+  }
+
   // 🚚 Metodi per Fornitori
   
   const loadFornitori = async () => {
@@ -1052,6 +1087,8 @@ export const useFirestoreStore = defineStore('firestore', () => {
     createDipendente,
     loadTimesheet,
     registraTimesheet,
+    loadPresenzeForDate,
+    savePresenza,
     
     // Fornitori
     loadFornitori,

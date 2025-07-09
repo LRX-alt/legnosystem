@@ -80,6 +80,7 @@ export class TimesheetDateValidator {
   static validateTimesheetData(timesheetData) {
     const errors = []
     const warnings = []
+    let isOverallValid = true
     const correctedData = { ...timesheetData }
 
     // Validazione data
@@ -88,6 +89,11 @@ export class TimesheetDateValidator {
       correctedData.data = dateValidation.correctedDate
       correctedData.dataOriginale = dateValidation.originalDate
       warnings.push(dateValidation.validationMessage)
+    }
+    // Se la data non era valida in origine, l'intero oggetto non lo è
+    if (!dateValidation.isValid) {
+      isOverallValid = false
+      errors.push(`Data originale non valida: ${dateValidation.originalDate || 'N/A'}`)
     }
 
     // Validazione campi obbligatori
@@ -116,7 +122,7 @@ export class TimesheetDateValidator {
     correctedData.validationVersion = '1.0'
 
     return {
-      isValid: errors.length === 0,
+      isValid: isOverallValid && errors.length === 0,
       errors,
       warnings,
       correctedData

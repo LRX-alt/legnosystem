@@ -13,9 +13,6 @@
           </svg>
           Aggiorna
         </button>
-        <button @click="fixBuggedDates" class="btn-secondary text-base font-medium bg-red-100 text-red-800 border-red-300" title="Correggi date sbagliate (01/01/2025)">
-          🔧 Fix Date
-        </button>
 
         <button @click="showTimesheetModal = true" class="btn-secondary text-base font-medium">
           <ClockIcon class="w-5 h-5 mr-2" />
@@ -407,7 +404,7 @@
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Entrata</p>
                 <input
-                  v-model="getPresenzaComputed(dipendente.id).entrata"
+                  v-model="presenze[dipendente.id].entrata"
                   type="time"
                   class="w-28 px-3 py-2 border border-gray-300 rounded text-base focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -417,7 +414,7 @@
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Uscita</p>
                 <input
-                  v-model="getPresenzaComputed(dipendente.id).uscita"
+                  v-model="presenze[dipendente.id].uscita"
                   type="time"
                   class="w-28 px-3 py-2 border border-gray-300 rounded text-base focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -427,7 +424,7 @@
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Pausa (min)</p>
                 <input
-                  v-model.number="getPresenzaComputed(dipendente.id).pausa"
+                  v-model.number="presenze[dipendente.id].pausa"
                   type="number"
                   min="0"
                   max="120"
@@ -447,7 +444,7 @@
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Stato</p>
                 <select
-                  v-model="getPresenzaComputed(dipendente.id).stato"
+                  v-model="presenze[dipendente.id].stato"
                   class="w-32 px-3 py-2 border border-gray-300 rounded text-base focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="presente">Presente</option>
@@ -491,7 +488,7 @@
               <div>
                 <label class="block text-sm text-gray-500 mb-1">Entrata</label>
                 <input
-                  v-model="getPresenzaComputed(dipendente.id).entrata"
+                  v-model="presenze[dipendente.id].entrata"
                   type="time"
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -499,7 +496,7 @@
               <div>
                 <label class="block text-sm text-gray-500 mb-1">Uscita</label>
                 <input
-                  v-model="getPresenzaComputed(dipendente.id).uscita"
+                  v-model="presenze[dipendente.id].uscita"
                   type="time"
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
                 />
@@ -507,7 +504,7 @@
               <div>
                 <label class="block text-sm text-gray-500 mb-1">Pausa (min)</label>
                 <input
-                  v-model.number="getPresenzaComputed(dipendente.id).pausa"
+                  v-model.number="presenze[dipendente.id].pausa"
                   type="number"
                   min="0"
                   max="120"
@@ -517,7 +514,7 @@
               <div>
                 <label class="block text-sm text-gray-500 mb-1">Stato</label>
                 <select
-                  v-model="getPresenzaComputed(dipendente.id).stato"
+                  v-model="presenze[dipendente.id].stato"
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
                 >
                   <option value="presente">Presente</option>
@@ -533,7 +530,7 @@
           <!-- Note presenza -->
           <div class="px-4 pb-4">
             <input
-              v-model="getPresenzaComputed(dipendente.id).note"
+              v-model="presenze[dipendente.id].note"
               type="text"
               placeholder="Note presenza..."
               class="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
@@ -1551,8 +1548,13 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '../stores/firestore.js'
 import { usePopup } from '../composables/usePopup.js'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 import { it } from 'date-fns/locale'
+import { TimesheetDateValidator } from '../utils/timesheetValidation.js'
+import CompleteTimesheetAuditor from '../utils/completeTimesheetAudit.js'
+import { TimesheetSystemTester } from '../utils/testTimesheetSystem.js'
+import { HoursCoherenceChecker } from '../utils/hoursCoherenceCheck.js'
+import { HoursCoherenceCorrector } from '../utils/hoursCoherenceCorrection.js'
 
 // Firestore store
 const firestoreStore = useFirestoreStore()
@@ -1579,6 +1581,136 @@ const popoverVisible = ref(false)
 const popoverPosition = ref({ top: '0px', left: '0px' })
 const popoverTimeout = ref(null)
 const popoverRef = ref(null)
+
+// Funzioni per gestire il popover
+const showDayDetails = async (day, event) => {
+  if (popoverTimeout.value) clearTimeout(popoverTimeout.value)
+  if (day && day.dipendenti && day.dipendenti.length > 0) {
+    hoveredDayDetails.value = day
+    popoverVisible.value = true
+    
+    await nextTick()
+    
+    if (popoverRef.value) {
+      const popoverRect = popoverRef.value.getBoundingClientRect()
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      
+      let top = event.clientY + 10
+      let left = event.clientX + 10
+
+      // Controlla se sfora a destra
+      if (left + popoverRect.width > viewportWidth) {
+        left = event.clientX - popoverRect.width - 10
+      }
+      
+      // Controlla se sfora in basso
+      if (top + popoverRect.height > viewportHeight) {
+        top = event.clientY - popoverRect.height - 10
+      }
+      
+      // Assicura che non vada fuori a sinistra o in alto
+      if (left < 10) left = 10
+      if (top < 10) top = 10
+
+      popoverPosition.value = { top: `${top}px`, left: `${left}px` }
+    }
+  }
+}
+
+const hideDayDetails = () => {
+  popoverTimeout.value = setTimeout(() => {
+    popoverVisible.value = false
+  }, 200)
+}
+
+const onPopoverEnter = () => {
+  if (popoverTimeout.value) clearTimeout(popoverTimeout.value)
+}
+
+// Funzione di utilità per il calendario
+const getCalendarDays = (date) => {
+  const start = startOfMonth(date)
+  const end = endOfMonth(date)
+  return eachDayOfInterval({ start, end })
+}
+
+const calendarDays = computed(() => {
+  if (!timesheetDettagli.value || timesheetDettagli.value.length === 0) {
+    return getCalendarDays(new Date(selectedDate.value)).map(day => ({
+      date: day,
+      dateStr: format(day, 'yyyy-MM-dd'),
+      isWeekend: getDay(day) === 0 || getDay(day) === 6,
+      stats: {
+        dipendentiPresenti: 0,
+        oreTotali: 0,
+        costoTotale: 0
+      },
+      dipendenti: []
+    }))
+  }
+
+  const days = getCalendarDays(new Date(selectedDate.value))
+  return days.map(day => {
+    const dateStr = format(day, 'yyyy-MM-dd')
+    const timesheetDelGiorno = timesheetDettagli.value.filter(t => t.data === dateStr)
+    
+    const dipendentiMap = new Map()
+
+    timesheetDelGiorno.forEach(t => {
+      const dipendente = dipendenti.value.find(d => d.id === t.dipendenteId)
+      if (!dipendente) return
+
+      if (!dipendentiMap.has(t.dipendenteId)) {
+        dipendentiMap.set(t.dipendenteId, {
+          id: t.dipendenteId,
+          nome: `${dipendente.nome} ${dipendente.cognome}`,
+          iniziali: dipendente.iniziali,
+          ore: 0,
+          costo: 0
+        })
+      }
+      const empData = dipendentiMap.get(t.dipendenteId)
+      empData.ore += (t.ore || t.oreLavorate || 0)
+      empData.costo += (t.costoTotale || 0)
+    })
+
+    const dipendentiLavoranti = Array.from(dipendentiMap.values())
+
+    const stats = {
+      dipendentiPresenti: dipendentiLavoranti.length,
+      oreTotali: dipendentiLavoranti.reduce((sum, d) => sum + d.ore, 0),
+      costoTotale: timesheetDelGiorno.reduce((sum, t) => sum + (t.costoTotale || 0), 0)
+    }
+
+    return {
+      date: day,
+      dateStr,
+      isWeekend: getDay(day) === 0, // Solo Domenica è weekend
+      stats,
+      dipendenti: dipendentiLavoranti
+    }
+  })
+})
+
+const calendarWeeks = computed(() => {
+  const days = calendarDays.value
+  const weeks = []
+  let week = Array(7).fill(null)
+  
+  days.forEach(day => {
+    const dayIndex = getDay(day.date)
+    week[dayIndex] = day
+    if (dayIndex === 6) {
+      weeks.push(week)
+      week = Array(7).fill(null)
+    }
+  })
+  if (week.some(d => d)) {
+    weeks.push(week)
+  }
+  return weeks
+})
 
 // Stats - calcolate dinamicamente dai dati Firestore
 const stats = computed(() => {
@@ -1755,782 +1887,281 @@ const loadTimesheet = async (dipendenteId = null) => {
   }
 }
 
-// Aggiorna le ore settimanali dei dipendenti basandosi sui timesheet
-const updateDipendentiOreFromTimesheet = () => {
-  console.log('🔄 Aggiornamento ore settimanali dipendenti...')
-  console.log('📅 Settimana selezionata:', selectedWeek.value)
-  
-  // 🔧 FIX: Usa il nuovo sistema di calcolo periodo
-  const { startOfWeek, endOfWeek } = getSelectedWeekPeriod()
-  
-  console.log('📅 Periodo analizzato:', {
-    start: startOfWeek.toISOString().split('T')[0],
-    end: endOfWeek.toISOString().split('T')[0]
-  })
-  
-  if (dipendenti.value.length === 0) {
-    console.warn('⚠️ Nessun dipendente trovato per aggiornamento ore')
-    return
-  }
-  
-  dipendenti.value.forEach(dipendente => {
-    // Filtra i timesheet per questa settimana
-    const timesheetSettimana = timesheetDettagli.value.filter(t => {
-      const dataTimesheet = new Date(t.data)
-      return t.dipendenteId === dipendente.id && 
-             dataTimesheet >= startOfWeek && 
-             dataTimesheet <= endOfWeek
-    })
-
-    // Raggruppa per data per controllo ore giornaliere
-    const orePerGiorno = {}
-    timesheetSettimana.forEach(t => {
-      if (!orePerGiorno[t.data]) {
-        orePerGiorno[t.data] = 0
-      }
-      orePerGiorno[t.data] += (t.ore || t.oreLavorate || 0)
-    })
-
-    // Controlla limiti ore giornaliere
-    Object.entries(orePerGiorno).forEach(([data, ore]) => {
-      if (ore > 12) {
-        console.warn(`⚠️ Il dipendente ${dipendente.nome} ha registrato ${ore}h il ${data} (max 12h)`)
-      }
-    })
-    
-    // Calcola ore settimanali totali
-    const oreSettimana = timesheetSettimana.reduce((total, t) => total + (t.ore || t.oreLavorate || 0), 0)
-    
-    // Aggiorna il dipendente
-    dipendente.oreTotaliSettimana = Math.round(oreSettimana * 2) / 2 // Arrotonda a 0.5
-    
-    console.log(`👤 ${dipendente.nome}: ${dipendente.oreTotaliSettimana}h questa settimana`)
-  })
-  
-  // 🚀 NUOVA FUNZIONE: Popola timesheetData per la visualizzazione settimanale
-  updateTimesheetDataFromDetails(startOfWeek, endOfWeek)
-  
-  console.log('✅ Aggiornamento ore settimanali completato')
-}
-
-// 🚀 NUOVA: Forza aggiornamento completo di tutti i dati
+// 🚀 NUOVO: Forza refresh di tutti i dati
 const forceRefreshAllData = async () => {
+  info('Aggiornamento...', 'Sto ricaricando tutti i dati dal server.')
   try {
-    console.log('🔄 Aggiornamento forzato di tutti i dati...')
-    
-    // Ricarica tutto
-    await loadDipendenti() // Questo carica sia dipendenti che timesheet
-    
-    success('Dati Aggiornati', 'Tutti i dati della pagina sono stati ricaricati con successo!')
-    
-  } catch (error) {
-    console.error('❌ Errore aggiornamento forzato:', error)
-    error('Errore', 'Impossibile aggiornare i dati')
-  }
-}
-
-// 🔍 DEBUG: Funzione per ispezionare lo stato dei dati timesheet
-const debugTimesheetData = async () => {
-  console.log('🔍 =================================')
-  console.log('🔍 DEBUG TIMESHEET DATA')
-  console.log('🔍 =================================')
-  
-  // 1. Stato generale
-  console.log('📊 STATO GENERALE:')
-  console.log(`  - Dipendenti caricati: ${dipendenti.value.length}`)
-  console.log(`  - Timesheet dettagli: ${timesheetDettagli.value.length}`)
-  console.log(`  - Timesheet data (visualizzazione): ${timesheetData.value.length}`)
-  console.log(`  - Stato loading: ${firestoreStore.loading}`)
-  console.log(`  - Errori: ${firestoreStore.error}`)
-  
-  // 2. Test caricamento diretto da Firestore
-  console.log('🔄 TEST CARICAMENTO DIRETTO:')
-  try {
-    const directResult = await firestoreStore.loadTimesheet()
-    console.log('  - Risultato caricamento diretto:', directResult)
-    console.log('  - Dati nello store dopo caricamento:', firestoreStore.timesheet.length)
-    if (firestoreStore.timesheet.length > 0) {
-      console.log('  - Primi 3 timesheet:', firestoreStore.timesheet.slice(0, 3))
-    }
+    await loadDipendenti()
+    await loadCantieri()
+    await loadTimesheet()
+    success('Dati Aggiornati', 'Tutti i dati sono stati sincronizzati.')
   } catch (err) {
-    console.error('  - Errore caricamento diretto:', err)
+    error('Errore Aggiornamento', `Impossibile aggiornare i dati: ${err.message}`)
   }
-  
-  // 3. Analisi periodo settimana corrente
-  const now = new Date()
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1))
-  startOfWeek.setHours(0, 0, 0, 0)
-  
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 5)
-  endOfWeek.setHours(23, 59, 59, 999)
-  
-  console.log('📅 PERIODO SETTIMANA CORRENTE:')
-  console.log(`  - Inizio: ${startOfWeek.toISOString().split('T')[0]}`)
-  console.log(`  - Fine: ${endOfWeek.toISOString().split('T')[0]}`)
-  
-  // 4. Analisi timesheet per periodo
-  const timesheetSettimana = timesheetDettagli.value.filter(t => {
-    const dataTimesheet = new Date(t.data)
-    return dataTimesheet >= startOfWeek && dataTimesheet <= endOfWeek
-  })
-  
-  console.log('📋 TIMESHEET SETTIMANA CORRENTE:')
-  console.log(`  - Totali timesheet: ${timesheetDettagli.value.length}`)
-  console.log(`  - Timesheet questa settimana: ${timesheetSettimana.length}`)
-  
-  if (timesheetSettimana.length > 0) {
-    console.log('  - Esempi timesheet settimana:')
-    timesheetSettimana.slice(0, 5).forEach((t, i) => {
-      console.log(`    ${i+1}. ${t.data} - ${t.dipendenteId} - ${t.ore || t.oreLavorate || 0}h - ${t.cantiere || 'N/A'}`)
-    })
-    
-    // Raggruppa per dipendente
-    const perDipendente = {}
-    timesheetSettimana.forEach(t => {
-      if (!perDipendente[t.dipendenteId]) {
-        perDipendente[t.dipendenteId] = []
-      }
-      perDipendente[t.dipendenteId].push(t)
-    })
-    
-    console.log('👥 RIEPILOGO PER DIPENDENTE:')
-    Object.entries(perDipendente).forEach(([dipendenteId, timesheet]) => {
-      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
-      const nome = dipendente ? `${dipendente.nome} ${dipendente.cognome}` : `ID: ${dipendenteId}`
-      const oreTotali = timesheet.reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
-      console.log(`  - ${nome}: ${oreTotali}h (${timesheet.length} registrazioni)`)
-    })
-  }
-  
-  // 5. Test creazione manuale di un timesheet
-  console.log('🧪 TEST CREAZIONE TIMESHEET:')
-  if (dipendenti.value.length > 0) {
-    const primoDipendente = dipendenti.value[0]
-    console.log(`  - Creando timesheet test per: ${primoDipendente.nome} ${primoDipendente.cognome}`)
-    
-    const testTimesheet = {
-      dipendenteId: primoDipendente.id,
-      data: new Date().toISOString().split('T')[0],
-      cantiere: 'Test Cantiere',
-      ore: 8,
-      orarioInizio: '08:00',
-      orarioFine: '17:00',
-      note: 'Timesheet di test per debug',
-      costoOrario: primoDipendente.pagaOraria || 25,
-      costoTotale: 8 * (primoDipendente.pagaOraria || 25),
-      fonte: 'debug_test',
-      createdAt: new Date().toISOString()
-    }
-    
-    console.log('  - Dati timesheet test:', testTimesheet)
-    
-    try {
-      const createResult = await firestoreStore.registraTimesheet(testTimesheet)
-      console.log('  - Risultato creazione:', createResult)
-      
-      if (createResult.success) {
-        // Ricarica e ricontrolla
-        console.log('  - Ricaricando dati dopo test...')
-        await loadTimesheet()
-        console.log(`  - Timesheet dopo ricaricamento: ${timesheetDettagli.value.length}`)
-      }
-    } catch (err) {
-      console.error('  - Errore creazione timesheet test:', err)
-    }
-  }
-  
-  console.log('🔍 =================================')
-  console.log('🔍 FINE DEBUG')
-  console.log('🔍 =================================')
-  
-  // Mostra popup con risultato
-  const report = `
-🔍 DEBUG TIMESHEET REPORT
-
-📊 Dati caricati:
-• Dipendenti: ${dipendenti.value.length}
-• Timesheet totali: ${timesheetDettagli.value.length}
-• Timesheet settimana: ${timesheetSettimana.length}
-
-📅 Periodo: ${startOfWeek.toISOString().split('T')[0]} → ${endOfWeek.toISOString().split('T')[0]}
-
-${timesheetDettagli.value.length === 0 ? 
-  '⚠️ PROBLEMA: Nessun timesheet trovato in Firestore!' : 
-  timesheetSettimana.length === 0 ? 
-    '⚠️ PROBLEMA: Nessun timesheet per questa settimana!' :
-    '✅ Timesheet presenti - problema nella logica di visualizzazione'
 }
 
-Controlla la console per dettagli completi.
-  `
-  
-  info('Debug Timesheet Completato', report)
+const debugAllTimesheetDates = () => {
+  console.log('📅 DEBUG: Tutte le date dei timesheet caricati');
+  const allDates = timesheetDettagli.value.map(t => ({ id: t.id, data: t.data, dipendente: t.dipendenteId }));
+  console.table(allDates);
+  info('Date in Console', 'Ho stampato tutte le date dei timesheet nella console del browser per il debug.');
 }
 
-// 🔧 FIX: Gestione cambio settimana
-const onWeekChange = () => {
-  console.log('📅 Cambio settimana:', selectedWeek.value)
-  updateDipendentiOreFromTimesheet()
-}
-
-// 🔍 AUDIT COMPLETO: Esegue controllo sistematico e correzione
 const performCompleteAudit = async () => {
+  const confirmed = await confirm('Avviare Audit Completo?', 'Questa operazione scansionerà l\'intero database alla ricerca di incoerenze. Potrebbe richiedere qualche minuto. Procedere?')
+  if (!confirmed) return
+
+  info('Audit in Corso', 'Scansione del database in corso...')
   try {
-    console.log('🔍 Avvio audit completo timesheet...')
-    
-    const { default: CompleteTimesheetAuditor } = await import('../utils/completeTimesheetAudit.js')
     const auditor = new CompleteTimesheetAuditor(firestoreStore)
-    
-    // Mostra loading
-    info('Audit in Corso...', 'Scansionando tutti i timesheet per identificare problemi...')
-    
-    // Esegui audit completo
     const auditResults = await auditor.performCompleteAudit()
     
-    if (auditResults.problematicRecords === 0) {
-      success('Database Pulito!', `✅ Audit completato: ${auditResults.totalRecords} record analizzati, nessun problema trovato.`)
-      return
-    }
+    const userReport = auditor.generateUserReport()
     
-    // Se ci sono problemi, chiedi conferma per la correzione automatica
-    const shouldFix = await confirm(
-      `Problemi Trovati: ${auditResults.problematicRecords}`,
-      `L'audit ha trovato ${auditResults.problematicRecords} problemi su ${auditResults.totalRecords} record totali.\n\nVuoi avviare la correzione automatica?`
-    )
-    
-    if (shouldFix) {
-      info('Correzione in Corso...', 'Applicando correzioni automatiche ai problemi trovati...')
-      
-      // Esegui correzione automatica
-      const fixResults = await auditor.performCompleteFix()
-      
-      // Genera report finale
-      const userReport = auditor.generateUserReport()
-      
-      // Ricarica i dati aggiornati
-      await loadTimesheet()
-      
-      success('Correzione Completata!', userReport)
-      
+    if (auditResults.problematicRecords > 0) {
+      const fixConfirmed = await confirm('Problemi Rilevati', `${userReport}\n\nVuoi tentare la correzione automatica?`)
+      if (fixConfirmed) {
+        info('Correzione in corso', 'Applicazione delle correzioni automatiche...')
+        const fixResults = await auditor.performCompleteFix()
+        const finalReport = auditor.generateUserReport()
+        success('Correzione Completata', finalReport)
+      }
     } else {
-      // Mostra solo il report dei problemi trovati
-      const userReport = auditor.generateUserReport()
-      warning('Problemi Identificati', userReport)
+      success('Audit Completato', userReport)
     }
-    
+
   } catch (err) {
     console.error('❌ Errore durante audit completo:', err)
-    error('Errore Audit', `Impossibile completare l'audit: ${err.message}`)
+    error('Errore Audit', `Impossibile completare l\'audit: ${err.message}`)
   }
 }
 
-// 🧪 TEST SISTEMA: Verifica che le correzioni funzionino
 const runSystemTests = async () => {
+  info('Test in Corso', 'Esecuzione dei test di validazione del sistema...')
   try {
-    console.log('🧪 Avvio test sistema timesheet...')
-    
-    const { default: TimesheetSystemTester } = await import('../utils/testTimesheetSystem.js')
     const tester = new TimesheetSystemTester()
-    
-    // Mostra loading
-    info('Test in Corso...', 'Eseguendo test di validazione del sistema...')
-    
-    // Esegui tutti i test
     const testResults = await tester.runAllTests()
     
-    // Genera report per l'utente
-    const userReport = tester.generateUserReport()
-    
-    if (testResults.success) {
-      success('Test Completati!', userReport)
-    } else {
+    const userReport = tester.generateUserReport(testResults)
+
+    if (testResults.failedTests > 0) {
       warning('Test Parzialmente Falliti', userReport)
+    } else {
+      success('Test Completati', userReport)
     }
-    
   } catch (err) {
     console.error('❌ Errore durante test sistema:', err)
     error('Errore Test', `Impossibile eseguire i test: ${err.message}`)
   }
 }
 
-// 📅 DEBUG: Mostra tutte le date disponibili nei timesheet  
-const debugAllTimesheetDates = () => {
-  console.log('📅 =================================')
-  console.log('📅 DEBUG DATE TIMESHEET')
-  console.log('📅 =================================')
-  
-  if (timesheetDettagli.value.length === 0) {
-    console.log('❌ Nessun timesheet trovato!')
-    info('Date Timesheet', '❌ Nessun timesheet trovato in Firestore!')
-    return
-  }
-  
-  // Raggruppa per data
-  const dateMap = new Map()
-  timesheetDettagli.value.forEach(t => {
-    const data = t.data
-    if (!dateMap.has(data)) {
-      dateMap.set(data, { count: 0, dipendenti: new Set(), ore: 0 })
-    }
-    const dataInfo = dateMap.get(data)
-    dataInfo.count++
-    dataInfo.dipendenti.add(t.dipendenteId)
-    dataInfo.ore += (t.ore || t.oreLavorate || 0)
-  })
-  
-  // Ordina per data
-  const sortedDates = Array.from(dateMap.entries()).sort(([a], [b]) => new Date(b) - new Date(a))
-  
-  console.log(`📊 Timesheet distribuiti su ${sortedDates.length} date diverse:`)
-  
-  let report = `📅 DATE TIMESHEET DISPONIBILI (${sortedDates.length} date)\n\n`
-  
-  sortedDates.slice(0, 20).forEach(([data, info]) => {
-    const dateObj = new Date(data)
-    const dayName = dateObj.toLocaleDateString('it-IT', { weekday: 'short' })
-    const formattedDate = dateObj.toLocaleDateString('it-IT')
-    
-    console.log(`  📅 ${data} (${dayName}): ${info.count} timesheet, ${info.dipendenti.size} dipendenti, ${info.ore}h totali`)
-    report += `${formattedDate} (${dayName}): ${info.count} timesheet, ${info.ore}h\n`
-  })
-  
-  if (sortedDates.length > 20) {
-    report += `\n... e altre ${sortedDates.length - 20} date`
-  }
-  
-  // Trova la settimana con più dati
-  const weekMap = new Map()
-  sortedDates.forEach(([data, info]) => {
-    const dateObj = new Date(data)
-    const startOfWeek = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate())
-    const dayOfWeek = startOfWeek.getDay()
-    const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-    startOfWeek.setDate(startOfWeek.getDate() - daysToSubtract)
-    
-    const weekKey = startOfWeek.toISOString().split('T')[0]
-    if (!weekMap.has(weekKey)) {
-      weekMap.set(weekKey, { ore: 0, giorni: new Set() })
-    }
-    const weekInfo = weekMap.get(weekKey)
-    weekInfo.ore += info.ore
-    weekInfo.giorni.add(data)
-  })
-  
-  const topWeeks = Array.from(weekMap.entries())
-    .sort(([, a], [, b]) => b.ore - a.ore)
-    .slice(0, 5)
-  
-  console.log('\n🏆 TOP 5 SETTIMANE PER ORE:')
-  report += '\n\n🏆 SETTIMANE CON PIÙ ORE:\n'
-  topWeeks.forEach(([weekStart, info], index) => {
-    console.log(`  ${index + 1}. Settimana ${weekStart}: ${info.ore}h su ${info.giorni.size} giorni`)
-    report += `${index + 1}. ${weekStart}: ${info.ore}h\n`
-  })
-  
-  console.log('📅 =================================')
-  
-  info('Date Timesheet', report)
-}
-
-// 🔧 FIX: Calcola periodo settimana basato su selezione
-const getSelectedWeekPeriod = () => {
+// Calcola le ore settimanali per ogni dipendente
+const updateDipendentiOreFromTimesheet = () => {
   const now = new Date()
-  let weeksBack = 0
-  
-  switch (selectedWeek.value) {
-    case 'current': weeksBack = 0; break
-    case 'last': weeksBack = 1; break
-    case 'two-weeks': weeksBack = 2; break
-    case 'three-weeks': weeksBack = 3; break
-    case 'month': weeksBack = 4; break
-    default: weeksBack = 0
-  }
-  
-  // Calcola l'inizio della settimana target
-  const targetDate = new Date(now)
-  targetDate.setDate(now.getDate() - (weeksBack * 7))
-  
-  const startOfWeek = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate())
-  const dayOfWeek = startOfWeek.getDay()
-  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-  startOfWeek.setDate(startOfWeek.getDate() - daysToSubtract)
-  startOfWeek.setHours(0, 0, 0, 0)
-  
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 5)
-  endOfWeek.setHours(23, 59, 59, 999)
-  
-  return { startOfWeek, endOfWeek }
-}
+  const startOfThisWeek = startOfWeek(now, { weekStartsOn: 1 }) // Lunedì
+  const endOfThisWeek = endOfWeek(now, { weekStartsOn: 1 })
 
-// 🔧 CORREZIONE CRITICA: Fix per timesheet con date sbagliate (01/01/2025)
-const fixBuggedDates = async () => {
-  try {
-    console.log('🔧 =================================')
-    console.log('🔧 CORREZIONE DATE TIMESHEET')
-    console.log('🔧 =================================')
-    
-    // Conferma dall'utente
-    const confirmed = await confirm(
-      'Correggere Date Timesheet?', 
-      'Questa operazione correggerà automaticamente tutti i timesheet con data 01/01/2025 impostandoli alla settimana scorsa (1-5 luglio 2025).\n\nVuoi procedere?'
-    )
-    
-    if (!confirmed) {
-      console.log('❌ Operazione annullata dall\'utente')
-      return
-    }
-    
-    info('Correzione in corso...', 'Analizzando e correggendo i timesheet con date sbagliate...')
-    
-    // 1. Trova tutti i timesheet con data 01/01/2025
-    const timesheetBuggati = timesheetDettagli.value.filter(t => t.data === '2025-01-01')
-    
-    console.log(`🔍 Trovati ${timesheetBuggati.length} timesheet con data sbagliata (01/01/2025)`)
-    
-    if (timesheetBuggati.length === 0) {
-      info('Nessun Problema', 'Non sono stati trovati timesheet con date sbagliate da correggere.')
-      return
-    }
-    
-    // 2. Calcola le date della settimana scorsa (1-5 luglio 2025)
-    const oggi = new Date() // 8 luglio 2025
-    const settimanaScorsa = []
-    
-    // Genera le date della settimana lavorativa scorsa (1-5 luglio)
-    for (let i = 1; i <= 5; i++) {
-      const data = new Date(2025, 6, i) // 6 = luglio (0-indexed), 1-5 = giorni
-      settimanaScorsa.push(data.toISOString().split('T')[0])
-    }
-    
-    console.log('📅 Date settimana scorsa da usare:', settimanaScorsa)
-    
-    // 3. Raggruppa i timesheet per dipendente
-    const perDipendente = {}
-    timesheetBuggati.forEach(t => {
-      if (!perDipendente[t.dipendenteId]) {
-        perDipendente[t.dipendenteId] = []
-      }
-      perDipendente[t.dipendenteId].push(t)
-    })
-    
-    // 4. Distribuzione intelligente delle date
-    let correzioniEffettuate = 0
-    const reportCorrezioni = []
-    
-    for (const [dipendenteId, timesheet] of Object.entries(perDipendente)) {
-      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
-      const nomeDipendente = dipendente ? `${dipendente.nome} ${dipendente.cognome}` : `ID: ${dipendenteId}`
-      
-      console.log(`👤 Correggendo ${timesheet.length} timesheet per ${nomeDipendente}`)
-      
-      for (let i = 0; i < timesheet.length; i++) {
-        const t = timesheet[i]
-        
-        // Distribuisci i timesheet sui giorni della settimana scorsa
-        const dataCorretta = settimanaScorsa[i % settimanaScorsa.length]
-        
-        console.log(`  🔧 ${t.id}: 2025-01-01 → ${dataCorretta}`)
-        
-        try {
-          // Aggiorna il timesheet con la data corretta
-          const updateResult = await firestoreStore.updateDocument('timesheet', t.id, {
-            data: dataCorretta,
-            note: (t.note || '') + ' [Data corretta automaticamente]',
-            fixedDate: true,
-            originalDate: '2025-01-01'
-          })
-          
-          if (updateResult.success) {
-            correzioniEffettuate++
-            reportCorrezioni.push({
-              dipendente: nomeDipendente,
-              ore: t.ore || t.oreLavorate || 0,
-              dataOriginale: '2025-01-01',
-              dataCorretta: dataCorretta
-            })
-          } else {
-            console.error(`❌ Errore aggiornamento timesheet ${t.id}:`, updateResult.error)
-          }
-          
-        } catch (err) {
-          console.error(`❌ Errore correzione timesheet ${t.id}:`, err)
-        }
-      }
-    }
-    
-    console.log(`✅ Correzioni completate: ${correzioniEffettuate}/${timesheetBuggati.length}`)
-    
-    // 5. Ricarica i dati
-    console.log('🔄 Ricaricamento dati...')
-    await loadTimesheet()
-    
-    // 6. Report finale
-    console.log('🔧 =================================')
-    console.log('🔧 FINE CORREZIONE')
-    console.log('🔧 =================================')
-    
-    const reportText = `
-🔧 CORREZIONE DATE COMPLETATA
-
-✅ Timesheet corretti: ${correzioniEffettuate}
-📅 Date ripristinate: ${reportCorrezioni.length}
-
-📋 DETTAGLI CORREZIONI:
-${reportCorrezioni.slice(0, 10).map(r => 
-  `• ${r.dipendente}: ${r.ore}h → ${r.dataCorretta}`
-).join('\n')}
-${reportCorrezioni.length > 10 ? `\n... e altri ${reportCorrezioni.length - 10}` : ''}
-
-🎯 Ora i timesheet sono distribuiti correttamente sulla settimana scorsa (1-5 luglio 2025).
-    `
-    
-         success('Date Corrette!', reportText)
-     
-     // 7. Cambia automaticamente alla settimana scorsa per vedere i dati corretti
-     selectedWeek.value = 'last'
-     console.log('📅 Cambiata visualizzazione alla settimana scorsa')
-     
-     // Aggiorna la visualizzazione
-     updateDipendentiOreFromTimesheet()
-     
-   } catch (error) {
-     console.error('❌ Errore durante correzione date:', error)
-     error('Errore Correzione', `Impossibile correggere le date: ${error.message}`)
-   }
- }
-
-// 🚀 NUOVA: Popola timesheetData con i dati reali per la visualizzazione settimanale
-const updateTimesheetDataFromDetails = (startOfWeek, endOfWeek) => {
-  const weeklyData = []
-  
-  console.log('📊 Aggiornamento timesheetData per periodo:', {
-    startOfWeek: startOfWeek.toISOString().split('T')[0],
-    endOfWeek: endOfWeek.toISOString().split('T')[0],
-    dipendenti: dipendenti.value.length,
-    timesheetTotali: timesheetDettagli.value.length
-  })
-  
-  // 🔧 FIX: Debug periodo per verificare correttezza
-  console.log('🗓️ Debug periodo settimana:')
-  console.log('  - Oggi:', new Date().toISOString().split('T')[0])
-  console.log('  - Inizio settimana:', startOfWeek.toISOString().split('T')[0])
-  console.log('  - Fine settimana:', endOfWeek.toISOString().split('T')[0])
-  
   dipendenti.value.forEach(dipendente => {
-    // Filtra i timesheet per questa settimana
-    const timesheetSettimana = timesheetDettagli.value.filter(t => {
-      const dataTimesheet = new Date(t.data)
-      return t.dipendenteId === dipendente.id && 
-             dataTimesheet >= startOfWeek && 
-             dataTimesheet <= endOfWeek
-    })
-
-    console.log(`👤 ${dipendente.nome}: ${timesheetSettimana.length} timesheet questa settimana`)
-
-    // Crea un oggetto per aggregare ore per giorno
-    const orePerGiorno = {
-      lunedi: 0,
-      martedi: 0,
-      mercoledi: 0,
-      giovedi: 0,
-      venerdi: 0,
-      sabato: 0
-    }
-
-    // Aggrega le ore per giorno della settimana
-    timesheetSettimana.forEach(t => {
-      const dataTimesheet = new Date(t.data)
-      const dayOfWeek = dataTimesheet.getDay()
-      const ore = t.ore || t.oreLavorate || 0
-      
-      console.log(`  📅 ${t.data} (giorno ${dayOfWeek}): ${ore}h`)
-      
-      switch (dayOfWeek) {
-        case 1: orePerGiorno.lunedi += ore; break
-        case 2: orePerGiorno.martedi += ore; break
-        case 3: orePerGiorno.mercoledi += ore; break
-        case 4: orePerGiorno.giovedi += ore; break
-        case 5: orePerGiorno.venerdi += ore; break
-        case 6: orePerGiorno.sabato += ore; break
-      }
-    })
-
-    // Calcola il totale settimanale
-    const totale = Object.values(orePerGiorno).reduce((sum, ore) => sum + ore, 0)
+    const oreSettimanali = timesheetDettagli.value
+      .filter(t => {
+        if (!t.data) return false
+        const tDate = new Date(t.data)
+        return t.dipendenteId === dipendente.id && tDate >= startOfThisWeek && tDate <= endOfThisWeek
+      })
+      .reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
     
-    // Trova il cantiere più comune per questo dipendente
-    const cantieri = timesheetSettimana.map(t => t.cantiere || t.cantiereNome || 'Non Assegnato')
-    const cantiereComune = cantieri.length > 0 ? 
-      cantieri.reduce((a, b, i, arr) => (arr.filter(v => v === a).length >= arr.filter(v => v === b).length ? a : b)) :
-      dipendente.cantiereAttuale || 'Non Assegnato'
-
-    // Aggiungi i dati settimanali (includi anche dipendenti senza ore)
-    const dipendenteData = {
-      dipendenteId: dipendente.id,
-      nome: `${dipendente.nome} ${dipendente.cognome}`,
-      iniziali: dipendente.iniziali || `${dipendente.nome?.[0] || ''}${dipendente.cognome?.[0] || ''}`,
-      cantiere: cantiereComune,
-      lunedi: Math.round(orePerGiorno.lunedi * 2) / 2,
-      martedi: Math.round(orePerGiorno.martedi * 2) / 2,
-      mercoledi: Math.round(orePerGiorno.mercoledi * 2) / 2,
-      giovedi: Math.round(orePerGiorno.giovedi * 2) / 2,
-      venerdi: Math.round(orePerGiorno.venerdi * 2) / 2,
-      sabato: Math.round(orePerGiorno.sabato * 2) / 2,
-      totale: Math.round(totale * 2) / 2
-    }
-    
-    weeklyData.push(dipendenteData)
-    
-    console.log(`  ✅ ${dipendente.nome}: ${totale}h totali`)
-  })
-
-  // Aggiorna timesheetData
-  timesheetData.value = weeklyData
-  console.log('✅ TimesheetData aggiornato:', {
-    dipendenti: weeklyData.length,
-    conOre: weeklyData.filter(d => d.totale > 0).length,
-    oreTotali: weeklyData.reduce((sum, d) => sum + d.totale, 0)
+    dipendente.oreTotaliSettimana = oreSettimanali
   })
 }
 
-// Computed
+// Filtra i dipendenti in base ai filtri attivi
 const filteredDipendenti = computed(() => {
-  let result = dipendenti.value
-
-  if (searchTerm.value) {
-    result = result.filter(d => 
-      `${d.nome} ${d.cognome}`.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-      d.email.toLowerCase().includes(searchTerm.value.toLowerCase())
-    )
-  }
-
-  if (selectedRuolo.value) {
-    result = result.filter(d => d.ruolo === selectedRuolo.value)
-  }
-
-  if (selectedStato.value) {
-    result = result.filter(d => d.stato === selectedStato.value)
-  }
-
-  return result
+  return dipendenti.value.filter(dipendente => {
+    const searchMatch = (dipendente.nome.toLowerCase().includes(searchTerm.value.toLowerCase()) || 
+                         dipendente.cognome.toLowerCase().includes(searchTerm.value.toLowerCase()))
+    const ruoloMatch = selectedRuolo.value ? dipendente.ruolo === selectedRuolo.value : true
+    const statoMatch = selectedStato.value ? dipendente.stato === selectedStato.value : true
+    return searchMatch && ruoloMatch && statoMatch
+  })
 })
 
-// Methods
-const getStatoColor = (stato) => {
-  const colors = {
-    'attivo': 'bg-green-100 text-green-800',
-    'in-ferie': 'bg-blue-100 text-blue-800',
-    'malattia': 'bg-yellow-100 text-yellow-800',
-    'sospeso': 'bg-red-100 text-red-800'
+// Gestione Modals
+const closeAddModal = () => showAddModal.value = false
+const closeEditModal = () => showEditModal.value = false
+const closeTimesheetModal = () => {
+  showTimesheetModal.value = false
+  // Reset form
+  newTimesheet.value = {
+    dipendenteId: '',
+    data: new Date().toISOString().split('T')[0],
+    ore: '',
+    cantiere: '',
+    note: '',
+    orarioInizio: '08:00',
+    orarioFine: '17:00'
   }
-  return colors[stato] || 'bg-gray-100 text-gray-800'
+}
+const closeDetailModal = () => showDetailModal.value = false
+
+const saveDipendente = async () => {
+  try {
+    await firestoreStore.addDocument('dipendenti', newDipendente.value)
+    success('Dipendente Aggiunto', `${newDipendente.value.nome} ${newDipendente.value.cognome} è stato aggiunto con successo.`)
+    closeAddModal()
+    newDipendente.value = {
+      nome: '', cognome: '', email: '', telefono: '', ruolo: '', pagaOraria: 25, dataAssunzione: new Date().toISOString().split('T')[0], stato: 'attivo', cantiereAttuale: '', note: ''
+    }
+    await loadDipendenti()
+  } catch (err) {
+    error('Errore Salvataggio', err.message)
+  }
+}
+
+const editDipendente = (dipendente) => {
+  editingDipendente.value = { ...dipendente }
+  showEditModal.value = true
+}
+
+const updateDipendente = async () => {
+  try {
+    const { id, ...dataToUpdate } = editingDipendente.value
+    await firestoreStore.updateDocument('dipendenti', id, dataToUpdate)
+    success('Dipendente Aggiornato', `${dataToUpdate.nome} ${dataToUpdate.cognome} aggiornato con successo.`)
+    closeEditModal()
+    await loadDipendenti()
+  } catch (err) {
+    error('Errore Aggiornamento', err.message)
+  }
+}
+
+const deleteDipendente = async (dipendente) => {
+  const confirmed = await confirm(
+    `Eliminare ${dipendente.nome} ${dipendente.cognome}?`,
+    "Questa azione è irreversibile. Tutti i dati associati (timesheet, presenze) non saranno eliminati ma potrebbero diventare orfani."
+  )
+  if (confirmed) {
+    try {
+      await firestoreStore.deleteDocument('dipendenti', dipendente.id)
+      success('Dipendente Eliminato', `${dipendente.nome} ${dipendente.cognome} è stato rimosso.`)
+      await loadDipendenti()
+    } catch (err) {
+      error('Errore Eliminazione', err.message)
+    }
+  }
+}
+
+// Funzioni per la tabella Timesheet
+const onWeekChange = () => {
+  processTimesheetData()
+}
+
+const processTimesheetData = () => {
+  const now = new Date()
+  let startDate, endDate
+
+  switch (selectedWeek.value) {
+    case 'current':
+      startDate = startOfWeek(now, { weekStartsOn: 1 })
+      endDate = endOfWeek(now, { weekStartsOn: 1 })
+      break
+    case 'last':
+      startDate = startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 })
+      endDate = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 })
+      break
+    case 'two-weeks':
+      startDate = startOfWeek(subWeeks(now, 2), { weekStartsOn: 1 })
+      endDate = endOfWeek(subWeeks(now, 2), { weekStartsOn: 1 })
+      break
+    case 'three-weeks':
+      startDate = startOfWeek(subWeeks(now, 3), { weekStartsOn: 1 })
+      endDate = endOfWeek(subWeeks(now, 3), { weekStartsOn: 1 })
+      break
+    case 'month':
+      startDate = startOfWeek(subWeeks(now, 4), { weekStartsOn: 1 })
+      endDate = endOfWeek(subWeeks(now, 4), { weekStartsOn: 1 })
+      break
+  }
+
+  const filteredTimesheet = timesheetDettagli.value.filter(t => {
+    const tDate = new Date(t.data)
+    return tDate >= startDate && tDate <= endDate
+  })
+
+  const records = {}
+
+  filteredTimesheet.forEach(t => {
+    const dipendente = dipendenti.value.find(d => d.id === t.dipendenteId)
+    if (!dipendente) return
+
+    if (!records[t.dipendenteId]) {
+      records[t.dipendenteId] = {
+        dipendenteId: t.dipendenteId,
+        nome: `${dipendente.nome} ${dipendente.cognome}`,
+        iniziali: dipendente.iniziali,
+        cantiere: t.cantiere || t.cantiereNome || 'Non Assegnato',
+        lunedi: 0, martedi: 0, mercoledi: 0, giovedi: 0, venerdi: 0, sabato: 0,
+        totale: 0
+      }
+    }
+
+    const dayOfWeek = getDay(new Date(t.data))
+    const ore = t.ore || t.oreLavorate || 0
+    records[t.dipendenteId].totale += ore
+
+    switch (dayOfWeek) {
+      case 1: records[t.dipendenteId].lunedi += ore; break
+      case 2: records[t.dipendenteId].martedi += ore; break
+      case 3: records[t.dipendenteId].mercoledi += ore; break
+      case 4: records[t.dipendenteId].giovedi += ore; break
+      case 5: records[t.dipendenteId].venerdi += ore; break
+      case 6: records[t.dipendenteId].sabato += ore; break
+    }
+  })
+
+  timesheetData.value = Object.values(records)
+}
+
+const getStatoColor = (stato) => {
+  switch(stato) {
+    case 'attivo': return 'bg-green-100 text-green-800'
+    case 'in-ferie': return 'bg-blue-100 text-blue-800'
+    case 'malattia': return 'bg-yellow-100 text-yellow-800'
+    case 'sospeso': return 'bg-red-100 text-red-800'
+    default: return 'bg-gray-100 text-gray-800'
+  }
 }
 
 const getStatoLabel = (stato) => {
-  const labels = {
-    'attivo': 'Attivo',
-    'in-ferie': 'In Ferie',
-    'malattia': 'Malattia',
-    'sospeso': 'Sospeso'
-  }
-  return labels[stato] || stato
+  return stato.charAt(0).toUpperCase() + stato.slice(1).replace('-', ' ')
 }
 
 const getRuoloLabel = (ruolo) => {
-  const labels = {
-    'capo-squadra': 'Capo Squadra',
-    'carpentiere': 'Carpentiere',
-    'operaio': 'Operaio Specializzato',
-    'amministrativo': 'Amministrativo'
-  }
-  return labels[ruolo] || ruolo
-}
-
-// 🚀 MULTI-ASSIGNMENT: Ottiene tutti i cantieri dove il dipendente è assegnato
-const getCantieriAssegnati = (dipendenteId) => {
-  if (!firestoreStore.cantieri || !dipendenteId) return []
-  
-  return firestoreStore.cantieri
-    .filter(cantiere => cantiere.team?.some(membro => membro.id === dipendenteId))
-    .map(cantiere => cantiere.nome)
+  if (!ruolo) return 'Non specificato'
+  return ruolo.charAt(0).toUpperCase() + ruolo.slice(1).replace('-', ' ')
 }
 
 const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString('it-IT')
+  if (!dateString) return 'N/A'
+  // Controlla se è un oggetto timestamp di Firestore
+  if (dateString.seconds) {
+    return format(new Date(dateString.seconds * 1000), 'dd/MM/yyyy')
+  }
+  return format(new Date(dateString), 'dd/MM/yyyy', { locale: it })
 }
 
-const saveDipendente = async () => {
-  if (!newDipendente.value.nome || !newDipendente.value.cognome || !newDipendente.value.email) {
-    error('Campi Mancanti', 'Compila tutti i campi obbligatori!')
-    return
-  }
-
-  try {
-    const result = await firestoreStore.createDipendente(newDipendente.value)
-    
-    if (result.success) {
-      // Ricarica dipendenti
-      await loadDipendenti()
-      
-      closeAddModal()
-      success('Dipendente Creato', `${newDipendente.value.nome} ${newDipendente.value.cognome} aggiunto con successo!`)
-    } else {
-      throw new Error(result.error || 'Errore sconosciuto')
+const validateTimesheet = (timesheet) => {
+  return new Promise((resolve, reject) => {
+    if (!timesheet.dipendenteId || !timesheet.data || !timesheet.ore) {
+      reject(new Error('Compilare tutti i campi obbligatori del timesheet.'))
     }
-  } catch (err) {
-    console.error('Errore creazione dipendente:', err)
-    error('Errore Creazione', `Impossibile creare il dipendente: ${err.message}`)
-  }
-}
-
-// Funzioni di validazione timesheet
-const validateTimesheet = async (timesheetData) => {
-  // Controllo base campi obbligatori
-  if (!timesheetData.dipendenteId || !timesheetData.ore || !timesheetData.cantiere) {
-    throw new Error('Compila tutti i campi obbligatori!')
-  }
-
-  // Controllo ore massime giornaliere
-  if (timesheetData.ore > 12) {
-    throw new Error('Non è possibile registrare più di 12 ore giornaliere')
-  }
-
-  // Controllo sovrapposizioni
-  const timesheetGiorno = timesheetDettagli.value.filter(t => 
-    t.dipendenteId === timesheetData.dipendenteId && 
-    t.data === timesheetData.data
-  )
-
-  // Calcola ore totali già registrate per quel giorno
-  const oreTotaliGiorno = timesheetGiorno.reduce((total, t) => total + t.ore, 0)
-  if (oreTotaliGiorno + timesheetData.ore > 12) {
-    throw new Error(`Il dipendente ha già registrato ${oreTotaliGiorno}h in questa data. Non può superare 12h totali.`)
-  }
-
-  // Controllo sovrapposizione orari se specificati
-  if (timesheetData.orarioInizio && timesheetData.orarioFine) {
-    const inizio = new Date(`${timesheetData.data}T${timesheetData.orarioInizio}`)
-    const fine = new Date(`${timesheetData.data}T${timesheetData.orarioFine}`)
-
-    // Verifica sovrapposizioni con altri timesheet
-    const sovrapposizioni = timesheetGiorno.filter(t => {
-      if (!t.orarioInizio || !t.orarioFine) return false
-      const tInizio = new Date(`${t.data}T${t.orarioInizio}`)
-      const tFine = new Date(`${t.data}T${t.orarioFine}`)
-      return (inizio < tFine && fine > tInizio)
-    })
-
-    if (sovrapposizioni.length > 0) {
-      throw new Error(`Sovrapposizione orari con altre registrazioni: ${
-        sovrapposizioni.map(t => `${t.cantiere} (${t.orarioInizio}-${t.orarioFine})`).join(', ')
-      }`)
+    if (timesheet.ore <= 0) {
+      reject(new Error('Le ore devono essere maggiori di zero.'))
     }
-  }
-
-  return true
+    if (new Date(timesheet.data) > new Date()) {
+      reject(new Error('La data del timesheet non può essere nel futuro.'))
+    }
+    resolve()
+  })
 }
 
 const saveTimesheet = async () => {
@@ -2540,7 +2171,6 @@ const saveTimesheet = async () => {
       throw new Error('Dipendente non trovato!')
     }
 
-    // 🔧 VALIDAZIONE CENTRALIZZATA per timesheet manuali
     const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
 
     const timesheetDataRaw = {
@@ -2557,27 +2187,21 @@ const saveTimesheet = async () => {
       createdAt: new Date().toISOString()
     }
 
-    // 🔧 DOPPIA VALIDAZIONE: centralizzata + esistente
     const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
-    
+
     if (!timesheetValidation.isValid) {
       throw new Error(`Dati non validi: ${timesheetValidation.errors.join(', ')}`)
     }
 
     if (timesheetValidation.warnings.length > 0) {
       console.warn('⚠️ TIMESHEET MANUALE warnings:', timesheetValidation.warnings)
+      warning('Attenzione', timesheetValidation.warnings.join(', '))
     }
 
-    // Valida anche con il metodo esistente
-    await validateTimesheet(timesheetValidation.correctedData)
-
-    // Salva in Firestore
     const result = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
-    
+
     if (result.success) {
-      // Ricarica i timesheet
       await loadTimesheet()
-      
       closeTimesheetModal()
       success('Ore Registrate', `Timesheet per ${dipendente?.nome} ${dipendente?.cognome} salvato con successo!`)
     } else {
@@ -2589,83 +2213,24 @@ const saveTimesheet = async () => {
   }
 }
 
-const viewTimesheet = async (dipendente) => {
+const viewTimesheet = (dipendente) => {
   selectedDipendente.value = dipendente
-  
-  // Carica i timesheet specifici per questo dipendente
-  await loadTimesheet(dipendente.id)
-  
   showDetailModal.value = true
 }
 
-const editDipendente = (dipendente) => {
-  editingDipendente.value = {
-    id: dipendente.id,
-    nome: dipendente.nome,
-    cognome: dipendente.cognome,
-    email: dipendente.email,
-    telefono: dipendente.telefono,
-    ruolo: dipendente.ruolo,
-    pagaOraria: dipendente.pagaOraria,
-    dataAssunzione: dipendente.dataAssunzione,
-    stato: dipendente.stato,
-    cantiereAttuale: dipendente.cantiereAttuale || '',
-    note: dipendente.note || ''
-  }
-  showEditModal.value = true
+const getTimesheetForDipendente = (dipendenteId) => {
+  if (!dipendenteId) return []
+  return timesheetDettagli.value
+    .filter(t => t.dipendenteId === dipendenteId)
+    .sort((a, b) => new Date(b.data) - new Date(a.data))
 }
 
-const saveEditedDipendente = async () => {
-  if (!editingDipendente.value.nome || !editingDipendente.value.cognome || !editingDipendente.value.email) {
-    error('Campi Mancanti', 'Compila tutti i campi obbligatori!')
-    return
-  }
-
-  try {
-    const result = await firestoreStore.updateDocument('dipendenti', editingDipendente.value.id, {
-      nome: editingDipendente.value.nome,
-      cognome: editingDipendente.value.cognome,
-      email: editingDipendente.value.email,
-      telefono: editingDipendente.value.telefono,
-      ruolo: editingDipendente.value.ruolo,
-      stato: editingDipendente.value.stato,
-      dataAssunzione: editingDipendente.value.dataAssunzione,
-      pagaOraria: editingDipendente.value.pagaOraria,
-      cantiereAttuale: editingDipendente.value.cantiereAttuale,
-      note: editingDipendente.value.note,
-      iniziali: editingDipendente.value.nome.charAt(0) + editingDipendente.value.cognome.charAt(0)
-    })
-    
-    if (result.success) {
-      // Ricarica dipendenti
-      await loadDipendenti()
-      
-      closeEditModal()
-      success('Dipendente Modificato', `${editingDipendente.value.nome} ${editingDipendente.value.cognome} aggiornato con successo!`)
-    } else {
-      throw new Error(result.error || 'Errore sconosciuto')
-    }
-  } catch (err) {
-    console.error('Errore aggiornamento dipendente:', err)
-    error('Errore Modifica', `Impossibile aggiornare il dipendente: ${err.message}`)
-  }
-}
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingDipendente.value = {
-    id: null,
-    nome: '',
-    cognome: '',
-    email: '',
-    telefono: '',
-    ruolo: '',
-    pagaOraria: 25,
-    dataAssunzione: '',
-    stato: 'attivo',
-    cantiereAttuale: '',
-    note: ''
-  }
+const getCantieriAssegnati = (dipendenteId) => {
+  const cantieri = new Set()
+  timesheetDettagli.value
+    .filter(t => t.dipendenteId === dipendenteId && (t.cantiere || t.cantiereNome))
+    .forEach(t => cantieri.add(t.cantiere || t.cantiereNome))
+  return Array.from(cantieri)
 }
 
 const viewSchedule = (dipendente) => {
@@ -2673,947 +2238,306 @@ const viewSchedule = (dipendente) => {
   showScheduleModal.value = true
 }
 
-const getTimesheetForDipendente = (dipendenteId) => {
-  return timesheetDettagli.value
-    .filter(t => t.dipendenteId === dipendenteId)
-    .sort((a, b) => new Date(b.data) - new Date(a.data)) // Ordina per data decrescente
-}
-
-const closeAddModal = () => {
-  showAddModal.value = false
-  newDipendente.value = {
-    nome: '',
-    cognome: '',
-    email: '',
-    telefono: '',
-    ruolo: '',
-    pagaOraria: 25,
-    dataAssunzione: new Date().toISOString().split('T')[0],
-    stato: 'attivo',
-    cantiereAttuale: '',
-    note: ''
+// Funzioni Presenze
+const loadPresenze = async () => {
+  try {
+    const result = await firestoreStore.loadPresenzeForDate(selectedDate.value)
+    if (result.success) {
+      const presenzeDelGiorno = result.data
+      const presenzeMap = {}
+      presenzeDelGiorno.forEach(p => {
+        presenzeMap[p.dipendenteId] = p
+      })
+      
+      // Merge con dipendenti per avere tutti in lista
+      dipendenti.value.forEach(d => {
+        if (!presenzeMap[d.id]) {
+          presenzeMap[d.id] = {
+            dipendenteId: d.id,
+            data: selectedDate.value,
+            stato: 'assente',
+            entrata: '',
+            uscita: '',
+            pausa: 0,
+            note: ''
+          }
+        }
+      })
+      presenze.value = presenzeMap
+    } else {
+      console.error('Errore caricamento presenze:', result.error)
+    }
+  } catch (err) {
+    console.error('Errore in loadPresenze:', err)
   }
 }
 
-const closeTimesheetModal = () => {
-  showTimesheetModal.value = false
-  newTimesheet.value = {
-    dipendenteId: '',
-    data: new Date().toISOString().split('T')[0],
-    ore: '',
-    cantiere: '',
-    note: '',
-    orarioInizio: '08:00',
-    orarioFine: '17:00'
+const calcolaOreTotali = (dipendenteId) => {
+  const p = presenze.value[dipendenteId]
+  if (!p || !p.entrata || !p.uscita) return 0
+
+  const entrata = new Date(`1970-01-01T${p.entrata}`)
+  const uscita = new Date(`1970-01-01T${p.uscita}`)
+  
+  if (uscita <= entrata) return 0
+
+  let diff = (uscita - entrata) / 1000 / 60 // minuti
+  diff -= (p.pausa || 0)
+  
+  return Math.max(0, parseFloat((diff / 60).toFixed(2)))
+}
+
+const markAllPresent = () => {
+  dipendenti.value.forEach(d => {
+    if (!presenze.value[d.id] || presenze.value[d.id].stato === 'assente') {
+      presenze.value[d.id] = {
+        ...presenze.value[d.id],
+        dipendenteId: d.id,
+        data: selectedDate.value,
+        stato: 'presente',
+        entrata: '08:00',
+        uscita: '17:00',
+        pausa: 60,
+        note: 'Marcato presente in massa'
+      }
+    }
+  })
+  info('Tutti Presenti', 'Tutti i dipendenti sono stati segnati come presenti.')
+}
+
+const savePresenza = async (dipendenteId) => {
+  try {
+    const presenzaData = presenze.value[dipendenteId]
+    if (!presenzaData) throw new Error('Dati presenza non trovati')
+
+    // Se è presente, calcola le ore e crea timesheet
+    if (presenzaData.stato === 'presente') {
+      const ore = calcolaOreTotali(dipendenteId)
+      if (ore <= 0) {
+        warning('Ore a Zero', 'Le ore calcolate sono zero, il timesheet non verrà creato.')
+        return
+      }
+      
+      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
+      const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
+      
+      const timesheetDataRaw = {
+        dipendenteId: dipendenteId,
+        data: selectedDate.value,
+        ore: ore,
+        oreLavorate: ore,
+        cantiere: dipendente.cantiereAttuale || 'Sede',
+        orarioInizio: presenzaData.entrata,
+        orarioFine: presenzaData.uscita,
+        note: `Generato da presenze: ${presenzaData.note || ''}`,
+        costoOrario: dipendente.pagaOraria || 25,
+        costoTotale: ore * (dipendente.pagaOraria || 25),
+        fonte: 'presenze',
+        createdAt: new Date().toISOString()
+      }
+      
+      const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
+      if (!timesheetValidation.isValid) {
+        throw new Error(`Dati timesheet non validi: ${timesheetValidation.errors.join(', ')}`)
+      }
+
+      const timesheetResult = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
+      if (!timesheetResult.success) {
+        throw new Error(timesheetResult.error)
+      } else {
+         // Associa l'ID del timesheet creato alla presenza
+        presenzaData.timesheetId = timesheetResult.id
+      }
+    }
+
+    const result = await firestoreStore.savePresenza(presenzaData)
+    if (result.success) {
+      success('Presenza Salvata', `Presenza per ${dipendenti.value.find(d => d.id === dipendenteId)?.nome} salvata.`)
+      await loadPresenze() // ricarica
+    } else {
+      throw new Error(result.error)
+    }
+  } catch (err) {
+    console.error(`Errore salvataggio presenza per ${dipendenteId}:`, err)
+    error('Errore Salvataggio', err.message)
   }
 }
 
-// 🚀 NUOVO: Funzioni per gestire modifica/eliminazione timesheet
-const editTimesheetEntry = (entry) => {
-  // Verifica che sia una registrazione manuale
-  if (entry.fonte !== 'manuale') {
-    warning('Modifica Non Permessa', 'Puoi modificare solo le registrazioni inserite manualmente. Le registrazioni auto-generate dal Giornale Cantiere non possono essere modificate.')
-    return
+const saveAllPresenze = async () => {
+  info('Salvataggio in corso...', 'Salvataggio di tutte le presenze modificate.')
+  const promises = Object.values(presenze.value).map(p => savePresenza(p.dipendenteId))
+  try {
+    await Promise.all(promises)
+    success('Salvataggio Completato', 'Tutte le presenze sono state salvate.')
+    await loadTimesheet() // Ricarica anche i timesheet
+  } catch(err) {
+    error('Errore Salvataggio Multiplo', `Almeno un salvataggio è fallito: ${err.message}`)
   }
+}
 
-  // Trova il dipendente
-  const dipendente = dipendenti.value.find(d => d.id === entry.dipendenteId)
-  if (!dipendente) {
-    error('Errore', 'Dipendente non trovato')
-    return
+const getRiepilogoPresenze = () => {
+  const riepilogo = {
+    presenti: 0,
+    assenti: 0,
+    ferie: 0,
+    malattia: 0,
+    permesso: 0,
+    oreTotali: 0
   }
+  Object.values(presenze.value).forEach(p => {
+    riepilogo[p.stato] = (riepilogo[p.stato] || 0) + 1
+    if(p.stato === 'presente') {
+      riepilogo.oreTotali += calcolaOreTotali(p.dipendenteId)
+    }
+  })
+  riepilogo.oreTotali = parseFloat(riepilogo.oreTotali.toFixed(2))
+  return riepilogo
+}
 
-  // Popola i dati per la modifica
+// Controllo Coerenze
+const checkPresenceTimesheetCoherence = async () => {
+  const checker = new HoursCoherenceChecker()
+  const report = await checker.executeFullCheck()
+
+  incoerenze.value = report.issues || []
+  ultimoControlloCount.value = report.summary.total_issues || 0
+
+  if (incoerenze.value.length > 0 && activeTab.value !== 'controlli') {
+    warning(
+      `${incoerenze.value.length} Incoerenze Trovate`,
+      'Sono state rilevate delle discrepanze tra presenze e timesheet. Vai alla sezione "Controlli" per i dettagli.'
+    )
+  }
+}
+
+const runCoherenceCheck = async () => {
+  controlloInCorso.value = true
+  info('Controllo Coerenza...', 'Analisi dei dati in corso, attendere prego.')
+  try {
+    await loadPresenze() // Carica le presenze per la data selezionata
+    await loadTimesheet() // Assicura di avere tutti i timesheet
+    await checkPresenceTimesheetCoherence()
+    if (incoerenze.value.length > 0) {
+      warning('Controllo Completato', `Trovate ${incoerenze.value.length} incoerenze.`)
+    } else {
+      success('Controllo Completato', 'Nessuna incoerenza trovata.')
+    }
+  } catch (err) {
+    error('Errore Controllo', `Impossibile completare il controllo: ${err.message}`)
+  } finally {
+    controlloInCorso.value = false
+  }
+}
+
+const resolveIncoherence = async (incoerenza) => {
+  info('Correzione in corso...', `Applico la correzione per ${incoerenza.dipendente}...`)
+
+  try {
+    const corrector = new HoursCoherenceCorrector()
+    let result
+
+    switch(incoerenza.type) {
+      case 'calculation_error':
+        result = await corrector.fixCalculationError(incoerenza)
+        break
+      case 'field_inconsistency':
+        result = await corrector.fixFieldInconsistency(incoerenza)
+        break
+      // Aggiungere altri casi se necessario
+      default:
+        throw new Error(`Tipo di incoerenza non gestito: ${incoerenza.type}`)
+    }
+    
+    if (result.status === 'success') {
+      success('Correzione Applicata', `Corretto: ${incoerenza.message}`)
+      // Rimuovi l'incoerenza risolta dalla lista
+      incoerenze.value = incoerenze.value.filter(i => i.recordId !== incoerenza.recordId)
+      // Ricarica i dati per riflettere le modifiche
+      await loadTimesheet()
+      await loadPresenze()
+    } else {
+      throw new Error(result.error || 'Errore non specificato durante la correzione')
+    }
+  } catch (err) {
+    error('Errore Correzione', `Impossibile applicare la correzione: ${err.message}`)
+  }
+}
+
+// 🚀 NUOVO: Gestione Modifica Timesheet
+const closeEditTimesheetModal = () => {
+  showEditTimesheetModal.value = false
+  editingTimesheet.value = { id: null, dipendenteId: '', data: '', ore: '', cantiere: '', note: '', orarioInizio: '08:00', orarioFine: '17:00' }
+  editingTimesheetDipendenteName.value = ''
+}
+
+const editTimesheet = (timesheet) => {
+  const dipendente = dipendenti.value.find(d => d.id === timesheet.dipendenteId)
+  editingTimesheetDipendenteName.value = dipendente ? `${dipendente.nome} ${dipendente.cognome}` : 'N/A'
+  
   editingTimesheet.value = {
-    id: entry.id,
-    dipendenteId: entry.dipendenteId,
-    data: entry.data,
-    ore: entry.ore || entry.oreLavorate || '',
-    cantiere: entry.cantiere || entry.cantiereNome || '',
-    note: entry.note || '',
-    orarioInizio: entry.orarioInizio || '08:00',
-    orarioFine: entry.orarioFine || '17:00'
+    id: timesheet.id,
+    dipendenteId: timesheet.dipendenteId,
+    data: timesheet.data,
+    ore: timesheet.ore || timesheet.oreLavorate || 0,
+    cantiere: timesheet.cantiere || timesheet.cantiereNome || '',
+    note: timesheet.note || '',
+    orarioInizio: timesheet.orarioInizio || '08:00',
+    orarioFine: timesheet.orarioFine || '17:00'
   }
   
-  editingTimesheetDipendenteName.value = `${dipendente.nome} ${dipendente.cognome}`
   showEditTimesheetModal.value = true
 }
 
 const updateTimesheet = async () => {
+  if (!editingTimesheet.value.id) return
+
   try {
     const dipendente = dipendenti.value.find(d => d.id === editingTimesheet.value.dipendenteId)
     if (!dipendente) {
       throw new Error('Dipendente non trovato!')
     }
 
-    // 🔧 VALIDAZIONE CENTRALIZZATA per update timesheet
     const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
 
     const timesheetDataRaw = {
-      dipendenteId: editingTimesheet.value.dipendenteId,
-      data: editingTimesheet.value.data,
-      cantiere: editingTimesheet.value.cantiere,
+      ...editingTimesheet.value,
       ore: parseFloat(editingTimesheet.value.ore),
-      oreLavorate: parseFloat(editingTimesheet.value.ore), // Entrambi i campi per compatibilità
-      orarioInizio: editingTimesheet.value.orarioInizio,
-      orarioFine: editingTimesheet.value.orarioFine,
-      note: editingTimesheet.value.note,
       costoOrario: dipendente.pagaOraria || 25,
       costoTotale: parseFloat(editingTimesheet.value.ore) * (dipendente.pagaOraria || 25),
-      fonte: 'manuale',
       updatedAt: new Date().toISOString()
     }
-
-    // 🔧 DOPPIA VALIDAZIONE: centralizzata + esistente
-    const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
     
+    delete timesheetDataRaw.id
+
+    const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
+
     if (!timesheetValidation.isValid) {
       throw new Error(`Dati non validi: ${timesheetValidation.errors.join(', ')}`)
     }
 
     if (timesheetValidation.warnings.length > 0) {
-      console.warn('⚠️ UPDATE TIMESHEET warnings:', timesheetValidation.warnings)
+      console.warn('⚠️ TIMESHEET UPDATE warnings:', timesheetValidation.warnings)
+      warning('Attenzione', timesheetValidation.warnings.join(', '))
     }
-
-    // Valida anche con il metodo esistente
-    await validateTimesheet(timesheetValidation.correctedData)
-
-    // Aggiorna in Firestore
-    const result = await firestoreStore.updateDocument('timesheet', editingTimesheet.value.id, timesheetValidation.correctedData)
     
-    if (result.success) {
-      // Ricarica i timesheet
-      await loadTimesheet()
-      
-      closeEditTimesheetModal()
-      success('Ore Aggiornate', `Timesheet per ${dipendente?.nome} ${dipendente?.cognome} aggiornato con successo!`)
-    } else {
-      throw new Error(result.error || 'Errore sconosciuto')
-    }
+    await firestoreStore.updateDocument('timesheet', editingTimesheet.value.id, timesheetValidation.correctedData)
+
+    await loadTimesheet()
+    closeEditTimesheetModal()
+    success('Timesheet Aggiornato', `Il timesheet è stato aggiornato con successo.`)
+
   } catch (err) {
     console.error('Errore aggiornamento timesheet:', err)
     error('Errore Aggiornamento', err.message)
   }
 }
 
-const deleteTimesheetEntry = async (entry) => {
-  // Verifica che sia una registrazione manuale
-  if (entry.fonte !== 'manuale') {
-    warning('Eliminazione Non Permessa', 'Puoi eliminare solo le registrazioni inserite manualmente. Le registrazioni auto-generate dal Giornale Cantiere non possono essere eliminate.')
-    return
-  }
-
-  try {
-    const dipendente = dipendenti.value.find(d => d.id === entry.dipendenteId)
-    if (!dipendente) {
-      error('Errore', 'Dipendente non trovato')
-      return
-    }
-
-    const confermato = await confirm(
-      'Elimina Registrazione',
-      `Sei sicuro di voler eliminare la registrazione di ${entry.ore || entry.oreLavorate}h per ${dipendente.nome} ${dipendente.cognome} del ${formatDate(entry.data)}?\n\nQuesta azione non può essere annullata.`
-    )
-
-    if (confermato) {
-      const result = await firestoreStore.deleteDocument('timesheet', entry.id)
-      
-      if (result.success) {
-        // Ricarica i timesheet
-        await loadTimesheet()
-        
-        success('Registrazione Eliminata', `Timesheet per ${dipendente.nome} ${dipendente.cognome} eliminato con successo!`)
-      } else {
-        throw new Error(result.error || 'Errore sconosciuto')
-      }
-    }
-  } catch (err) {
-    console.error('Errore eliminazione timesheet:', err)
-    error('Errore Eliminazione', err.message)
-  }
-}
-
-const closeEditTimesheetModal = () => {
-  showEditTimesheetModal.value = false
-  editingTimesheet.value = {
-    id: null,
-    dipendenteId: '',
-    data: '',
-    ore: '',
-    cantiere: '',
-    note: '',
-    orarioInizio: '08:00',
-    orarioFine: '17:00'
-  }
-  editingTimesheetDipendenteName.value = ''
-}
-
-const closeDetailModal = () => {
-  showDetailModal.value = false
-  selectedDipendente.value = null
-}
-
-// Funzioni per gestione presenze
-const getPresenza = async (dipendenteId) => {
-  const key = `${selectedDate.value}-${dipendenteId}`
-  
-  try {
-    // Se la presenza è già in memoria, la restituiamo
-    if (presenze.value[key]) {
-      return presenze.value[key]
-    }
-
-    // Proviamo a caricare la presenza da Firestore
-    const result = await firestoreStore.getDocument('presenze', key)
-    
-    if (result.success && result.data) {
-      // Se trovata in Firestore, la salviamo in memoria e la restituiamo
-      presenze.value[key] = result.data
-      return presenze.value[key]
-    }
-
-    // Se non trovata, creiamo un nuovo record di default
-    presenze.value[key] = {
-      entrata: '08:00',
-      uscita: '17:00',
-      pausa: 60,
-      stato: 'presente',
-      note: '',
-      dipendenteId,
-      data: selectedDate.value,
-      oreTotali: 0,
-      createdAt: new Date().toISOString()
-    }
-
-    return presenze.value[key]
-  } catch (error) {
-    console.error('Errore caricamento presenza:', error)
-    // Restituiamo un record di default in caso di errore
-    return {
-      entrata: '08:00',
-      uscita: '17:00',
-      pausa: 60,
-      stato: 'presente',
-      note: '',
-      dipendenteId,
-      data: selectedDate.value,
-      oreTotali: 0,
-      createdAt: new Date().toISOString()
-    }
-  }
-}
-
-const savePresenza = async (dipendenteId) => {
-  const key = `${selectedDate.value}-${dipendenteId}`
-  const presenza = presenze.value[key]
-  
-  // Validazione base
-  if (!presenza.entrata || !presenza.uscita) {
-    error('Errore', 'Orario entrata e uscita obbligatori')
-    return false
-  }
-  
-  // Converti orari in minuti per confronto
-  const entrata = presenza.entrata.split(':').reduce((acc, time) => (60 * acc) + +time, 0)
-  const uscita = presenza.uscita.split(':').reduce((acc, time) => (60 * acc) + +time, 0)
-  
-  // Validazioni orari
-  if (entrata >= uscita) {
-    error('Errore', 'L\'orario di uscita deve essere successivo all\'entrata')
-    return false
-  }
-  
-  if (presenza.pausa < 0 || presenza.pausa > 120) {
-    error('Errore', 'La pausa deve essere tra 0 e 120 minuti')
-    return false
-  }
-  
-  try {
-    // Salva la presenza in Firestore
-    const presenzaResult = await firestoreStore.createDocument('presenze', {
-      ...presenza,
-      id: key,
-      updatedAt: new Date().toISOString()
-    })
-    
-    if (presenzaResult.success) {
-      // Calcola le ore effettive considerando la pausa
-      const oreEffettive = ((uscita - entrata) / 60) - (presenza.pausa / 60)
-      
-      // 🔧 VALIDAZIONE CENTRALIZZATA per timesheet da presenza
-      const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
-      
-      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
-      const timesheetDataRaw = {
-        dipendenteId: dipendenteId,
-        data: selectedDate.value,
-        cantiere: dipendente?.cantiereAttuale || 'Non Assegnato',
-        ore: oreEffettive,
-        orarioInizio: presenza.entrata,
-        orarioFine: presenza.uscita,
-        note: presenza.note || 'Generato da registro presenze',
-        costoOrario: dipendente?.pagaOraria || 25,
-        costoTotale: oreEffettive * (dipendente?.pagaOraria || 25),
-        fonte: 'presenze',
-        presenzaId: key,
-        createdAt: new Date().toISOString()
-      }
-
-      const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
-      
-      if (!timesheetValidation.isValid) {
-        throw new Error(`Timesheet presenza non valido: ${timesheetValidation.errors.join(', ')}`)
-      }
-
-      if (timesheetValidation.warnings.length > 0) {
-        console.warn('⚠️ TIMESHEET PRESENZA warnings:', timesheetValidation.warnings)
-      }
-
-      // Salva il timesheet in Firestore
-      const timesheetResult = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
-      
-      if (timesheetResult.success) {
-        // Ricarica i timesheet
-        await loadTimesheet()
-        success('Presenza Salvata', `Presenza e timesheet di ${selectedDate.value} salvati con successo`)
-        return true
-      } else {
-        throw new Error(timesheetResult.error || 'Errore salvataggio timesheet')
-      }
-    } else {
-      throw new Error(presenzaResult.error || 'Errore sconosciuto')
-    }
-  } catch (error) {
-    console.error('Errore salvataggio presenza/timesheet:', error)
-    error('Errore', `Impossibile salvare: ${error.message}`)
-    return false
-  }
-}
-
-// Funzione per salvare tutte le presenze del giorno
-const saveAllPresenze = async () => {
-  let tuttoOk = true
-  
-  for (const dipendente of dipendenti.value) {
-    const presenza = getPresenzaComputed(dipendente.id)
-    if (!(await savePresenza(dipendente.id, presenza))) {
-      tuttoOk = false
-      break
-    }
-  }
-  
-  if (tuttoOk) {
-    success('Presenze Salvate', 'Tutte le presenze sono state salvate con successo!')
-  }
-}
-
-const calcolaOreTotali = (dipendenteId) => {
-  // Calcola le ore oggi basandosi sui timesheet reali
-  const oggi = new Date().toISOString().split('T')[0]
-  
-  const oreOggi = timesheetDettagli.value
-    .filter(t => t.dipendenteId === dipendenteId && t.data === oggi)
-    .reduce((total, t) => total + (t.ore || 0), 0)
-  
-  return Math.round(oreOggi * 2) / 2 // Arrotonda a 0.5
-}
-
-const markAllPresent = () => {
-  dipendenti.value.forEach(dipendente => {
-    const presenza = getPresenzaComputed(dipendente.id)
-    presenza.stato = 'presente'
-    presenza.entrata = '08:00'
-    presenza.uscita = '17:00'
-    presenza.pausa = 60
-  })
-  success('Presenze Aggiornate', 'Tutti i dipendenti sono stati segnati come presenti!')
-}
-
-const getRiepilogoPresenze = () => {
-  let presenti = 0
-  let assenti = 0
-  let ferie = 0
-  let malattia = 0
-  let oreTotali = 0
-  
-  dipendenti.value.forEach(dipendente => {
-    const presenza = getPresenzaComputed(dipendente.id)
-    switch (presenza.stato) {
-      case 'presente':
-        presenti++
-        oreTotali += calcolaOreTotali(dipendente.id)
-        break
-      case 'assente':
-        assenti++
-        break
-      case 'ferie':
-        ferie++
-        break
-      case 'malattia':
-        malattia++
-        break
-    }
-  })
-  
-  return { presenti, assenti, ferie, malattia, oreTotali }
-}
-
-
-
-const closeScheduleModal = () => {
-  showScheduleModal.value = false
-  selectedDipendente.value = null
-}
-
-// Inizializzazione del componente
+// Lifecycle Hooks
 onMounted(async () => {
-  try {
-    console.log('🚀 Inizializzazione pagina Personale...')
-    
-    // STEP 1: Carica cantieri da Firestore
-    console.log('1️⃣ Caricamento cantieri...')
-    await loadCantieri()
-    
-    // STEP 2: Carica dipendenti da Firestore (include anche timesheet)
-    console.log('2️⃣ Caricamento dipendenti e timesheet...')
-    await loadDipendenti()
-    console.log(`👥 Dipendenti caricati: ${dipendenti.value.length}`)
-    console.log(`📊 Timesheet caricati: ${timesheetDettagli.value.length}`)
-    
-    // STEP 3: Forza aggiornamento anche se non ci sono timesheet
-    console.log('3️⃣ Aggiornamento forzato dati...')
-    updateDipendentiOreFromTimesheet()
-    
-    // STEP 4: Debug finale dello stato
-    console.log('📊 Stato finale caricamento:')
-    console.log(`  - Dipendenti: ${dipendenti.value.length}`)
-    console.log(`  - Timesheet dettagli: ${timesheetDettagli.value.length}`)
-    console.log(`  - Timesheet data: ${timesheetData.value.length}`)
-    console.log(`  - Stats ore settimana: ${stats.value.oreSettimana}`)
-    console.log(`  - Stats presenti oggi: ${stats.value.presentiOggi}`)
-    
-    console.log('✅ Inizializzazione pagina Personale completata')
-    
-  } catch (error) {
-    console.error('❌ Errore durante inizializzazione pagina Personale:', error)
-    error('Errore Inizializzazione', 'Impossibile caricare tutti i dati della pagina Personale')
-  }
+  info('Caricamento dati...', 'Recupero dipendenti e cantieri dal database.')
+  await loadDipendenti()
+  await loadCantieri()
+  processTimesheetData()
+  await loadPresenze()
 })
-
-// Funzione di utilità per il calendario
-const getCalendarDays = (date) => {
-  const start = startOfMonth(date)
-  const end = endOfMonth(date)
-  return eachDayOfInterval({ start, end })
-}
-
-const calendarDays = computed(() => {
-  if (!timesheetDettagli.value || timesheetDettagli.value.length === 0) {
-    return getCalendarDays(new Date(selectedDate.value)).map(day => ({
-      date: day,
-      dateStr: format(day, 'yyyy-MM-dd'),
-      isWeekend: getDay(day) === 0 || getDay(day) === 6,
-      stats: {
-        dipendentiPresenti: 0,
-        oreTotali: 0,
-        costoTotale: 0
-      },
-      dipendenti: []
-    }))
-  }
-
-  const days = getCalendarDays(new Date(selectedDate.value))
-  return days.map(day => {
-    const dateStr = format(day, 'yyyy-MM-dd')
-    const timesheetDelGiorno = timesheetDettagli.value.filter(t => t.data === dateStr)
-    
-    const dipendentiMap = new Map()
-
-    timesheetDelGiorno.forEach(t => {
-      const dipendente = dipendenti.value.find(d => d.id === t.dipendenteId)
-      if (!dipendente) return
-
-      if (!dipendentiMap.has(t.dipendenteId)) {
-        dipendentiMap.set(t.dipendenteId, {
-          id: t.dipendenteId,
-          nome: `${dipendente.nome} ${dipendente.cognome}`,
-          iniziali: dipendente.iniziali,
-          ore: 0,
-          costo: 0
-        })
-      }
-      const empData = dipendentiMap.get(t.dipendenteId)
-      empData.ore += (t.ore || t.oreLavorate || 0)
-      empData.costo += (t.costoTotale || 0)
-    })
-
-    const dipendentiLavoranti = Array.from(dipendentiMap.values())
-
-    const stats = {
-      dipendentiPresenti: dipendentiLavoranti.length,
-      oreTotali: dipendentiLavoranti.reduce((sum, d) => sum + d.ore, 0),
-      costoTotale: timesheetDelGiorno.reduce((sum, t) => sum + (t.costoTotale || 0), 0)
-    }
-
-    return {
-      date: day,
-      dateStr,
-      isWeekend: getDay(day) === 0, // Solo Domenica è weekend
-      stats,
-      dipendenti: dipendentiLavoranti
-    }
-  })
-})
-
-const calendarWeeks = computed(() => {
-  const days = calendarDays.value
-  const weeks = []
-  let week = Array(7).fill(null)
-  
-  days.forEach(day => {
-    const dayIndex = getDay(day.date)
-    week[dayIndex] = day
-    if (dayIndex === 6) {
-      weeks.push(week)
-      week = Array(7).fill(null)
-    }
-  })
-  if (week.some(d => d)) {
-    weeks.push(week)
-  }
-  return weeks
-})
-
-const deleteDipendente = async (dipendente) => {
-  const confirmed = await confirm('Eliminare Dipendente', `Sei sicuro di voler eliminare ${dipendente.nome} ${dipendente.cognome}? Questa operazione non può essere annullata.`)
-  if (confirmed) {
-    try {
-      const result = await firestoreStore.deleteDocument('dipendenti', dipendente.id)
-      
-      if (result.success) {
-        // Ricarica dipendenti
-        await loadDipendenti()
-        success('Dipendente Eliminato', `${dipendente.nome} ${dipendente.cognome} eliminato con successo!`)
-      } else {
-        throw new Error(result.error || 'Errore sconosciuto')
-      }
-    } catch (err) {
-      console.error('Errore eliminazione dipendente:', err)
-      error('Errore Eliminazione', `Impossibile eliminare il dipendente: ${err.message}`)
-    }
-  }
-}
-
-// 🚀 NUOVA: Controllo coerenza tra presenze e timesheet
-const checkPresenceTimesheetCoherence = async () => {
-  try {
-    console.log('🔍 Inizio controllo coerenza presenze-timesheet...')
-    
-    // Carica tutte le presenze
-    const presenzeResult = await firestoreStore.loadCollection('presenze')
-    if (!presenzeResult.success) {
-      console.warn('⚠️ Impossibile caricare presenze per controllo coerenza')
-      return
-    }
-
-    const listaIncoerenze = []
-    const presenzeFiltrate = presenzeResult.data || []
-
-    // Raggruppa timesheet e presenze per dipendente e data
-    const dataMap = new Map()
-
-    // Aggiungi timesheet alla mappa
-    timesheetDettagli.value.forEach(timesheet => {
-      const key = `${timesheet.dipendenteId}-${timesheet.data}`
-      if (!dataMap.has(key)) {
-        dataMap.set(key, { timesheet: [], presenze: [] })
-      }
-      dataMap.get(key).timesheet.push(timesheet)
-    })
-
-    // Aggiungi presenze alla mappa
-    presenzeFiltrate.forEach(presenza => {
-      const key = `${presenza.dipendenteId}-${presenza.data}`
-      if (!dataMap.has(key)) {
-        dataMap.set(key, { timesheet: [], presenze: [] })
-      }
-      dataMap.get(key).presenze.push(presenza)
-    })
-
-    // Controlla coerenza per ogni combinazione dipendente-data
-    for (const [key, data] of dataMap.entries()) {
-      const [dipendenteId, dataStr] = key.split('-')
-      const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
-      
-      if (!dipendente) continue
-
-      const timesheetGiorno = data.timesheet
-      const presenzeGiorno = data.presenze
-
-      // Caso 1: Timesheet senza presenza
-      if (timesheetGiorno.length > 0 && presenzeGiorno.length === 0) {
-        const oreTotali = timesheetGiorno.reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
-        if (oreTotali > 0) {
-          listaIncoerenze.push({
-            tipo: 'timesheet_senza_presenza',
-            dipendente: `${dipendente.nome} ${dipendente.cognome}`,
-            data: dataStr,
-            dettaglio: `${oreTotali}h in timesheet ma nessuna presenza registrata`,
-            gravita: 'alta'
-          })
-        }
-      }
-
-      // Caso 2: Presenza senza timesheet
-      if (presenzeGiorno.length > 0 && timesheetGiorno.length === 0) {
-        const presenzeAttive = presenzeGiorno.filter(p => p.stato === 'presente')
-        if (presenzeAttive.length > 0) {
-          listaIncoerenze.push({
-            tipo: 'presenza_senza_timesheet',
-            dipendente: `${dipendente.nome} ${dipendente.cognome}`,
-            data: dataStr,
-            dettaglio: 'Presenza registrata ma nessun timesheet',
-            gravita: 'media'
-          })
-        }
-      }
-
-      // Caso 3: Ore timesheet vs ore calcolate da presenza
-      if (timesheetGiorno.length > 0 && presenzeGiorno.length > 0) {
-        const oreTimesheet = timesheetGiorno.reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
-        
-        presenzeGiorno.forEach(presenza => {
-          if (presenza.stato === 'presente' && presenza.orarioInizio && presenza.orarioFine) {
-            const oreCalcolate = presenza.oreEffettive || calcolaOreDaOrari(presenza.orarioInizio, presenza.orarioFine, presenza.pausa || 0)
-            const differenza = Math.abs(oreTimesheet - oreCalcolate)
-            
-            if (differenza > 0.5) { // Tolleranza di 30 minuti
-              listaIncoerenze.push({
-                tipo: 'ore_non_corrispondenti',
-                dipendente: `${dipendente.nome} ${dipendente.cognome}`,
-                data: dataStr,
-                dettaglio: `Timesheet: ${oreTimesheet}h vs Presenza: ${oreCalcolate}h (diff: ${differenza.toFixed(1)}h)`,
-                gravita: 'media'
-              })
-            }
-          }
-        })
-      }
-    }
-
-    // Aggiorna variabili reattive per l'interfaccia
-    incoerenze.value = listaIncoerenze
-    ultimoControlloCount.value = dataMap.size
-    
-    // Mostra risultati controllo
-    if (listaIncoerenze.length === 0) {
-      console.log('✅ Controllo coerenza completato: nessuna incoerenza trovata')
-    } else {
-      console.warn(`⚠️ Trovate ${listaIncoerenze.length} incoerenze:`)
-      
-      // Raggruppa per gravità
-      const incoerenzGravi = listaIncoerenze.filter(i => i.gravita === 'alta')
-      const incoerenzMedie = listaIncoerenze.filter(i => i.gravita === 'media')
-      
-      if (incoerenzGravi.length > 0) {
-        console.error('❌ Incoerenze GRAVI:')
-        incoerenzGravi.forEach(inc => console.error(`  - ${inc.dipendente} (${inc.data}): ${inc.dettaglio}`))
-      }
-      
-      if (incoerenzMedie.length > 0) {
-        console.warn('⚠️ Incoerenze MEDIE:')
-        incoerenzMedie.forEach(inc => console.warn(`  - ${inc.dipendente} (${inc.data}): ${inc.dettaglio}`))
-      }
-      
-      // Mostra popup di riepilogo migliorato
-      const messaggioRiepilogo = `Trovate ${listaIncoerenze.length} incoerenze:\n` +
-        (incoerenzGravi.length > 0 ? `• ${incoerenzGravi.length} gravi\n` : '') +
-        (incoerenzMedie.length > 0 ? `• ${incoerenzMedie.length} medie\n` : '') +
-        '\nVai al tab "Controlli" per visualizzarle e risolverle.'
-      
-      warning('Incoerenze Rilevate', messaggioRiepilogo)
-    }
-
-    return listaIncoerenze
-
-  } catch (error) {
-    console.error('❌ Errore controllo coerenza presenze-timesheet:', error)
-    return []
-  }
-}
-
-// Helper per calcolare ore da orari
-const calcolaOreDaOrari = (orarioInizio, orarioFine, pausaMinuti = 0) => {
-  try {
-    const [inizioOre, inizioMin] = orarioInizio.split(':').map(Number)
-    const [fineOre, fineMin] = orarioFine.split(':').map(Number)
-    
-    const inizioTotaleMin = inizioOre * 60 + inizioMin
-    const fineTotaleMin = fineOre * 60 + fineMin
-    
-    const differenzaMin = fineTotaleMin - inizioTotaleMin - pausaMinuti
-    return Math.max(0, differenzaMin / 60)
-  } catch (error) {
-    console.error('Errore calcolo ore da orari:', error)
-    return 0
-  }
-}
-
-
-// Computed per le presenze
-const presenzeComputed = computed(() => {
-  const result = {}
-  dipendenti.value.forEach(dipendente => {
-    const key = `${selectedDate.value}-${dipendente.id}`
-    result[key] = presenze.value[key] || {
-      entrata: '08:00',
-      uscita: '17:00',
-      pausa: 60,
-      stato: 'presente',
-      note: '',
-      dipendenteId: dipendente.id,
-      data: selectedDate.value,
-      oreTotali: 0,
-      createdAt: new Date().toISOString()
-    }
-  })
-  return result
-})
-
-// Funzione per ottenere la presenza dal computed
-const getPresenzaComputed = (dipendenteId) => {
-  const key = `${selectedDate.value}-${dipendenteId}`
-  return presenzeComputed.value[key]
-}
-
-// 🚀 NUOVE: Funzioni per gestire il tab Controlli
-
-/**
- * Esegue il controllo di coerenza manualmente
- */
-const runCoherenceCheck = async () => {
-  try {
-    controlloInCorso.value = true
-    console.log('🔄 Esecuzione controllo coerenza manuale...')
-    
-    // Esegui il controllo
-    await checkPresenceTimesheetCoherence()
-    
-    // Mostra risultato
-    if (incoerenze.value.length === 0) {
-      success('Controllo Completato', 'Nessuna incoerenza rilevata. Tutto in ordine!')
-    } else {
-      const gravi = incoerenze.value.filter(i => i.gravita === 'alta').length
-      const medie = incoerenze.value.filter(i => i.gravita === 'media').length
-      warning('Controllo Completato', `Rilevate ${incoerenze.value.length} incoerenze (${gravi} gravi, ${medie} medie)`)
-    }
-    
-  } catch (error) {
-    console.error('❌ Errore controllo coerenza manuale:', error)
-    error('Errore Controllo', 'Impossibile eseguire il controllo di coerenza')
-  } finally {
-    controlloInCorso.value = false
-  }
-}
-
-/**
- * Risolve un'incoerenza specifica
- */
-const risolviIncoerenza = async (incoerenza) => {
-  try {
-    console.log('🔧 Risoluzione incoerenza:', incoerenza)
-    
-    const dipendente = dipendenti.value.find(d => `${d.nome} ${d.cognome}` === incoerenza.dipendente)
-    if (!dipendente) {
-      throw new Error('Dipendente non trovato')
-    }
-    
-    let messaggioRisoluzione = ''
-    let azioneRisoluzione = null
-    
-    // Determina l'azione di risoluzione in base al tipo di incoerenza
-    switch (incoerenza.tipo) {
-      case 'timesheet_senza_presenza':
-        messaggioRisoluzione = `Vuoi creare automaticamente una presenza per ${dipendente.nome} ${dipendente.cognome} il ${formatDate(incoerenza.data)}?`
-        azioneRisoluzione = async () => {
-          // Crea presenza automatica basata sul timesheet
-          const timesheetGiorno = timesheetDettagli.value.filter(t => 
-            t.dipendenteId === dipendente.id && t.data === incoerenza.data
-          )
-          
-          if (timesheetGiorno.length > 0) {
-            const oreTotali = timesheetGiorno.reduce((sum, t) => sum + (t.ore || 0), 0)
-            const presenzaData = {
-              dipendenteId: dipendente.id,
-              data: incoerenza.data,
-              stato: 'presente',
-              orarioInizio: '08:00',
-              orarioFine: `${Math.floor(8 + oreTotali)}:00`,
-              pausa: 60,
-              oreEffettive: oreTotali,
-              note: 'Presenza generata automaticamente da timesheet',
-              fonte: 'risoluzione_automatica'
-            }
-            
-            const result = await firestoreStore.createDocument('presenze', presenzaData)
-            if (!result.success) {
-              throw new Error(result.error || 'Errore creazione presenza')
-            }
-          }
-        }
-        break
-        
-      case 'presenza_senza_timesheet':
-        messaggioRisoluzione = `Vuoi creare automaticamente un timesheet per ${dipendente.nome} ${dipendente.cognome} il ${formatDate(incoerenza.data)}?`
-        azioneRisoluzione = async () => {
-          // Crea timesheet automatico basato sulla presenza
-          const presenzeResult = await firestoreStore.loadCollection('presenze', [
-            ['dipendenteId', '==', dipendente.id],
-            ['data', '==', incoerenza.data]
-          ])
-          
-          if (presenzeResult.success && presenzeResult.data?.length > 0) {
-            const presenza = presenzeResult.data[0]
-            const oreEffettive = presenza.oreEffettive || 8 // Default 8 ore
-            
-            // 🔧 VALIDAZIONE CENTRALIZZATA per risoluzione automatica
-            const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
-            
-            const timesheetDataRaw = {
-              dipendenteId: dipendente.id,
-              data: incoerenza.data,
-              cantiere: dipendente.cantiereAttuale || 'Non Assegnato',
-              ore: oreEffettive,
-              orarioInizio: presenza.orarioInizio || '08:00',
-              orarioFine: presenza.orarioFine || '17:00',
-              note: 'Timesheet generato automaticamente da presenza',
-              costoOrario: dipendente.pagaOraria || 25,
-              costoTotale: oreEffettive * (dipendente.pagaOraria || 25),
-              fonte: 'risoluzione_automatica'
-            }
-            
-            const timesheetValidation = ensureValidTimesheetData(timesheetDataRaw)
-            
-            if (!timesheetValidation.isValid) {
-              throw new Error(`Timesheet risoluzione automatica non valido: ${timesheetValidation.errors.join(', ')}`)
-            }
-
-            if (timesheetValidation.warnings.length > 0) {
-              console.warn('⚠️ TIMESHEET RISOLUZIONE warnings:', timesheetValidation.warnings)
-            }
-            
-            const result = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
-            if (!result.success) {
-              throw new Error(result.error || 'Errore creazione timesheet')
-            }
-          }
-        }
-        break
-        
-      case 'ore_non_corrispondenti':
-        messaggioRisoluzione = `Incoerenza nelle ore per ${dipendente.nome} ${dipendente.cognome} il ${formatDate(incoerenza.data)}. Questa richiede verifica manuale.`
-        azioneRisoluzione = async () => {
-          // Apri modal per modifica manuale
-          selectedDipendente.value = dipendente
-          showDetailModal.value = true
-        }
-        break
-        
-      default:
-        throw new Error(`Tipo di incoerenza non gestito: ${incoerenza.tipo}`)
-    }
-    
-    // Chiedi conferma
-    const confermato = await confirm('Risolvi Incoerenza', messaggioRisoluzione)
-    
-    if (confermato && azioneRisoluzione) {
-      await azioneRisoluzione()
-      
-      // Rimuovi l'incoerenza dalla lista
-      incoerenze.value = incoerenze.value.filter(i => 
-        !(i.dipendente === incoerenza.dipendente && i.data === incoerenza.data && i.tipo === incoerenza.tipo)
-      )
-      
-      // Ricarica i dati
-      await loadTimesheet()
-      
-      success('Incoerenza Risolta', `Incoerenza per ${dipendente.nome} ${dipendente.cognome} risolta con successo!`)
-    }
-    
-  } catch (error) {
-    console.error('❌ Errore risoluzione incoerenza:', error)
-    error('Errore Risoluzione', `Impossibile risolvere l'incoerenza: ${error.message}`)
-  }
-}
-
-/**
- * Ignora un'incoerenza (la rimuove dalla lista senza risolverla)
- */
-const ignoraIncoerenza = async (incoerenza) => {
-  try {
-    const confermato = await confirm(
-      'Ignora Incoerenza', 
-      `Sei sicuro di voler ignorare questa incoerenza per ${incoerenza.dipendente} del ${formatDate(incoerenza.data)}? L'incoerenza rimarrà nel sistema ma non sarà più mostrata.`
-    )
-    
-    if (confermato) {
-      // Rimuovi l'incoerenza dalla lista
-      incoerenze.value = incoerenze.value.filter(i => 
-        !(i.dipendente === incoerenza.dipendente && i.data === incoerenza.data && i.tipo === incoerenza.tipo)
-      )
-      
-      success('Incoerenza Ignorata', 'L\'incoerenza è stata rimossa dalla lista')
-    }
-    
-  } catch (error) {
-    console.error('❌ Errore ignorando incoerenza:', error)
-    error('Errore', 'Impossibile ignorare l\'incoerenza')
-  }
-}
-
-// Funzione per gestire il popover
-const showDayDetails = async (day, event) => {
-  if (popoverTimeout.value) clearTimeout(popoverTimeout.value)
-  if (day && day.dipendenti && day.dipendenti.length > 0) {
-    hoveredDayDetails.value = day
-    popoverVisible.value = true
-    
-    await nextTick()
-    
-    if (popoverRef.value) {
-      const popoverRect = popoverRef.value.getBoundingClientRect()
-      const viewportWidth = window.innerWidth
-      const viewportHeight = window.innerHeight
-      
-      let top = event.clientY + 10
-      let left = event.clientX + 10
-
-      // Controlla se sfora a destra
-      if (left + popoverRect.width > viewportWidth) {
-        left = event.clientX - popoverRect.width - 10
-      }
-      
-      // Controlla se sfora in basso
-      if (top + popoverRect.height > viewportHeight) {
-        top = event.clientY - popoverRect.height - 10
-      }
-      
-      // Assicura che non vada fuori a sinistra o in alto
-      if (left < 10) left = 10
-      if (top < 10) top = 10
-
-      popoverPosition.value = { top: `${top}px`, left: `${left}px` }
-    }
-  }
-}
-
-const hideDayDetails = () => {
-  popoverTimeout.value = setTimeout(() => {
-    popoverVisible.value = false
-  }, 200)
-}
-
-const onPopoverEnter = () => {
-  if (popoverTimeout.value) clearTimeout(popoverTimeout.value)
-}
 </script> 

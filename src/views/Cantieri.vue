@@ -1518,7 +1518,8 @@ const deleteCantiere = async (cantiere) => {
       `🔐 CONTROLLO DI SICUREZZA\n\nPer confermare l'eliminazione, scrivi esattamente il nome del cantiere:\n\n"${cantiere.nome}"`
     )
     
-    if (!nomeConferma || nomeConferma.trim() !== cantiere.nome) {
+    // 🚀 FIX: Confronto case-insensitive e con trim su entrambi i valori per massima robustezza
+    if (!nomeConferma || nomeConferma.trim().toLowerCase() !== cantiere.nome.trim().toLowerCase()) {
       popup.error('Eliminazione Annullata', 'Il nome inserito non corrisponde. Operazione annullata per sicurezza.')
       loading.value = false
       return
