@@ -22,7 +22,7 @@ export default defineConfig({
     sourcemap: false
   },
   define: {
-    'import.meta.env.VITE_APP_VERSION': JSON.stringify('2.11.0'),
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify('2.12.0'),
     'import.meta.env.VITE_APP_NAME': JSON.stringify('Legnosystem.bio')
   },
   server: {

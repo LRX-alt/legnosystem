@@ -127,16 +127,6 @@ const router = createRouter({
         requiresAuth: true
       }
     },
-    {
-      path: '/preventivi',
-      name: 'preventivi',
-      component: () => import('../views/Preventivi.vue'),
-      meta: { 
-        title: 'Preventivi - Legnosystem.bio',
-        requiresAuth: true,
-        permissions: ['canViewFinancials']
-      }
-    },
 
     // 📊 Analytics
     {

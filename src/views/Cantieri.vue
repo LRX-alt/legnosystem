@@ -991,7 +991,7 @@ const addVoceAggiuntiva = () => {
     descrizione: '',
     importo: 0,
     note: '',
-    tipo: 'aggiunta' // distingue dalle voci originali del preventivo
+    tipo: 'aggiunta' // distingue dalle voci originali
   }
   showAddVoceModal.value = true
 }

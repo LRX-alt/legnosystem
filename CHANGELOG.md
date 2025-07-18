@@ -5,28 +5,37 @@ Tutte le modifiche significative a questo progetto verranno documentate in quest
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.7.0] - 2024-12-30
+## [2.12.0] - 2024-12-30
 
-### 🎯 **SISTEMA PREVENTIVI COMPLETO**
-- ✅ **Gestione preventivi integrata**: Creazione, modifica, visualizzazione preventivi con Firestore real-time
-- ✅ **Pipeline vendite**: Dashboard completa con statistiche (preventivi aperti, valore pipeline, tasso conversione, tempo medio)
-- ✅ **Workflow stati**: Bozza → Inviato → Accettato/Rifiutato → Convertito con tracking automatico
-- ✅ **Integrazione clienti**: Selezione da clienti esistenti o creazione nuovi clienti inline
-- ✅ **Numerazione automatica**: Formato PREV-YYYYMMDD-XXX per identificazione univoca
-- ✅ **Conversione in cantiere**: Trasferimento automatico preventivi accettati in cantieri attivi con tutti i dati
-- ✅ **Gestione scadenze**: Aggiornamento automatico stato "scaduto" per preventivi non confermati
-- ✅ **Modal avanzate**: Visualizzazione dettagliata, modifica completa, gestione workflow
-- ✅ **Filtri e ricerca**: Per stato, cliente, numero preventivo con interfaccia responsive
-- ✅ **Toast notifications**: Feedback immediato per tutte le operazioni con sistema uniforme
-- ✅ **Menu dropdown elegante**: Sostituiti pulsanti separati con menu a tre punti per UI pulita e moderna
+### 🗑️ **RIMOZIONE SISTEMA PREVENTIVI**
+- ❌ **Rimossa completamente la funzionalità preventivi**: Eliminato tutto il sistema di gestione preventivi
+- ❌ **Rimossa rotta /preventivi**: Eliminata dal router e dalla navigazione
+- ❌ **Rimossa sezione preventivi dal sidebar**: Eliminato il link dalla navigazione principale
+- ❌ **Rimossi riferimenti dal store**: Eliminati tutti i ref e metodi relativi ai preventivi
+- ❌ **Rimossi composables**: Eliminate funzioni specifiche da useEmailJS, useFirebaseAnalytics, useFirebaseStorage
+- ❌ **Rimossa configurazione Firebase**: Eliminati riferimenti alla collection preventivi
+- ❌ **Pulizia codice**: Rimossi tutti i file e riferimenti correlati ai preventivi
 
-### 🎨 **MENU DROPDOWN AZIONI**
-- ✅ **Componente ActionDropdown**: Nuovo componente riutilizzabile con menu a tre punti
-- ✅ **Azioni dinamiche**: Menu contestuali basati sullo stato del preventivo
-- ✅ **UX moderna**: Sostituiti pulsanti multipli con elegante dropdown
-- ✅ **Animazioni smooth**: Transizioni fluide con effetto zoom + fade
-- ✅ **Gestione keyboard**: Supporto chiusura con ESC key
-- ✅ **Responsive design**: Menu ottimizzato per mobile e desktop
+### 🎯 **SISTEMA PREVENTIVI COMPLETO (RIMOSSO)**
+- ❌ **Gestione preventivi integrata**: Creazione, modifica, visualizzazione preventivi con Firestore real-time
+- ❌ **Pipeline vendite**: Dashboard completa con statistiche (preventivi aperti, valore pipeline, tasso conversione, tempo medio)
+- ❌ **Workflow stati**: Bozza → Inviato → Accettato/Rifiutato → Convertito con tracking automatico
+- ❌ **Integrazione clienti**: Selezione da clienti esistenti o creazione nuovi clienti inline
+- ❌ **Numerazione automatica**: Formato PREV-YYYYMMDD-XXX per identificazione univoca
+- ❌ **Conversione in cantiere**: Trasferimento automatico preventivi accettati in cantieri attivi con tutti i dati
+- ❌ **Gestione scadenze**: Aggiornamento automatico stato "scaduto" per preventivi non confermati
+- ❌ **Modal avanzate**: Visualizzazione dettagliata, modifica completa, gestione workflow
+- ❌ **Filtri e ricerca**: Per stato, cliente, numero preventivo con interfaccia responsive
+- ❌ **Toast notifications**: Feedback immediato per tutte le operazioni con sistema uniforme
+- ❌ **Menu dropdown elegante**: Sostituiti pulsanti separati con menu a tre punti per UI pulita e moderna
+
+### 🎨 **MENU DROPDOWN AZIONI (RIMOSSO)**
+- ❌ **Componente ActionDropdown**: Nuovo componente riutilizzabile con menu a tre punti
+- ❌ **Azioni dinamiche**: Menu contestuali basati sullo stato del preventivo
+- ❌ **UX moderna**: Sostituiti pulsanti multipli con elegante dropdown
+- ❌ **Animazioni smooth**: Transizioni fluide con effetto zoom + fade
+- ❌ **Gestione keyboard**: Supporto chiusura con ESC key
+- ❌ **Responsive design**: Menu ottimizzato per mobile e desktop
 - ✅ **Icone emoji**: Visualizzazione chiara azioni con icone intuitive
 
 ### 🔧 **CORREZIONI TECNICHE**

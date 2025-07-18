@@ -379,8 +379,7 @@ export const useFirebaseStorage = () => {
   const getMaterialeAttachmentsPath = (materialeId) => 
     storagePaths.materialiAttachments.replace('{materialeId}', materialeId)
   
-  const getPreventivoPath = (preventivoId) => 
-    storagePaths.preventivi.replace('{preventivoId}', preventivoId)
+  
 
   // Upload specifici per entità
   const uploadCantiereAttachment = async (cantiereId, file, options = {}) => {
@@ -459,7 +458,7 @@ export const useFirebaseStorage = () => {
     getCantiereAttachmentsPath,
     getCantierePhotosPath,
     getMaterialeAttachmentsPath,
-    getPreventivoPath,
+
 
     // Specific uploads
     uploadCantiereAttachment,

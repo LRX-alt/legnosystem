@@ -248,17 +248,7 @@ export const useFirebaseAnalytics = () => {
     })
   }
 
-  /**
-   * Eventi E-commerce (per fatturazione/preventivi)
-   */
-  const logPreventivoCreated = async (preventivo) => {
-    return await trackEvent('preventivo_created', {
-      preventivo_id: preventivo.id,
-      cliente_id: preventivo.clienteId,
-      valore: preventivo.valore,
-      categoria: preventivo.categoria
-    })
-  }
+
 
   const logFatturaGenerated = async (fattura) => {
     return await trackEvent('fattura_generated', {
@@ -449,7 +439,7 @@ export const useFirebaseAnalytics = () => {
     logReportGenerated,
     logSearchPerformed,
     logDashboardViewed,
-    logPreventivoCreated,
+
     logFatturaGenerated,
 
     // Performance & Error tracking

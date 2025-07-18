@@ -77,8 +77,7 @@ export const firestoreConfig = {
     clienti: 'clienti',
     clientiContacts: 'clientiContacts',
     
-    // 📋 Gestione preventivi e fatturazione
-    preventivi: 'preventivi',
+      // 📋 Gestione fatturazione
     fatture: 'fatture',
     
     // 📦 Gestione magazzino
@@ -130,7 +129,7 @@ export const storagePaths = {
   materialiFatture: 'materiali/{materialeId}/fatture',
   
   // 📁 Documenti aziendali
-  preventivi: 'preventivi/{preventivoId}',
+  
   fatture: 'fatture/{fatturaId}',
   
   // 📁 Documenti dipendenti

@@ -104,10 +104,6 @@
               <UserGroupIcon class="w-5 h-5" />
               <span>Anagrafica Clienti</span>
             </router-link>
-            <router-link to="/preventivi" @click="$emit('close-sidebar')" class="nav-link" active-class="active">
-              <DocumentTextIcon class="w-5 h-5" />
-              <span>Preventivi</span>
-            </router-link>
           </div>
         </div>
 
@@ -134,7 +130,6 @@ import {
   BuildingOfficeIcon,
   UsersIcon,
   UserGroupIcon,
-  DocumentTextIcon,
   ChartBarIcon,
   XMarkIcon,
   TruckIcon,

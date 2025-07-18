@@ -54,7 +54,6 @@ export const useFirestoreStore = defineStore('firestore', () => {
   const mezzi_manutenzione = ref([])
   
   // 📋 Documenti
-  const preventivi = ref([])
   const fatture = ref([])
   
   // 🔔 Notifiche
@@ -1049,7 +1048,6 @@ export const useFirestoreStore = defineStore('firestore', () => {
     fornitori_ordini,
     mezzi,
     mezzi_manutenzione,
-    preventivi,
     fatture,
     notifications,
     
