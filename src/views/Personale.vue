@@ -371,22 +371,58 @@
         
         <!-- Filtri per la lista dettagliata -->
         <div class="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4 mb-4">
-          <select v-model="selectedDipendenteFilter" class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-lg text-base">
+          <select v-model="selectedDipendenteFilter" class="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg text-base">
             <option value="">Tutti i dipendenti</option>
             <option v-for="dipendente in dipendenti" :key="dipendente.id" :value="dipendente.id">
               {{ dipendente.nome }} {{ dipendente.cognome }}
             </option>
           </select>
-          <select v-model="selectedCantiereFilter" class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-lg text-base">
+          <select v-model="selectedCantiereFilter" class="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg text-base">
             <option value="">Tutti i cantieri</option>
             <option v-for="cantiere in cantieriDisponibili" :key="cantiere" :value="cantiere">
               {{ cantiere }}
             </option>
           </select>
+          <input
+            v-model="selectedTimesheetDateFilter"
+            type="date"
+            class="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
+            placeholder="Filtra per data"
+          />
+          <button @click="clearTimesheetFilters" class="w-full sm:w-auto px-4 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-base hover:bg-gray-200 transition-colors">
+            🔄 Pulisci Filtri
+          </button>
+          <button @click="syncWithWeekFilter" class="w-full sm:w-auto px-4 py-2 bg-primary-100 text-primary-700 border border-primary-300 rounded-lg text-base hover:bg-primary-200 transition-colors">
+            📅 Usa Settimana Selezionata
+          </button>
         </div>
 
         <!-- Tabella dettagliata timesheet -->
         <div class="card">
+          <!-- Indicatore risultati filtrati -->
+          <div class="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+              <p class="text-sm text-gray-600">
+                Mostrando <span class="font-medium">{{ filteredTimesheetList.length }}</span> 
+                di <span class="font-medium">{{ timesheetDettagli.length }}</span> registrazioni
+                <span v-if="selectedDipendenteFilter || selectedCantiereFilter || selectedTimesheetDateFilter" class="text-blue-600">
+                  (filtrate)
+                </span>
+              </p>
+              <div v-if="selectedDipendenteFilter || selectedCantiereFilter || selectedTimesheetDateFilter" class="flex items-center space-x-2">
+                <span class="text-xs text-gray-500">Filtri attivi:</span>
+                <span v-if="selectedDipendenteFilter" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {{ getDipendenteNome(selectedDipendenteFilter) }}
+                </span>
+                <span v-if="selectedCantiereFilter" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  {{ selectedCantiereFilter }}
+                </span>
+                <span v-if="selectedTimesheetDateFilter" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  {{ formatDate(selectedTimesheetDateFilter) }}
+                </span>
+              </div>
+            </div>
+          </div>
           <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
@@ -1833,6 +1869,7 @@ const ultimoControlloCount = ref(0)
 // 🚀 NUOVO: Variabili per la lista dettagliata timesheet
 const selectedDipendenteFilter = ref('')
 const selectedCantiereFilter = ref('')
+const selectedTimesheetDateFilter = ref('')
 
 // Nuovo dipendente
 const newDipendente = ref({
@@ -2621,6 +2658,11 @@ const filteredTimesheetList = computed(() => {
     )
   }
 
+  // Filtro per data
+  if (selectedTimesheetDateFilter.value) {
+    filtered = filtered.filter(t => t.data === selectedTimesheetDateFilter.value)
+  }
+
   // Ordina per data (più recente prima)
   return filtered.sort((a, b) => new Date(b.data) - new Date(a.data))
 })
@@ -2655,6 +2697,42 @@ const deleteTimesheet = async (timesheet) => {
     console.error('Errore eliminazione timesheet:', err)
     error('Errore Eliminazione', `Impossibile eliminare il timesheet: ${err.message}`)
   }
+}
+
+const clearTimesheetFilters = () => {
+  selectedDipendenteFilter.value = ''
+  selectedCantiereFilter.value = ''
+  selectedTimesheetDateFilter.value = ''
+  info('Filtri Puliti', 'Tutti i filtri sono stati resettati.')
+}
+
+const syncWithWeekFilter = () => {
+  // Calcola la data di inizio della settimana selezionata
+  let startDate
+  const today = new Date()
+  
+  switch (selectedWeek.value) {
+    case 'current':
+      startDate = startOfWeek(today, { weekStartsOn: 1 }) // Lunedì
+      break
+    case 'last':
+      startDate = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
+      break
+    case 'two-weeks':
+      startDate = startOfWeek(subWeeks(today, 2), { weekStartsOn: 1 })
+      break
+    case 'three-weeks':
+      startDate = startOfWeek(subWeeks(today, 3), { weekStartsOn: 1 })
+      break
+    case 'month':
+      startDate = startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 })
+      break
+    default:
+      startDate = startOfWeek(today, { weekStartsOn: 1 })
+  }
+  
+  selectedTimesheetDateFilter.value = format(startDate, 'yyyy-MM-dd')
+  info('Filtro Sincronizzato', `Filtro data impostato sulla settimana selezionata: ${formatDate(selectedTimesheetDateFilter.value)}`)
 }
 
 // Lifecycle Hooks
