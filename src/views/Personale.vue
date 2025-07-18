@@ -212,10 +212,10 @@
             <span class="font-medium">{{ dipendente.oreTotaliSettimana }}h</span>
           </div>
           <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${Math.min((dipendente.oreTotaliSettimana / 52) * 100, 100)}%`"></div>
+            <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${Math.min((dipendente.oreTotaliSettimana / 44) * 100, 100)}%`"></div>
           </div>
           <div class="text-xs text-gray-500 mt-1">
-            Target: 52h/settimana (6 giorni lavorativi)
+            Target: 44h/settimana (6 giorni lavorativi)
           </div>
         </div>
 
@@ -282,7 +282,7 @@
               <p class="text-base text-gray-600">{{ record.cantiere }}</p>
             </div>
             <div class="text-right">
-              <p class="text-xl font-bold" :class="record.totale >= 52 ? 'text-green-600' : 'text-gray-900'">
+              <p class="text-xl font-bold" :class="record.totale >= 44 ? 'text-green-600' : 'text-gray-900'">
                 {{ record.totale }}h
               </p>
               <p class="text-sm text-gray-500">totale</p>
@@ -355,7 +355,7 @@
                 <td class="px-6 py-4 whitespace-nowrap text-base text-gray-900">{{ record.venerdi }}h</td>
                 <td class="px-6 py-4 whitespace-nowrap text-base text-gray-900">{{ record.sabato }}h</td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <span class="text-base font-semibold" :class="record.totale >= 52 ? 'text-green-600' : 'text-gray-900'">
+                  <span class="text-base font-semibold" :class="record.totale >= 44 ? 'text-green-600' : 'text-gray-900'">
                     {{ record.totale }}h
                   </span>
                 </td>
@@ -1225,10 +1225,10 @@
                 <p class="text-2xl font-bold text-blue-900">{{ selectedDipendente?.oreTotaliSettimana || 0 }}h</p>
                 <div class="w-full bg-blue-200 rounded-full h-2 mt-2">
                   <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                       :style="`width: ${Math.min(((selectedDipendente?.oreTotaliSettimana || 0) / 52) * 100, 100)}%`"></div>
+                       :style="`width: ${Math.min(((selectedDipendente?.oreTotaliSettimana || 0) / 44) * 100, 100)}%`"></div>
                 </div>
                 <div class="text-xs text-blue-600 mt-1">
-                  Target: 52h/settimana (6 giorni lavorativi, Lun-Sab)
+                  Target: 44h/settimana (6 giorni lavorativi, Lun-Sab)
                 </div>
               </div>
               <div class="bg-green-50 p-4 rounded-lg border border-green-200">
@@ -1617,7 +1617,7 @@
                   <p class="font-medium text-gray-900 mb-2">{{ giorno }}</p>
                   <div class="space-y-2">
                     <div class="bg-primary-100 text-primary-800 px-2 py-1 rounded text-sm">
-                      08:00 - 17:00
+                      {{ index === 5 ? '08:00 - 12:00' : '08:00 - 17:00' }}
                     </div>
                     <p class="text-xs text-gray-500">
                       {{ getCantieriAssegnati(selectedDipendente?.id).length > 0 
@@ -1628,7 +1628,7 @@
                 </div>
               </div>
               <div class="mt-4 text-center">
-                <p class="text-sm text-gray-600">🕐 Settimana lavorativa: 6 giorni (Lun-Sab) - 52h totali</p>
+                <p class="text-sm text-gray-600">🕐 Settimana lavorativa: 6 giorni (Lun-Sab) - 44h totali</p>
               </div>
               <div class="mt-4 text-center">
                 <p class="text-sm text-gray-500">📝 Planning completo disponibile nel modulo Calendario</p>
@@ -2580,6 +2580,11 @@ const closeEditTimesheetModal = () => {
   editingTimesheetDipendenteName.value = ''
 }
 
+const closeScheduleModal = () => {
+  showScheduleModal.value = false
+  selectedDipendente.value = null
+}
+
 const editTimesheet = (timesheet) => {
   const dipendente = dipendenti.value.find(d => d.id === timesheet.dipendenteId)
   editingTimesheetDipendenteName.value = dipendente ? `${dipendente.nome} ${dipendente.cognome}` : 'N/A'
@@ -2699,9 +2704,7 @@ const filteredTimesheetList = computed(() => {
       
       filtered = filtered.filter(t => {
         const recordDate = new Date(t.data)
-        const isInRange = recordDate >= startDate && recordDate <= endDate
-        console.log(`📅 Filtro settimana: ${t.data} (${recordDate}) in range ${format(startDate, 'yyyy-MM-dd')} - ${format(endDate, 'yyyy-MM-dd')} = ${isInRange}`)
-        return isInRange
+        return recordDate >= startDate && recordDate <= endDate
       })
     } else {
       // Filtro per data singola
@@ -2786,12 +2789,7 @@ const syncWithWeekFilter = () => {
       endDate = endOfWeek(today, { weekStartsOn: 1 })
   }
   
-  // Debug: mostra le date e i timesheet disponibili
-  console.log('🔍 DEBUG FILTRO SETTIMANALE:')
-  console.log('Settimana selezionata:', selectedWeek.value)
-  console.log('Data inizio settimana:', format(startDate, 'yyyy-MM-dd'))
-  console.log('Data fine settimana:', format(endDate, 'yyyy-MM-dd'))
-  console.log('Timesheet disponibili:', timesheetDettagli.value.map(t => ({ data: t.data, dipendente: t.dipendenteId })))
+
   
   info('Filtro Sincronizzato', `Filtro impostato per la settimana: ${formatDate(format(startDate, 'yyyy-MM-dd'))} - ${formatDate(format(endDate, 'yyyy-MM-dd'))}`)
 }
