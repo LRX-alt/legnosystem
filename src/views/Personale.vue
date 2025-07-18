@@ -418,7 +418,9 @@
                   {{ selectedCantiereFilter }}
                 </span>
                 <span v-if="selectedTimesheetDateFilter" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  {{ formatDate(selectedTimesheetDateFilter) }}
+                  {{ selectedTimesheetDateFilter.includes('week-') ? 
+                     `Settimana ${selectedTimesheetDateFilter.replace('week-', '')}` : 
+                     formatDate(selectedTimesheetDateFilter) }}
                 </span>
               </div>
             </div>
@@ -2658,9 +2660,53 @@ const filteredTimesheetList = computed(() => {
     )
   }
 
-  // Filtro per data
+  // Filtro per data (singola data o settimana)
   if (selectedTimesheetDateFilter.value) {
-    filtered = filtered.filter(t => t.data === selectedTimesheetDateFilter.value)
+    // Se il filtro è impostato tramite "Usa Settimana Selezionata", filtra per l'intera settimana
+    if (selectedTimesheetDateFilter.value.includes('week-')) {
+      const weekType = selectedTimesheetDateFilter.value.replace('week-', '')
+      const today = new Date()
+      let startDate, endDate
+      
+      switch (weekType) {
+        case 'current':
+          startDate = startOfWeek(today, { weekStartsOn: 1 })
+          endDate = endOfWeek(today, { weekStartsOn: 1 })
+          break
+        case 'last':
+          startDate = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
+          endDate = endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
+          break
+        case 'two-weeks':
+          startDate = startOfWeek(subWeeks(today, 2), { weekStartsOn: 1 })
+          endDate = endOfWeek(subWeeks(today, 2), { weekStartsOn: 1 })
+          break
+        case 'three-weeks':
+          startDate = startOfWeek(subWeeks(today, 3), { weekStartsOn: 1 })
+          endDate = endOfWeek(subWeeks(today, 3), { weekStartsOn: 1 })
+          break
+        case 'month':
+          startDate = startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 })
+          endDate = endOfWeek(subWeeks(today, 4), { weekStartsOn: 1 })
+          break
+        default:
+          startDate = startOfWeek(today, { weekStartsOn: 1 })
+          endDate = endOfWeek(today, { weekStartsOn: 1 })
+      }
+      
+      const startDateStr = format(startDate, 'yyyy-MM-dd')
+      const endDateStr = format(endDate, 'yyyy-MM-dd')
+      
+      filtered = filtered.filter(t => {
+        const recordDate = new Date(t.data)
+        const isInRange = recordDate >= startDate && recordDate <= endDate
+        console.log(`📅 Filtro settimana: ${t.data} (${recordDate}) in range ${format(startDate, 'yyyy-MM-dd')} - ${format(endDate, 'yyyy-MM-dd')} = ${isInRange}`)
+        return isInRange
+      })
+    } else {
+      // Filtro per data singola
+      filtered = filtered.filter(t => t.data === selectedTimesheetDateFilter.value)
+    }
   }
 
   // Ordina per data (più recente prima)
@@ -2707,32 +2753,47 @@ const clearTimesheetFilters = () => {
 }
 
 const syncWithWeekFilter = () => {
-  // Calcola la data di inizio della settimana selezionata
-  let startDate
+  // Usa il tipo di settimana selezionato per il filtro
+  selectedTimesheetDateFilter.value = `week-${selectedWeek.value}`
+  
+  // Calcola le date per il messaggio informativo
   const today = new Date()
+  let startDate, endDate
   
   switch (selectedWeek.value) {
     case 'current':
-      startDate = startOfWeek(today, { weekStartsOn: 1 }) // Lunedì
+      startDate = startOfWeek(today, { weekStartsOn: 1 })
+      endDate = endOfWeek(today, { weekStartsOn: 1 })
       break
     case 'last':
       startDate = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
+      endDate = endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 })
       break
     case 'two-weeks':
       startDate = startOfWeek(subWeeks(today, 2), { weekStartsOn: 1 })
+      endDate = endOfWeek(subWeeks(today, 2), { weekStartsOn: 1 })
       break
     case 'three-weeks':
       startDate = startOfWeek(subWeeks(today, 3), { weekStartsOn: 1 })
+      endDate = endOfWeek(subWeeks(today, 3), { weekStartsOn: 1 })
       break
     case 'month':
       startDate = startOfWeek(subWeeks(today, 4), { weekStartsOn: 1 })
+      endDate = endOfWeek(subWeeks(today, 4), { weekStartsOn: 1 })
       break
     default:
       startDate = startOfWeek(today, { weekStartsOn: 1 })
+      endDate = endOfWeek(today, { weekStartsOn: 1 })
   }
   
-  selectedTimesheetDateFilter.value = format(startDate, 'yyyy-MM-dd')
-  info('Filtro Sincronizzato', `Filtro data impostato sulla settimana selezionata: ${formatDate(selectedTimesheetDateFilter.value)}`)
+  // Debug: mostra le date e i timesheet disponibili
+  console.log('🔍 DEBUG FILTRO SETTIMANALE:')
+  console.log('Settimana selezionata:', selectedWeek.value)
+  console.log('Data inizio settimana:', format(startDate, 'yyyy-MM-dd'))
+  console.log('Data fine settimana:', format(endDate, 'yyyy-MM-dd'))
+  console.log('Timesheet disponibili:', timesheetDettagli.value.map(t => ({ data: t.data, dipendente: t.dipendenteId })))
+  
+  info('Filtro Sincronizzato', `Filtro impostato per la settimana: ${formatDate(format(startDate, 'yyyy-MM-dd'))} - ${formatDate(format(endDate, 'yyyy-MM-dd'))}`)
 }
 
 // Lifecycle Hooks
