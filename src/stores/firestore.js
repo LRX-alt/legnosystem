@@ -487,7 +487,15 @@ export const useFirestoreStore = defineStore('firestore', () => {
   }
 
   const registraTimesheet = async (timesheetData) => {
-    return await createDocument(firestoreConfig.collections.timesheet, timesheetData)
+    const result = await createDocument(firestoreConfig.collections.timesheet, timesheetData)
+    
+    // Se la creazione è riuscita, aggiorna la lista locale
+    if (result.success) {
+      // Ricarica i timesheet per avere i dati aggiornati
+      await loadTimesheet()
+    }
+    
+    return result
   }
 
   const loadPresenzeForDate = async (dateStr) => {

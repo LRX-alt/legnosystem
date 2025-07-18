@@ -364,6 +364,97 @@
           </table>
         </div>
       </div>
+
+      <!-- Lista Dettagliata Timesheet -->
+      <div class="mt-8">
+        <h4 class="text-lg font-semibold text-gray-900 mb-4">Dettaglio Registrazioni Ore</h4>
+        
+        <!-- Filtri per la lista dettagliata -->
+        <div class="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4 mb-4">
+          <select v-model="selectedDipendenteFilter" class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-lg text-base">
+            <option value="">Tutti i dipendenti</option>
+            <option v-for="dipendente in dipendenti" :key="dipendente.id" :value="dipendente.id">
+              {{ dipendente.nome }} {{ dipendente.cognome }}
+            </option>
+          </select>
+          <select v-model="selectedCantiereFilter" class="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-lg text-base">
+            <option value="">Tutti i cantieri</option>
+            <option v-for="cantiere in cantieriDisponibili" :key="cantiere" :value="cantiere">
+              {{ cantiere }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Tabella dettagliata timesheet -->
+        <div class="card">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dipendente</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantiere</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ore</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Costo</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fonte</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="timesheet in filteredTimesheetList" :key="timesheet.id" class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                      <div class="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
+                        {{ getDipendenteIniziali(timesheet.dipendenteId) }}
+                      </div>
+                      <div class="text-sm font-medium text-gray-900">
+                        {{ getDipendenteNome(timesheet.dipendenteId) }}
+                      </div>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ formatDate(timesheet.data) }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ timesheet.cantiere || timesheet.cantiereNome || 'N/A' }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ timesheet.ore || timesheet.oreLavorate || 0 }}h
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    €{{ (timesheet.costoTotale || 0).toFixed(2) }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
+                          :class="timesheet.fonte === 'manuale' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'">
+                      {{ timesheet.fonte === 'manuale' ? 'Manuale' : 'Presenze' }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div class="flex space-x-2">
+                      <button @click="editTimesheet(timesheet)" 
+                              class="text-primary-600 hover:text-primary-900"
+                              title="Modifica timesheet">
+                        <PencilIcon class="w-4 h-4" />
+                      </button>
+                      <button @click="deleteTimesheet(timesheet)" 
+                              class="text-red-600 hover:text-red-900"
+                              title="Elimina timesheet">
+                        <TrashIcon class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Messaggio se nessun timesheet -->
+          <div v-if="filteredTimesheetList.length === 0" class="text-center py-8">
+            <p class="text-gray-500">Nessuna registrazione ore trovata per i filtri selezionati.</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Tab Content: Presenze -->
@@ -918,17 +1009,7 @@
               <input v-model="newTimesheet.data" type="date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-base font-medium text-gray-700 mb-2">Orario Inizio</label>
-                <input v-model="newTimesheet.orarioInizio" type="time" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
-              </div>
-              
-              <div>
-                <label class="block text-base font-medium text-gray-700 mb-2">Orario Fine</label>
-                <input v-model="newTimesheet.orarioFine" type="time" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
-              </div>
-            </div>
+
             
             <div>
               <label class="block text-base font-medium text-gray-700 mb-2">Ore Lavorate</label>
@@ -1355,19 +1436,7 @@
                      class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-base font-medium text-gray-700 mb-2">Orario Inizio</label>
-                <input v-model="editingTimesheet.orarioInizio" type="time" 
-                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
-              </div>
-              
-              <div>
-                <label class="block text-base font-medium text-gray-700 mb-2">Orario Fine</label>
-                <input v-model="editingTimesheet.orarioFine" type="time" 
-                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base">
-              </div>
-            </div>
+
             
             <div>
               <label class="block text-base font-medium text-gray-700 mb-2">Ore Lavorate</label>
@@ -1761,6 +1830,10 @@ const incoerenze = ref([])
 const controlloInCorso = ref(false)
 const ultimoControlloCount = ref(0)
 
+// 🚀 NUOVO: Variabili per la lista dettagliata timesheet
+const selectedDipendenteFilter = ref('')
+const selectedCantiereFilter = ref('')
+
 // Nuovo dipendente
 const newDipendente = ref({
   nome: '',
@@ -1781,9 +1854,7 @@ const newTimesheet = ref({
   data: new Date().toISOString().split('T')[0],
   ore: '',
   cantiere: '',
-  note: '',
-  orarioInizio: '08:00',
-  orarioFine: '17:00'
+  note: ''
 })
 
 // Dipendente in modifica
@@ -1808,9 +1879,7 @@ const editingTimesheet = ref({
   data: '',
   ore: '',
   cantiere: '',
-  note: '',
-  orarioInizio: '08:00',
-  orarioFine: '17:00'
+  note: ''
 })
 
 const editingTimesheetDipendenteName = ref('')
@@ -1996,9 +2065,7 @@ const closeTimesheetModal = () => {
     data: new Date().toISOString().split('T')[0],
     ore: '',
     cantiere: '',
-    note: '',
-    orarioInizio: '08:00',
-    orarioFine: '17:00'
+    note: ''
   }
 }
 const closeDetailModal = () => showDetailModal.value = false
@@ -2178,8 +2245,6 @@ const saveTimesheet = async () => {
       data: newTimesheet.value.data,
       cantiere: newTimesheet.value.cantiere,
       ore: parseFloat(newTimesheet.value.ore),
-      orarioInizio: newTimesheet.value.orarioInizio,
-      orarioFine: newTimesheet.value.orarioFine,
       note: newTimesheet.value.note,
       costoOrario: dipendente.pagaOraria || 25,
       costoTotale: parseFloat(newTimesheet.value.ore) * (dipendente.pagaOraria || 25),
@@ -2201,7 +2266,10 @@ const saveTimesheet = async () => {
     const result = await firestoreStore.registraTimesheet(timesheetValidation.correctedData)
 
     if (result.success) {
+      // Forza un aggiornamento completo dei dati
       await loadTimesheet()
+      // Aggiorna anche le ore settimanali dei dipendenti
+      updateDipendentiOreFromTimesheet()
       closeTimesheetModal()
       success('Ore Registrate', `Timesheet per ${dipendente?.nome} ${dipendente?.cognome} salvato con successo!`)
     } else {
@@ -2327,8 +2395,6 @@ const savePresenza = async (dipendenteId) => {
         ore: ore,
         oreLavorate: ore,
         cantiere: dipendente.cantiereAttuale || 'Sede',
-        orarioInizio: presenzaData.entrata,
-        orarioFine: presenzaData.uscita,
         note: `Generato da presenze: ${presenzaData.note || ''}`,
         costoOrario: dipendente.pagaOraria || 25,
         costoTotale: ore * (dipendente.pagaOraria || 25),
@@ -2354,6 +2420,11 @@ const savePresenza = async (dipendenteId) => {
     if (result.success) {
       success('Presenza Salvata', `Presenza per ${dipendenti.value.find(d => d.id === dipendenteId)?.nome} salvata.`)
       await loadPresenze() // ricarica
+      // Se è stato creato un timesheet, ricarica anche i timesheet
+      if (presenzaData.stato === 'presente') {
+        await loadTimesheet()
+        updateDipendentiOreFromTimesheet()
+      }
     } else {
       throw new Error(result.error)
     }
@@ -2466,7 +2537,7 @@ const resolveIncoherence = async (incoerenza) => {
 // 🚀 NUOVO: Gestione Modifica Timesheet
 const closeEditTimesheetModal = () => {
   showEditTimesheetModal.value = false
-  editingTimesheet.value = { id: null, dipendenteId: '', data: '', ore: '', cantiere: '', note: '', orarioInizio: '08:00', orarioFine: '17:00' }
+  editingTimesheet.value = { id: null, dipendenteId: '', data: '', ore: '', cantiere: '', note: '' }
   editingTimesheetDipendenteName.value = ''
 }
 
@@ -2480,9 +2551,7 @@ const editTimesheet = (timesheet) => {
     data: timesheet.data,
     ore: timesheet.ore || timesheet.oreLavorate || 0,
     cantiere: timesheet.cantiere || timesheet.cantiereNome || '',
-    note: timesheet.note || '',
-    orarioInizio: timesheet.orarioInizio || '08:00',
-    orarioFine: timesheet.orarioFine || '17:00'
+    note: timesheet.note || ''
   }
   
   showEditTimesheetModal.value = true
@@ -2522,13 +2591,69 @@ const updateTimesheet = async () => {
     
     await firestoreStore.updateDocument('timesheet', editingTimesheet.value.id, timesheetValidation.correctedData)
 
+    // Forza un aggiornamento completo dei dati
     await loadTimesheet()
+    // Aggiorna anche le ore settimanali dei dipendenti
+    updateDipendentiOreFromTimesheet()
     closeEditTimesheetModal()
     success('Timesheet Aggiornato', `Il timesheet è stato aggiornato con successo.`)
 
   } catch (err) {
     console.error('Errore aggiornamento timesheet:', err)
     error('Errore Aggiornamento', err.message)
+  }
+}
+
+// 🚀 NUOVO: Funzioni per la lista dettagliata timesheet
+const filteredTimesheetList = computed(() => {
+  let filtered = timesheetDettagli.value
+
+  // Filtro per dipendente
+  if (selectedDipendenteFilter.value) {
+    filtered = filtered.filter(t => t.dipendenteId === selectedDipendenteFilter.value)
+  }
+
+  // Filtro per cantiere
+  if (selectedCantiereFilter.value) {
+    filtered = filtered.filter(t => 
+      (t.cantiere && t.cantiere === selectedCantiereFilter.value) ||
+      (t.cantiereNome && t.cantiereNome === selectedCantiereFilter.value)
+    )
+  }
+
+  // Ordina per data (più recente prima)
+  return filtered.sort((a, b) => new Date(b.data) - new Date(a.data))
+})
+
+const getDipendenteIniziali = (dipendenteId) => {
+  const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
+  return dipendente ? dipendente.iniziali : 'N/A'
+}
+
+const getDipendenteNome = (dipendenteId) => {
+  const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
+  return dipendente ? `${dipendente.nome} ${dipendente.cognome}` : 'N/A'
+}
+
+const deleteTimesheet = async (timesheet) => {
+  const confirmed = await confirm(
+    'Elimina Timesheet', 
+    `Sei sicuro di voler eliminare la registrazione ore del ${formatDate(timesheet.data)} per ${getDipendenteNome(timesheet.dipendenteId)}?`
+  )
+  
+  if (!confirmed) return
+
+  try {
+    await firestoreStore.deleteDocument('timesheet', timesheet.id)
+    
+    // Ricarica i dati
+    await loadTimesheet()
+    updateDipendentiOreFromTimesheet()
+    
+    success('Timesheet Eliminato', 'La registrazione ore è stata eliminata con successo.')
+  } catch (err) {
+    console.error('Errore eliminazione timesheet:', err)
+    error('Errore Eliminazione', `Impossibile eliminare il timesheet: ${err.message}`)
   }
 }
 
