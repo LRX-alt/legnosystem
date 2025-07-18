@@ -16,7 +16,7 @@
         </div>
       </div>
       <div class="flex space-x-3">
-        <button @click="newEntry" class="btn-primary">
+        <button @click="newEntry()" class="btn-primary">
           <PlusIcon class="w-5 h-5 mr-2" />
           Nuova Registrazione
         </button>
@@ -292,10 +292,10 @@
         <h3 class="mt-2 text-sm font-medium text-gray-900">Nessuna registrazione</h3>
         <p class="mt-1 text-sm text-gray-500">Inizia creando la prima registrazione del giornale di cantiere.</p>
         <div class="mt-6">
-          <button @click="newEntry" class="btn-primary">
-            <PlusIcon class="w-5 h-5 mr-2" />
-            Nuova Registrazione
-          </button>
+                      <button @click="newEntry()" class="btn-primary">
+              <PlusIcon class="w-5 h-5 mr-2" />
+              Nuova Registrazione
+            </button>
         </div>
       </div>
     </div>
@@ -334,8 +334,9 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Responsabile</label>
               <select v-model="newEntryData.responsabile" required class="form-select">
-                <option v-for="membro in cantiere?.team" :key="membro.id" :value="membro.nome">
-                  {{ membro.nome }}
+                <option value="">Seleziona responsabile...</option>
+                <option v-for="dipendente in firestoreStore.dipendenti" :key="dipendente.id" :value="dipendente.nome">
+                  {{ dipendente.nome }} {{ dipendente.cognome }} ({{ dipendente.ruolo }})
                 </option>
               </select>
             </div>
@@ -381,82 +382,41 @@
               </div>
             </div>
 
-            <!-- 👥 Team Presente e Ore Lavorate -->
+            <!-- 👥 Dipendenti Dettagliati -->
             <div>
-              <h4 class="text-lg font-medium text-gray-900 mb-4">👥 Team Presente e Ore</h4>
-              
-              <!-- Ore Totali -->
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">⏰ Ore Totali Lavorate</label>
-                  <input v-model.number="newEntryData.oreTotali" type="number" min="0.5" max="12" step="0.5" required class="form-input"
-                         :class="{'border-orange-500': newEntryData.oreTotali > 8}">
-                  <p v-if="newEntryData.oreTotali > 8" class="text-xs text-orange-600 mt-1">
-                    Include {{ newEntryData.oreTotali - 8 }}h di straordinario
-                  </p>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">💶 Costi Extra</label>
-                  <input v-model.number="newEntryData.costiExtra"
-                         type="number"
-                         min="0"
-                         step="0.5"
-                         class="form-input"
-                         placeholder="Es: trasferte, bonus...">
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">💰 Costo Stimato Giornata</label>
-                  <input :value="calculateDayCost().toFixed(2)" type="text" readonly class="form-input bg-gray-100 font-bold text-green-600">
-                  <p class="text-xs text-gray-500 mt-1">€ per questa giornata</p>
-                </div>
-              </div>
+              <h4 class="text-lg font-medium text-gray-900 mb-4">👥 Dipendenti Presenti e Ore Lavorate</h4>
+              <DipendentiSelector 
+                :dipendenti="firestoreStore.dipendenti || []"
+                v-model="newEntryData.dipendenti"
+              />
+            </div>
 
-              <!-- Selezione Team Presente -->
-              <div class="space-y-3">
-                <div class="flex items-center justify-between">
-                  <label class="text-sm font-medium text-gray-700">Dipendenti Presenti</label>
-                  <div class="text-xs text-gray-500">
-                    Seleziona chi ha effettivamente lavorato oggi
-                  </div>
-                </div>
-                
-                <!-- Lista dipendenti disponibili -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                  <div v-for="membro in cantiere?.team" :key="membro.id" class="flex items-center space-x-3">
-                    <input 
-                      :id="'team-' + membro.id" 
-                      type="checkbox" 
-                      :checked="isTeamMemberPresent(membro)"
-                      @change="toggleTeamMember(membro)"
-                      class="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
-                    >
-                    <label :for="'team-' + membro.id" class="text-sm text-gray-700 flex-1 cursor-pointer">
-                      <span class="font-medium">{{ membro.nome }}</span>
-                      <span class="text-gray-500 ml-2">({{ membro.ruolo }})</span>
-                      <span class="text-green-600 ml-2 font-medium">€{{ getDipendentePagaOraria(membro.id) }}/h</span>
-                    </label>
-                  </div>
-                </div>
 
-                <!-- Team presente riepilogo -->
-                <div v-if="newEntryData.teamPresente.length > 0" class="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                  <p class="text-sm font-medium text-blue-900 mb-2">Team presente ({{ newEntryData.teamPresente.length }} dipendenti):</p>
-                  <div class="flex flex-wrap gap-2">
-                    <span v-for="membro in newEntryData.teamPresente" :key="membro.id" class="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                      {{ membro.nome }} - €{{ membro.pagaOraria }}/h
-                    </span>
-                  </div>
-                  <p class="text-xs text-blue-700 mt-2">
-                    Costo orario team: €{{ calcolayCostoOrarioTeam() }}/h • 
-                    {{ newEntryData.oreTotali }}h × €{{ calcolayCostoOrarioTeam() }}/h = €{{ calculateDayCost() }}
-                  </p>
-                </div>
 
-                <!-- Warning se nessun team -->
-                <div v-if="newEntryData.teamPresente.length === 0" class="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                  <p class="text-sm text-yellow-800">⚠️ Seleziona almeno un dipendente che ha lavorato in questa giornata</p>
-                </div>
-              </div>
+            <!-- NUOVO: Materiali Utilizzati -->
+            <div>
+              <h4 class="text-lg font-medium text-gray-900 mb-4">🧱 Materiali Utilizzati</h4>
+              <MaterialiSelector 
+                :materiali="materialiDisponibili"
+                v-model="newEntryData.materiali"
+              />
+            </div>
+
+            <!-- NUOVO: Mezzi Utilizzati -->
+            <div>
+              <h4 class="text-lg font-medium text-gray-900 mb-4">🚛 Mezzi Utilizzati</h4>
+              <MezziSelector 
+                :mezzi="mezziDisponibili"
+                v-model="newEntryData.mezzi"
+              />
+            </div>
+
+            <!-- NUOVO: Tipi di Lavori -->
+            <div>
+              <h4 class="text-lg font-medium text-gray-900 mb-4">🔨 Tipi di Lavori Effettuati</h4>
+              <TipiLavoriSelector 
+                v-model="newEntryData.lavori"
+              />
             </div>
 
             <!-- Note e Problemi -->
@@ -471,27 +431,35 @@
               </div>
             </div>
 
-            <!-- Riepilogo Costi -->
+                        <!-- Riepilogo Costi Semplificato -->
             <div class="bg-gray-50 p-4 rounded-lg">
-              <h4 class="text-lg font-medium text-gray-900 mb-4">💰 Riepilogo Costi</h4>
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <h4 class="text-lg font-medium text-gray-900 mb-4">💰 Riepilogo Costi Giornata</h4>
+              
+              <!-- Costi dettagliati -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <div>
-                  <p class="text-sm text-gray-600">Costo Base</p>
-                  <p class="text-lg font-semibold">€{{ (calcolayCostoOrarioTeam() * Math.min(8, newEntryData.oreTotali)).toFixed(2) }}</p>
-                </div>
-                <div v-if="newEntryData.oreTotali > 8">
-                  <p class="text-sm text-gray-600">Straordinari</p>
-                  <p class="text-lg font-semibold text-orange-600">
-                    €{{ (calcolayCostoOrarioTeam() * 1.3 * (newEntryData.oreTotali - 8)).toFixed(2) }}
-                  </p>
-                </div>
-                <div v-if="newEntryData.costiExtra">
-                  <p class="text-sm text-gray-600">Extra</p>
-                  <p class="text-lg font-semibold text-blue-600">€{{ newEntryData.costiExtra.toFixed(2) }}</p>
+                  <p class="text-sm text-gray-600">Dipendenti</p>
+                  <p class="text-lg font-semibold text-orange-600">€{{ calculateDipendentiCost().toFixed(2) }}</p>
                 </div>
                 <div>
-                  <p class="text-sm text-gray-600">Totale Giornata</p>
-                  <p class="text-xl font-bold text-green-600">€{{ calculateDayCost().toFixed(2) }}</p>
+                  <p class="text-sm text-gray-600">Materiali</p>
+                  <p class="text-lg font-semibold text-blue-600">€{{ calculateMaterialiCost().toFixed(2) }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-600">Mezzi</p>
+                  <p class="text-lg font-semibold text-purple-600">€{{ calculateMezziCost().toFixed(2) }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-600">Lavori</p>
+                  <p class="text-lg font-semibold text-green-600">€{{ calculateLavoriCost().toFixed(2) }}</p>
+                </div>
+              </div>
+
+              <!-- Totale finale -->
+              <div class="mt-4 pt-4 border-t-2 border-gray-300">
+                <div class="flex justify-between items-center">
+                  <p class="text-lg font-medium text-gray-900">TOTALE GIORNATA</p>
+                  <p class="text-2xl font-bold text-red-600">€{{ calculateTotalCost().toFixed(2) }}</p>
                 </div>
               </div>
             </div>
@@ -518,6 +486,10 @@ import { useRoute } from 'vue-router'
 import { useFirestoreOperations } from '@/composables/useFirestoreOperations'
 import { usePopup } from '@/composables/usePopup'
 import { useFirestoreStore } from '@/stores/firestore'
+import DipendentiSelector from '@/components/DipendentiSelector.vue'
+import MaterialiSelector from '@/components/MaterialiSelector.vue'
+import MezziSelector from '@/components/MezziSelector.vue'
+import TipiLavoriSelector from '@/components/TipiLavoriSelector.vue'
 import {
   PlusIcon,
   DocumentArrowDownIcon,
@@ -565,7 +537,12 @@ const newEntryData = ref({
   problemiText: '',
   oreTotali: 8,
   costiExtra: 0,
-  teamPresente: []
+  teamPresente: [],
+  // NUOVO: Dati estesi per tracking costi
+  dipendenti: [],
+  materiali: [],
+  mezzi: [],
+  lavori: []
 })
 
 // 💰 Costi cantiere
@@ -577,6 +554,23 @@ const costiCantiere = ref({
   oreTotali: 0,
   costoMedioGiorno: 0
 })
+
+// NUOVO: Dati per materiali e mezzi
+const materialiDisponibili = ref([
+  { id: 'mat_001', nome: 'Cemento', categoria: 'Materiali da costruzione', prezzo: 0.5, unita: 'kg' },
+  { id: 'mat_002', nome: 'Mattoni', categoria: 'Materiali da costruzione', prezzo: 0.8, unita: 'pz' },
+  { id: 'mat_003', nome: 'Legno', categoria: 'Materiali da costruzione', prezzo: 15.0, unita: 'm' },
+  { id: 'mat_004', nome: 'Vernice', categoria: 'Finiture', prezzo: 25.0, unita: 'l' },
+  { id: 'mat_005', nome: 'Bulloni', categoria: 'Ferramenta', prezzo: 0.2, unita: 'pz' }
+])
+
+const mezziDisponibili = ref([
+  { id: 'mez_001', nome: 'Escavatore CAT', categoria: 'Mezzi pesanti', costoOrario: 45 },
+  { id: 'mez_002', nome: 'Betoniera', categoria: 'Mezzi da cantiere', costoOrario: 25 },
+  { id: 'mez_003', nome: 'Gru', categoria: 'Mezzi pesanti', costoOrario: 60 },
+  { id: 'mez_004', nome: 'Compressore', categoria: 'Attrezzature', costoOrario: 15 },
+  { id: 'mez_005', nome: 'Pompa per calcestruzzo', categoria: 'Mezzi specializzati', costoOrario: 35 }
+])
 
 // Computed
 const filteredEntries = computed(() => {
@@ -619,13 +613,23 @@ const formatDate = (dateString) => {
   })
 }
 
-const newEntry = () => {
+const newEntry = async () => {
   editingEntry.value = null
+  
+  // Carica i dipendenti se non sono già caricati
+  if (!firestoreStore.dipendenti || firestoreStore.dipendenti.length === 0) {
+    try {
+      await firestoreStore.loadDipendenti()
+    } catch (error) {
+      console.error('Errore caricamento dipendenti:', error)
+    }
+  }
+  
   newEntryData.value = {
     data: new Date().toISOString().split('T')[0],
-    orarioInizio: '06:00',
-    orarioFine: '22:00',
-    responsabile: cantiere.value?.team?.[0]?.nome || '',
+    orarioInizio: '08:00',
+    orarioFine: '17:00',
+    responsabile: firestoreStore.dipendenti?.[0]?.nome || '',
     meteo: {
       condizioni: 'sereno',
       temperatura: 20,
@@ -636,16 +640,27 @@ const newEntry = () => {
     allegati: [],
     note: '',
     problemiText: '',
-    oreTotali: 8,
-    costiExtra: 0,
-    team: [], // Legacy
-    teamPresente: [] // Nuovo team specifico
+    // NUOVO: Inizializza dati estesi
+    dipendenti: [],
+    materiali: [],
+    mezzi: [],
+    lavori: []
   }
   showEntryModal.value = true
 }
 
-const editEntry = (entry) => {
+const editEntry = async (entry) => {
   editingEntry.value = entry
+  
+  // Carica i dipendenti se non sono già caricati
+  if (!firestoreStore.dipendenti || firestoreStore.dipendenti.length === 0) {
+    try {
+      await firestoreStore.loadDipendenti()
+    } catch (error) {
+      console.error('Errore caricamento dipendenti:', error)
+    }
+  }
+  
   newEntryData.value = {
     data: entry.data,
     orarioInizio: entry.orarioInizio,
@@ -657,10 +672,11 @@ const editEntry = (entry) => {
     allegati: [...(entry.allegati || [])],
     note: entry.note || '',
     problemiText: (entry.problemi || []).join('\n'),
-    oreTotali: entry.oreTotali || 8,
-    costiExtra: entry.costiExtra || 0,
-    team: [...(entry.team || [])], // Legacy
-    teamPresente: [...(entry.teamPresente || entry.team || [])] // Nuovo team, fallback su legacy
+    // NUOVO: Carica dati estesi
+    dipendenti: [...(entry.dipendenti || [])],
+    materiali: [...(entry.materiali || [])],
+    mezzi: [...(entry.mezzi || [])],
+    lavori: [...(entry.lavori || [])]
   }
   showEntryModal.value = true
 }
@@ -678,132 +694,36 @@ const removeAttivita = (index) => {
   newEntryData.value.attivita.splice(index, 1)
 }
 
-// 👥 ===== FUNZIONI GESTIONE TEAM PRESENTE =====
 
-// Verifica se un membro del team è presente nella registrazione
-const isTeamMemberPresent = (membro) => {
-  return newEntryData.value.teamPresente.some(m => m.id === membro.id)
+
+// NUOVO: Calcola costo dipendenti dettagliati
+const calculateDipendentiCost = () => {
+  return newEntryData.value.dipendenti?.reduce((tot, dip) => tot + (dip.costoTotale || 0), 0) || 0
 }
 
-// Aggiunge/rimuove un membro dal team presente
-const toggleTeamMember = async (membro) => {
-  const index = newEntryData.value.teamPresente.findIndex(m => m.id === membro.id)
-  
-  if (index >= 0) {
-    // Rimuovi il membro se già presente
-    newEntryData.value.teamPresente.splice(index, 1)
-    console.log(`👤 Rimosso ${membro.nome} dal team presente`)
-  } else {
-    // 🚀 MULTI-ASSIGNMENT: Validazione smart con warning
-    const validationResult = await validateDipendenteAssignment(membro.id, newEntryData.value.data)
-    
-    // ❌ BLOCCO: Solo per errori gravi (dipendente non attivo, non trovato, ecc.)
-    if (!validationResult.canAssign) {
-      popup.error('Impossibile Assegnare', validationResult.message)
-      console.log(`❌ Assegnazione bloccata per ${membro.nome}: ${validationResult.message}`)
-      return
-    }
-    
-    // ⚠️ WARNING: Mostra avvisi ma permette l'assegnazione
-    if (validationResult.type === 'warning' && validationResult.warnings?.length > 0) {
-      // Mostra popup informativo per i warning
-      const confirmed = await popup.confirm('Assegnazione con Avvertimenti', 
-        `${membro.nome}:\n\n${validationResult.warnings.map(w => `• ${w}`).join('\n')}\n\nVuoi procedere con l'assegnazione?`)
-      
-      if (!confirmed) {
-        console.log(`⚠️ Assegnazione annullata dall'utente per ${membro.nome}`)
-        return
-      }
-      
-      // Procedi con info per l'utente
-      console.log(`⚠️ Assegnazione confermata per ${membro.nome} con warning:`, validationResult.warnings)
-    } else {
-      // Nessun warning - assegnazione diretta
-      console.log(`✅ Assegnazione diretta per ${membro.nome} - nessun conflitto rilevato`)
-    }
-    
-    // Aggiungi il membro al team presente
-    const pagaOraria = getDipendentePagaOraria(membro.id)
-    newEntryData.value.teamPresente.push({
-      id: membro.id,
-      nome: membro.nome,
-      ruolo: membro.ruolo,
-      iniziali: membro.iniziali,
-      pagaOraria: pagaOraria
-    })
-    console.log(`👤 Aggiunto ${membro.nome} al team presente`)
-  }
-  
-  // 🚀 SINCRONIZZAZIONE IN TEMPO REALE: Aggiorna immediatamente le presenze
-  updateRealTimePresences()
+// NUOVO: Calcola costo materiali
+const calculateMaterialiCost = () => {
+  return newEntryData.value.materiali?.reduce((tot, mat) => tot + (mat.costoTotale || 0), 0) || 0
 }
 
-// Ottiene la paga oraria di un dipendente dai dati reali
-const getDipendentePagaOraria = (dipendenteId) => {
-  try {
-    // Cerca il dipendente nello store dei dipendenti
-    const dipendente = firestoreStore.dipendenti.find(d => d.id === dipendenteId)
-    
-    if (dipendente && dipendente.pagaOraria) {
-      return parseFloat(dipendente.pagaOraria)
-    }
-    
-    // Se non trovato, cerca nel team del cantiere
-    const membroTeam = cantiere.value?.team?.find(m => m.id === dipendenteId)
-    if (membroTeam && membroTeam.pagaOraria) {
-      return parseFloat(membroTeam.pagaOraria)
-    }
-    
-    // Default fallback
-    console.warn(`Paga oraria non trovata per dipendente ${dipendenteId}, usando default €25/h`)
-    return 25
-  } catch (error) {
-    console.error('Errore nel recupero paga oraria:', error)
-    return 25
-  }
+// NUOVO: Calcola costo mezzi
+const calculateMezziCost = () => {
+  return newEntryData.value.mezzi?.reduce((tot, mez) => tot + (mez.costoTotale || 0), 0) || 0
 }
 
-// Calcola il costo orario del team presente con maggiorazioni
-const calcolayCostoOrarioTeam = () => {
-  return newEntryData.value.teamPresente.reduce((total, membro) => {
-    let pagaOraria = membro.pagaOraria || 25
-    
-    // Applica maggiorazioni in base al turno e giorno
-    const data = new Date(newEntryData.value.data)
-    const giorno = data.getDay() // 0 = domenica
-    
-    // Maggiorazione domenica/festivi (+50%)
-    if (giorno === 0) {
-      pagaOraria *= 1.5
-    }
-    
-    // Maggiorazione turno notturno (+25%)
-    if (newEntryData.value.orarioInizio === '22:00' && newEntryData.value.orarioFine === '06:00') {
-      pagaOraria *= 1.25
-    }
-    
-    // Maggiorazione straordinari (+30% dopo 8h)
-    const oreTotali = newEntryData.value.oreTotali || 0
-    if (oreTotali > 8) {
-      const oreNormali = 8
-      const oreStraordinario = oreTotali - 8
-      return total + (pagaOraria * oreNormali) + (pagaOraria * 1.3 * oreStraordinario)
-    }
-    
-    return total + (pagaOraria * oreTotali)
-  }, 0)
+// NUOVO: Calcola costo lavori
+const calculateLavoriCost = () => {
+  return newEntryData.value.lavori?.reduce((tot, lav) => tot + (lav.ore * lav.costoOrario), 0) || 0
 }
 
-// Calcola il costo totale della giornata
-const calculateDayCost = () => {
-  const costoTotale = calcolayCostoOrarioTeam()
+// NUOVO: Calcola costo totale completo
+const calculateTotalCost = () => {
+  const costoDipendenti = calculateDipendentiCost()
+  const costoMateriali = calculateMaterialiCost()
+  const costoMezzi = calculateMezziCost()
+  const costoLavori = calculateLavoriCost()
   
-  // Aggiungi costi extra se specificati
-  if (newEntryData.value.costiExtra) {
-    return costoTotale + newEntryData.value.costiExtra
-  }
-  
-  return costoTotale
+  return costoDipendenti + costoMateriali + costoMezzi + costoLavori
 }
 
 // 🚀 MULTI-ASSIGNMENT: Validazione smart per assegnazione dipendente
@@ -1382,7 +1302,15 @@ const saveEntry = async () => {
       ...newEntryData.value,
       problemi: problemiArray, // Sostituisce problemiText con array problemi
       cantiereId: cantiere.value.id,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      // NUOVO: Calcoli automatici costi
+      costiTotali: {
+        dipendenti: calculateDipendentiCost(),
+        materiali: calculateMaterialiCost(),
+        mezzi: calculateMezziCost(),
+        lavori: calculateLavoriCost(),
+        totale: calculateTotalCost()
+      }
     }
     
     // 🧹 PULIZIA: Rimuove problemiText dal salvataggio (è solo per l'UI)
@@ -1469,10 +1397,12 @@ const syncTimesheet = async () => {
     
     // Crea i nuovi timesheet e presenze in parallelo
     const promises = entries.value.flatMap(entry => {
-      return entry.teamPresente.map(async membro => {
-        // Trova il dipendente corrispondente
-        const dipendente = firestoreStore.dipendenti.find(d => d.id === membro.id)
-        if (!dipendente) return null
+      // Usa entry.dipendenti invece di entry.teamPresente
+      const dipendenti = entry.dipendenti || []
+      return dipendenti.map(async dipendente => {
+        // Trova il dipendente corrispondente nello store
+        const dipendenteStore = firestoreStore.dipendenti.find(d => d.id === dipendente.id)
+        if (!dipendenteStore) return null
         
         // 🔧 VALIDAZIONE CENTRALIZZATA anche nella sincronizzazione
         const { validateTimesheetDate } = await import('../utils/timesheetValidation.js')
@@ -1486,18 +1416,18 @@ const syncTimesheet = async () => {
         
         // Crea timesheet
         const timesheetData = {
-          dipendenteId: membro.id,
+          dipendenteId: dipendente.id,
           cantiereId: cantiere.value.id,
           data: dataValidata, // 🔧 Usa data validata
-          oreLavorate: membro.oreLavorate || 8,
-          costoOrario: dipendente.pagaOraria || 0,
+          oreLavorate: dipendente.ore || 8,
+          costoOrario: dipendente.costoOrario || dipendenteStore.pagaOraria || 0,
           fonte: 'giornale_cantiere_sync', // 🔧 Distingui la fonte
           dataOriginale: entry.data // 🔧 Salva originale per debug
         }
         
         // Crea presenza
         const presenzaData = {
-          dipendenteId: membro.id,
+          dipendenteId: dipendente.id,
           cantiereId: cantiere.value.id,
           data: dataValidata, // 🔧 Usa stessa data validata del timesheet
           tipo: 'cantiere',

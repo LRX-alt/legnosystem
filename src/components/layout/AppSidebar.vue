@@ -115,6 +115,10 @@
               <ChartBarIcon class="w-5 h-5" />
               <span>Analytics</span>
             </router-link>
+            <router-link to="/analisi-costi" @click="$emit('close-sidebar')" class="nav-link" active-class="active">
+              <CurrencyEuroIcon class="w-5 h-5" />
+              <span>Analisi Costi</span>
+            </router-link>
           </div>
         </div>
       </nav>
@@ -134,7 +138,8 @@ import {
   XMarkIcon,
   TruckIcon,
   CalendarDaysIcon,
-  WrenchScrewdriverIcon
+  WrenchScrewdriverIcon,
+  CurrencyEuroIcon
 } from '@heroicons/vue/24/outline'
 
 // Props per controllare stato di apertura

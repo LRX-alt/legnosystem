@@ -139,6 +139,16 @@ const router = createRouter({
         permissions: ['canViewFinancials']
       }
     },
+    {
+      path: '/analisi-costi',
+      name: 'analisi-costi',
+      component: () => import('../views/AnalisiCosti.vue'),
+      meta: { 
+        title: 'Analisi Costi - Legnosystem.bio',
+        requiresAuth: true,
+        permissions: ['canViewFinancials']
+      }
+    },
 
     // 🔧 Admin Tools
     {

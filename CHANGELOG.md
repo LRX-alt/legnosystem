@@ -5,6 +5,427 @@ Tutte le modifiche significative a questo progetto verranno documentate in quest
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.0] - 2024-12-30
+
+### 📊 **SISTEMA REPORT PROFESSIONALE - Analisi Costi**
+
+#### **🎯 Nuove Funzionalità**
+- **Report PDF**: Generazione report PDF professionali con jsPDF
+- **Report Excel**: Generazione report Excel multi-foglio con XLSX
+- **Filtri Rispettati**: I report includono solo i dati filtrati
+- **Design Professionale**: Layout pulito e formattazione professionale
+
+#### **📄 Report PDF**
+- **Header Brandizzato**: Logo e titolo "REPORT ANALISI COSTI"
+- **Filtri Applicati**: Sezione che mostra i filtri utilizzati
+- **Riepilogo Statistiche**: Tabella con costi totali e per categoria
+- **Distribuzione Costi**: Tabella con percentuali per categoria
+- **Dettaglio Completo**: Tabella con tutti i costi filtrati
+- **Footer Paginato**: Numero pagina e branding Legnosystem
+- **Colori Professionali**: Schema colori aziendale
+
+#### **📊 Report Excel (Multi-foglio)**
+- **Foglio 1 - Riepilogo**: 
+  - Informazioni generali e filtri applicati
+  - Statistiche costi totali
+  - Distribuzione costi per categoria con percentuali
+- **Foglio 2 - Dettaglio Costi**: 
+  - Tabella completa con tutti i costi filtrati
+  - Colonne: Data, Cantiere, Categoria, Descrizione, Quantità, Costo Unitario, Totale
+- **Foglio 3 - Analisi Temporale**: 
+  - Costi raggruppati per data
+  - Colonne per ogni categoria (Dipendenti, Materiali, Mezzi, Lavori)
+
+#### **🔧 Caratteristiche Tecniche**
+- **Formattazione Valuta**: Euro formattati in stile italiano
+- **Formattazione Date**: Date in formato italiano (dd/mm/yyyy)
+- **Nomi File**: Automatici con data corrente (es: `report-costi-2024-12-30.pdf`)
+- **Gestione Errori**: Popup di successo/errore per feedback utente
+- **Dati Filtrati**: Solo i dati visibili vengono inclusi nei report
+
+#### **📁 Dipendenze Aggiunte**
+- `jspdf`: Generazione PDF professionali
+- `jspdf-autotable`: Tabelle formattate nei PDF
+- `xlsx`: Generazione file Excel
+
+#### **🎨 Design Report**
+- **PDF**: Layout A4 con header colorato, tabelle formattate, footer paginato
+- **Excel**: Multi-foglio con stili, intestazioni in grassetto, dati organizzati
+- **Branding**: Logo e nome "Legnosystem" in tutti i report
+
+#### **🎯 Come Usare**
+1. **Applica Filtri**: Configura i filtri desiderati nella pagina "Analisi Costi"
+2. **Genera Report**: Clicca "Export PDF" o "Export Excel" nell'header
+3. **Scarica**: Il file viene scaricato automaticamente con nome e data
+4. **Condividi**: I report sono pronti per essere condivisi o stampati
+
+---
+
+## [2.16.1] - 2024-12-30
+
+### 🎨 **Layout Grafici Ottimizzato - Spazio Dettagli**
+
+#### **📏 Dimensioni Aumentate**
+- **Container Grafici**: Aumentata altezza da h-64 a h-80 per entrambi i grafici
+- **Canvas Grafici**: Aumentata altezza massima da 200px a 280px
+- **Spazio Dettagli**: Più spazio per la sezione "Dettaglio Costi" sotto i grafici
+
+#### **🎯 Risultato**
+- **Grafici Più Grandi**: Visualizzazione più chiara e dettagliata
+- **Dettagli Visibili**: Sezione "Dettaglio Costi" ora completamente visibile
+- **Layout Bilanciato**: Proporzioni ottimali tra grafici e dettagli
+- **Nessuna Sovrapposizione**: Tutti gli elementi hanno spazio sufficiente
+
+---
+
+## [2.16.0] - 2024-12-30
+
+### ⚙️ **SISTEMA ALERT CONFIGURABILE - Analisi Costi**
+
+#### **🎯 Nuove Funzionalità**
+- **Configurazione Alert**: Sistema completo per configurare soglie di costo
+- **Modal Impostazioni**: Interfaccia dedicata per gestire tutte le soglie
+- **Persistenza**: Impostazioni salvate in localStorage
+- **Alert Dinamici**: Sistema che si adatta alle nuove soglie in tempo reale
+
+#### **📊 Soglie Configurabili**
+- **Costo Giornaliero**: Soglia personalizzabile per costo giornaliero per cantiere
+- **Costo Settimanale**: Soglia per costo settimanale per cantiere  
+- **Costo Mensile**: Soglia per costo mensile per cantiere
+- **Soglie per Categoria**: Soglie specifiche per dipendenti, materiali, mezzi, lavori
+- **Incremento Anomalo**: Soglia percentuale per incrementi anomali rispetto alla media
+
+#### **🔔 Tipi di Alert**
+- **Costo Giornaliero Eccessivo**: Alert quando il costo giornaliero supera la soglia
+- **Costo Settimanale Eccessivo**: Alert per costi settimanali eccessivi
+- **Costo Mensile Eccessivo**: Alert per costi mensili eccessivi
+- **Costo Categoria Singola**: Alert quando una categoria supera la sua soglia
+- **Incremento Anomalo**: Alert per incrementi percentuali anomali
+
+#### **🎨 Interfaccia Utente**
+- **Modal Dedicato**: Interfaccia pulita per configurare tutte le soglie
+- **Colori Categoria**: Indicatori colorati per ogni categoria (arancione, blu, viola, verde)
+- **Checkbox Abilitazione**: Possibilità di abilitare/disabilitare singoli tipi di alert
+- **Validazione Input**: Controlli sui valori inseriti (min/max)
+- **Feedback Visivo**: Conferma salvataggio con popup di successo
+
+#### **🔧 Layout Ottimizzato**
+- **Grafici Compatti**: Ridotta altezza canvas da 250px a 200px
+- **Container Ridotti**: Altezza container da h-72 a h-64
+- **Spazio Dettagli**: Più spazio per la sezione "Dettaglio Costi"
+- **Legend Scroll**: Legend con scroll automatico se necessario
+
+#### **📁 File Aggiunti**
+- `src/config/alertSettings.js`: Configurazione centralizzata delle soglie
+- `src/components/AlertSettingsModal.vue`: Modal per gestione impostazioni
+
+#### **🎯 Come Usare**
+1. **Accedi**: Vai su "Analisi Costi"
+2. **Configura**: Clicca "⚙️ Impostazioni" nella sezione "Alert Costi Eccessivi"
+3. **Personalizza**: Imposta le soglie desiderate per ogni tipo di costo
+4. **Salva**: Clicca "💾 Salva Impostazioni"
+5. **Monitora**: Gli alert si aggiornano automaticamente con le nuove soglie
+
+---
+
+## [2.15.2] - 2024-12-30
+
+### 🎨 **Fix Layout Grafici - Sovrapposizione Legend**
+
+#### **🐛 Correzione Layout**
+- **Sovrapposizione Legend**: Risolto problema di sovrapposizione tra legend grafici e sezione "Dettaglio Costi"
+- **Causa**: Legend troppo alta e container grafici troppo alti
+- **Soluzione**: Ottimizzato layout con altezze ridotte e scroll per legend
+
+#### **📊 Ottimizzazioni Grafici**
+- **Canvas Height**: Ridotta da 300px a 250px per entrambi i grafici
+- **Container Height**: Ridotta da h-80 a h-72 per i container dei grafici
+- **Legend Scroll**: Aggiunto `max-h-32 overflow-y-auto` per legend con scroll se necessario
+- **Spazio Ottimizzato**: Più spazio per la sezione "Dettaglio Costi" sotto i grafici
+
+#### **🎯 Risultato**
+- **Layout Pulito**: Nessuna sovrapposizione tra elementi
+- **Legend Compatta**: Scroll automatico se ci sono molte categorie
+- **Responsive**: Mantiene design responsive su tutti i dispositivi
+
+---
+
+## [2.15.1] - 2024-12-30
+
+### 🔧 **Fix Chart.js Controllers**
+
+#### **🐛 Correzione Errore**
+- **Errore Controllers**: Risolto errore "doughnut is not a registered controller" e "line is not a registered controller"
+- **Causa**: Mancava l'importazione e registrazione dei controller `DoughnutController` e `LineController`
+- **Soluzione**: Aggiunti import e registrazione dei controller necessari per Chart.js
+
+#### **📊 Componenti Grafici**
+- **CostDistributionChart**: Aggiunto `DoughnutController` e `Title` agli import
+- **CostTrendChart**: Aggiunto `LineController` e `Title` agli import
+- **Registrazione Completa**: Tutti i componenti Chart.js necessari ora registrati correttamente
+
+---
+
+## [2.15.0] - 2024-12-30
+
+### 📊 **GRAFICI INTERATTIVI - Analisi Costi**
+
+#### **🎯 Nuove Funzionalità**
+- **Chart.js Integration**: Installato Chart.js e vue-chartjs per grafici professionali
+- **Grafico Distribuzione Costi**: Doughnut chart interattivo con percentuali
+- **Grafico Andamento Temporale**: Line chart con trend temporale
+- **Responsive Design**: Grafici si adattano a tutti i dispositivi
+
+#### **📊 Grafico Distribuzione Costi**
+- **Tipo**: Doughnut chart con animazioni
+- **Categorie**: Dipendenti, Materiali, Mezzi, Lavori
+- **Colori**: Schema colori coerente (arancione, blu, viola, verde)
+- **Interattività**: 
+  - Hover per dettagli con valori e percentuali
+  - Click su legend per nascondere/mostrare categorie
+  - Legend personalizzata con valori e percentuali
+- **Animazioni**: Rotazione e scala durante il caricamento
+
+#### **📈 Grafico Andamento Temporale**
+- **Tipo**: Line chart multi-serie
+- **Periodi**: 7, 30, 90 giorni (controlli interattivi)
+- **Serie**: 4 linee per categoria (Dipendenti, Materiali, Mezzi, Lavori)
+- **Interattività**:
+  - Hover per valori dettagliati
+  - Click su periodo per cambiare vista
+  - Tooltip con formattazione valuta
+- **Scaling**: Asse Y con formattazione valuta automatica
+
+#### **🔧 Caratteristiche Tecniche**
+- **Performance**: Aggiornamento efficiente con watch e computed
+- **Filtri**: Grafici rispettano i filtri applicati
+- **Formattazione**: Valute in formato italiano
+- **Accessibilità**: Focus states e contrasti ottimali
+- **Mobile**: Layout responsive per tutti i dispositivi
+
+#### **🎨 Design Enhancement**
+- **Header Informativi**: Totale costi e periodo visualizzati
+- **Controlli Periodo**: Pulsanti per cambiare periodo temporale
+- **Legend Personalizzata**: Con valori e percentuali
+- **Animazioni Fluide**: Transizioni smooth per tutti i cambiamenti
+
+---
+
+## [2.14.6] - 2024-12-30
+
+### 🎨 **Miglioramento UI Filtri Analisi Costi**
+
+#### **🎯 Layout Migliorato**
+- **Header Elegante**: Icona filtro + titolo + descrizione + pulsante applica in alto
+- **Grid Responsivo**: Layout `lg:grid-cols-2 xl:grid-cols-4` per schermi grandi
+- **Spaziatura Ottimizzata**: Gap aumentato a 6 per migliore respirazione
+- **Focus States**: Colori primari per focus su input e select
+
+#### **🎨 Design Enhancement**
+- **Icone Emoji**: Aggiunte icone per ogni filtro (📅🏗️🔨📊)
+- **Categorie con Icone**: Opzioni categoria con emoji (👥🧱🚛🔨)
+- **Periodo Personalizzato**: Card blu con stile distintivo
+- **Filtri Attivi**: Riepilogo visuale dei filtri applicati con badge rimovibili
+
+#### **🔧 Funzionalità Aggiuntive**
+- **Riepilogo Filtri**: Mostra filtri attivi con badge colorati
+- **Rimozione Filtri**: Click su × per rimuovere singolo filtro
+- **Feedback Utente**: Popup di conferma quando si applicano i filtri
+- **Reset Intelligente**: Rimozione filtri resetta anche date personalizzate
+
+#### **📱 Responsive Design**
+- **Mobile**: Layout a colonna singola
+- **Tablet**: Layout a 2 colonne
+- **Desktop**: Layout a 4 colonne
+- **Focus States**: Migliorata accessibilità con focus visibili
+
+---
+
+## [2.14.5] - 2024-12-30
+
+### 🔧 **Fix Analisi Costi - Caricamento Dati**
+
+#### **🐛 Correzione Errore**
+- **Errore getCollection**: Risolto errore "getCollection is not a function"
+- **Causa**: Uso errato del composable `useFirestore` invece del store `useFirestoreStore`
+- **Soluzione**: Aggiornato per usare `firestoreStore.loadCantieri()` e `firestoreStore.loadCollection()`
+
+#### **📊 Miglioramenti Analisi Costi**
+- **Caricamento Cantieri**: Usa `firestoreStore.loadCantieri()` per caricare cantieri
+- **Caricamento Giornale**: Usa `firestoreStore.loadCollection('giornale_cantiere')` per dati costi
+- **Costi Lavori**: Aggiunta estrazione costi lavori da `entry.lavori`
+- **Gestione Errori**: Migliorata gestione errori con fallback su array vuoti
+
+#### **🔧 Funzionalità Complete**
+- **Dipendenti**: Estrae costi da `entry.dipendenti`
+- **Materiali**: Estrae costi da `entry.materiali`
+- **Mezzi**: Estrae costi da `entry.mezzi`
+- **Lavori**: Estrae costi da `entry.lavori` (nuovo)
+- **Filtri**: Tutti i filtri funzionanti
+- **Dashboard**: Statistiche in tempo reale
+
+---
+
+## [2.14.4] - 2024-12-30
+
+### 🔧 **Fix Sincronizzazione Timesheet**
+
+#### **🐛 Correzione Errore**
+- **Errore syncTimesheet**: Risolto errore "Cannot read properties of undefined (reading 'map')"
+- **Causa**: Funzione `syncTimesheet` cercava `entry.teamPresente` che non esiste più
+- **Soluzione**: Aggiornata per usare `entry.dipendenti` con la nuova struttura dati
+- **Compatibilità**: Mantenuta compatibilità con dati esistenti usando `entry.dipendenti || []`
+
+#### **📊 Verifica Analisi Costi**
+- **Funzionalità Confermata**: Pagina "Analisi Costi" funziona correttamente
+- **Estrazione Dati**: Legge correttamente da `giornale_cantiere`:
+  - `entry.dipendenti` → Costi dipendenti
+  - `entry.materiali` → Costi materiali  
+  - `entry.mezzi` → Costi mezzi
+  - `entry.lavori` → Costi lavori
+- **Filtri Attivi**: Periodo, cantiere, tipo lavoro, categoria
+- **Dashboard**: Totale costi, breakdown per categoria
+- **Alert**: Costi giornalieri eccessivi (>1000€)
+
+#### **🔧 Miglioramenti Tecnici**
+- **Validazione Dati**: Gestione sicura di array vuoti o undefined
+- **Fallback**: Uso di valori di default per evitare errori
+- **Debug**: Log migliorati per tracciare sincronizzazione
+
+---
+
+## [2.14.3] - 2024-12-30
+
+### 🔧 **Semplificazione Sistema Tracking Costi**
+
+#### **🗑️ Rimozione Duplicazioni**
+- **Sezione Team Presente**: Rimossa sezione duplicata con checkbox dipendenti
+- **Ore Totali**: Eliminato campo "Ore Totali Lavorate" (non più necessario)
+- **Costi Extra**: Eliminato campo "Costi Extra" (non più necessario)
+- **Costo Stimato**: Eliminato campo "Costo Stimato Giornata" (calcolo automatico)
+
+#### **👥 Unificazione Dipendenti**
+- **Sezione Unica**: Mantenuta solo "Dipendenti Presenti e Ore Lavorate"
+- **Componente DipendentiSelector**: Gestisce selezione + ore + costi in un unico posto
+- **Calcolo Automatico**: Costo per dipendente = Ore × Costo Orario
+- **Totale Giornata**: Somma automatica di tutti i costi (Dipendenti + Materiali + Mezzi + Lavori)
+
+#### **🔧 Pulizia Codice**
+- **Funzioni Rimosse**: `calcolayCostoOrarioTeam()`, `calculateDayCost()`, `isTeamMemberPresent()`, `toggleTeamMember()`, `getDipendentePagaOraria()`
+- **Campi Rimosse**: `oreTotali`, `costiExtra`, `team`, `teamPresente` da `newEntryData`
+- **Riepilogo Semplificato**: Solo costi dettagliati + totale finale
+
+#### **📊 Nuovo Flusso**
+1. **Seleziona Dipendenti**: Usa DipendentiSelector per aggiungere dipendenti
+2. **Specifica Ore**: Per ogni dipendente, inserisci ore lavorate
+3. **Costo Automatico**: Calcolo automatico costo per dipendente
+4. **Totale Finale**: Somma di tutti i costi della giornata
+
+---
+
+## [2.14.2] - 2024-12-30
+
+### 🔧 **Fix Dipendenti nel Modale Responsabile**
+
+#### **👥 Campo Responsabile**
+- **Dipendenti Completi**: Campo responsabile ora usa `firestoreStore.dipendenti` invece di `cantiere.team`
+- **Nomi Completi**: Visualizzazione `Nome Cognome (Ruolo)` per identificazione chiara
+- **Opzione Vuota**: Aggiunta opzione "Seleziona responsabile..." per chiarezza
+- **Responsabile Predefinito**: Impostato primo dipendente dallo store come predefinito
+
+#### **👥 Sezione Team Presente**
+- **Dipendenti Completi**: Lista team presente ora usa `firestoreStore.dipendenti`
+- **Nomi Completi**: Visualizzazione `Nome Cognome` invece di solo nome
+- **Paga Oraria Diretta**: Uso diretto `dipendente.pagaOraria` invece di funzione lookup
+- **Funzioni Aggiornate**: `toggleTeamMember()` e `isTeamMemberPresent()` aggiornate per gestire dipendenti completi
+
+#### **🔧 Miglioramenti Tecnici**
+- **Consistenza Dati**: Tutti i campi dipendenti ora usano la stessa fonte dati
+- **Performance**: Eliminati lookup ridondanti per paga oraria
+- **UX Migliorata**: Nomi completi per identificazione univoca dipendenti
+
+---
+
+## [2.14.1] - 2024-12-30
+
+### 🔧 **Correzioni Sistema Tracking Costi**
+
+#### **👥 Fix Dipendenti nel Modale**
+- **Caricamento Dipendenti**: Risolto problema dipendenti non caricati nel modale nuova registrazione
+- **Async Loading**: Aggiunto caricamento automatico dipendenti quando si apre il modale
+- **Store Integration**: Componente DipendentiSelector ora usa `firestoreStore.dipendenti` invece di `cantiere.team`
+- **Error Handling**: Gestione errori per caricamento dipendenti con fallback
+
+#### **⏰ Correzione Orari Predefiniti**
+- **Orario Inizio**: Cambiato da 06:00 a 08:00 (orario lavorativo standard)
+- **Orario Fine**: Cambiato da 22:00 a 17:00 (orario lavorativo standard)
+- **Consistenza**: Orari ora allineati con la settimana lavorativa di 8 ore (08:00-17:00)
+
+#### **🔧 Miglioramenti Tecnici**
+- **Async Functions**: Convertite `newEntry()` e `editEntry()` in funzioni async
+- **Loading States**: Caricamento dipendenti gestito in background senza bloccare UI
+- **Performance**: Caricamento dipendenti solo se necessario (se non già caricati)
+
+---
+
+## [2.14.0] - 2024-12-30
+
+### 🚀 **NUOVO: Sistema di Tracking Costi Completo**
+
+#### **📋 Estensione Giornale Cantiere**
+- **Dipendenti Dettagliati**: Selezione dipendenti con ore di lavoro individuali e costi
+- **Materiali Utilizzati**: Tracking materiali con quantità, unità di misura e costi
+- **Mezzi Utilizzati**: Registrazione mezzi con ore di utilizzo e costi orari
+- **Tipi di Lavori**: Categorizzazione lavori con sottocategorie e costi standard
+- **Calcoli Automatici**: Sistema di calcolo costi in tempo reale
+
+#### **📊 Nuova Pagina Analisi Costi**
+- **Dashboard Completa**: Visualizzazione costi totali, dipendenti, materiali, mezzi
+- **Filtri Avanzati**: Per periodo, cantiere, tipo lavoro, categoria
+- **Vista Tabellare/Grafica**: Due modalità di visualizzazione dati
+- **Alert Costi Eccessivi**: Notifiche automatiche per costi giornalieri >1000€
+- **Export Report**: Preparazione per export PDF/Excel
+
+#### **🔧 Componenti Creati**
+- `DipendentiSelector.vue`: Selezione dipendenti con calcolo costi
+- `MaterialiSelector.vue`: Selezione materiali con quantità e prezzi
+- `MezziSelector.vue`: Selezione mezzi con ore utilizzo
+- `TipiLavoriSelector.vue`: Categorizzazione lavori con sottocategorie
+- `AnalisiCosti.vue`: Dashboard completa analisi costi
+
+#### **📁 Dati di Esempio**
+- **Tipi di Lavori**: Fondazioni, Muratura, Carpenteria, Impianti, Finiture, Esterni
+- **Materiali**: Cemento, Mattoni, Legno, Vernice, Bulloni
+- **Mezzi**: Escavatore, Betoniera, Gru, Compressore, Pompa calcestruzzo
+
+#### **💰 Sistema di Calcolo**
+- **Costi Base**: Ore lavorate × costo orario team
+- **Costi Dipendenti**: Ore individuali × costo orario dipendente
+- **Costi Materiali**: Quantità × costo unitario
+- **Costi Mezzi**: Ore utilizzo × costo orario mezzo
+- **Costi Lavori**: Ore lavoro × costo orario standard
+- **Totale Completo**: Somma di tutti i costi
+
+#### **🎯 Integrazione**
+- **Router**: Aggiunta rotta `/analisi-costi`
+- **Sidebar**: Link alla nuova pagina analisi costi
+- **Giornale Cantiere**: Form esteso con tutti i nuovi componenti
+- **Database**: Salvataggio automatico costi totali per ogni registrazione
+
+### 🔧 **Miglioramenti**
+- **UI/UX**: Interfacce moderne e intuitive per tutti i selettori
+- **Validazione**: Controlli automatici su quantità e costi
+- **Performance**: Calcoli in tempo reale senza rallentamenti
+- **Responsive**: Design ottimizzato per mobile e desktop
+
+### 📈 **Prossimi Sviluppi**
+- **Grafici**: Implementazione grafici distribuzione costi
+- **Export**: Funzionalità complete PDF/Excel
+- **Alert**: Sistema di notifiche avanzato
+- **Report**: Generazione report personalizzati
+
+---
+
 ## [2.13.0] - 2024-12-30
 
 ### 🕐 **SISTEMA TIMESHEET AVANZATO**
