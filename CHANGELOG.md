@@ -5,7 +5,57 @@ Tutte le modifiche significative a questo progetto verranno documentate in quest
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0] - 2024-12-30
+
+### 🕐 **SISTEMA TIMESHEET AVANZATO**
+- ✅ **Lista dettagliata timesheet**: Nuova sezione "Dettaglio Registrazioni Ore" con tabella completa
+- ✅ **Pulsanti modifica ed eliminazione**: Icone ✏️ e 🗑️ per ogni registrazione ore
+- ✅ **Sistema filtri avanzato**: Filtro per dipendente, cantiere e data con sincronizzazione settimanale
+- ✅ **Modal modifica timesheet**: Interfaccia completa per modifica ore, cantiere, note
+- ✅ **Eliminazione con conferma**: Popup di conferma per eliminazione sicura registrazioni
+- ✅ **Indicatori filtri attivi**: Badge colorati per visualizzare filtri applicati
+- ✅ **Ordinamento intelligente**: Registrazioni ordinate per data (più recente prima)
+- ✅ **Visualizzazione fonte**: Distinzione tra registrazioni "Manuale" e "Presenze" con badge colorati
+
+### 🔧 **CORREZIONI TECNICHE**
+- ✅ **Fix modal planning**: Aggiunta funzione `closeScheduleModal()` per chiusura corretta
+- ✅ **Correzione target ore**: Aggiornato da 52h a 44h settimanali (8h × 5 giorni + 4h sabato)
+- ✅ **Calendario settimanale**: Sabato 08:00-12:00 (4h), altri giorni 08:00-17:00 (8h)
+- ✅ **Barre progresso**: Calcolo corretto percentuale su target 44 ore
+- ✅ **Indicatori colorati**: Ore totali diventano verdi quando raggiungono 44 ore
+- ✅ **Filtro settimanale**: Corretto per includere tutti i giorni della settimana lavorativa
+
+### 🎨 **MIGLIORAMENTI UX**
+- ✅ **Layout responsive**: Ottimizzato per mobile e desktop
+- ✅ **Feedback visivo**: Indicatori risultati filtrati con contatori
+- ✅ **Pulsanti azione**: "Pulisci Filtri" e "Usa Settimana Selezionata" per navigazione rapida
+- ✅ **Sistema coerente**: Target 44 ore applicato uniformemente in tutta l'applicazione
+
 ## [2.12.0] - 2024-12-30
+
+### 🕐 **SISTEMA TIMESHEET AVANZATO**
+- ✅ **Lista dettagliata timesheet**: Nuova sezione "Dettaglio Registrazioni Ore" con tabella completa
+- ✅ **Pulsanti modifica ed eliminazione**: Icone ✏️ e 🗑️ per ogni registrazione ore
+- ✅ **Sistema filtri avanzato**: Filtro per dipendente, cantiere e data con sincronizzazione settimanale
+- ✅ **Modal modifica timesheet**: Interfaccia completa per modifica ore, cantiere, note
+- ✅ **Eliminazione con conferma**: Popup di conferma per eliminazione sicura registrazioni
+- ✅ **Indicatori filtri attivi**: Badge colorati per visualizzare filtri applicati
+- ✅ **Ordinamento intelligente**: Registrazioni ordinate per data (più recente prima)
+- ✅ **Visualizzazione fonte**: Distinzione tra registrazioni "Manuale" e "Presenze" con badge colorati
+
+### 🔧 **CORREZIONI TECNICHE**
+- ✅ **Fix modal planning**: Aggiunta funzione `closeScheduleModal()` per chiusura corretta
+- ✅ **Correzione target ore**: Aggiornato da 52h a 44h settimanali (8h × 5 giorni + 4h sabato)
+- ✅ **Calendario settimanale**: Sabato 08:00-12:00 (4h), altri giorni 08:00-17:00 (8h)
+- ✅ **Barre progresso**: Calcolo corretto percentuale su target 44 ore
+- ✅ **Indicatori colorati**: Ore totali diventano verdi quando raggiungono 44 ore
+- ✅ **Filtro settimanale**: Corretto per includere tutti i giorni della settimana lavorativa
+
+### 🎨 **MIGLIORAMENTI UX**
+- ✅ **Layout responsive**: Ottimizzato per mobile e desktop
+- ✅ **Feedback visivo**: Indicatori risultati filtrati con contatori
+- ✅ **Pulsanti azione**: "Pulisci Filtri" e "Usa Settimana Selezionata" per navigazione rapida
+- ✅ **Sistema coerente**: Target 44 ore applicato uniformemente in tutta l'applicazione
 
 ### 🗑️ **RIMOZIONE SISTEMA PREVENTIVI**
 - ❌ **Rimossa completamente la funzionalità preventivi**: Eliminato tutto il sistema di gestione preventivi
