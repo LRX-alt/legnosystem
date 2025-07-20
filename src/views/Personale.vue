@@ -94,6 +94,10 @@
             <option value="operaio">Operaio Specializzato</option>
             <option value="capo-squadra">Capo Squadra</option>
             <option value="amministrativo">Amministrativo</option>
+            <option value="manovale">Manovale</option>
+            <option value="commerciale">Commerciale</option>
+            <option value="tecnico">Tecnico</option>
+            <option value="altro">Altro</option>
           </select>
         </div>
         <div class="w-full md:w-48">
@@ -158,7 +162,7 @@
         <!-- Header Card -->
         <div class="flex items-center space-x-4 mb-4">
           <div class="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold">
-            {{ dipendente.iniziali }}
+            {{ getIniziali(dipendente.nome, dipendente.cognome) }}
           </div>
           <div class="flex-1">
             <h3 class="text-lg font-semibold text-gray-900">{{ dipendente.nome }} {{ dipendente.cognome }}</h3>
@@ -206,18 +210,18 @@
         </div>
 
         <!-- Ore Settimana -->
-        <div class="mb-4">
-          <div class="flex items-center justify-between text-base mb-2">
-            <span class="text-gray-600">Ore questa settimana:</span>
-            <span class="font-medium">{{ dipendente.oreTotaliSettimana }}h</span>
+                  <div class="mb-4">
+            <div class="flex items-center justify-between text-base mb-2">
+              <span class="text-gray-600">Ore questa settimana:</span>
+              <span class="font-medium">{{ (dipendente.oreTotaliSettimana || 0) }}h</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${Math.min(((dipendente.oreTotaliSettimana || 0) / 44) * 100, 100)}%`"></div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1">
+              Target: 44h/settimana (6 giorni lavorativi)
+            </div>
           </div>
-          <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="bg-primary-500 h-2 rounded-full transition-all duration-300" :style="`width: ${Math.min((dipendente.oreTotaliSettimana / 44) * 100, 100)}%`"></div>
-          </div>
-          <div class="text-xs text-gray-500 mt-1">
-            Target: 44h/settimana (6 giorni lavorativi)
-          </div>
-        </div>
 
         <!-- Azioni -->
         <div class="flex items-center justify-between pt-4 border-t border-gray-200">
@@ -275,7 +279,7 @@
         <div v-for="record in timesheetData" :key="record.dipendenteId" class="card">
           <div class="flex items-center space-x-3 mb-4">
             <div class="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white text-base font-medium">
-              {{ record.iniziali }}
+              {{ getIniziali(record.nome.split(' ')[0], record.nome.split(' ')[1]) }}
             </div>
             <div class="flex-1">
               <h4 class="font-semibold text-gray-900 text-base">{{ record.nome }}</h4>
@@ -340,7 +344,7 @@
                 <td class="px-6 py-4 whitespace-nowrap">
                   <div class="flex items-center">
                     <div class="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3">
-                      {{ record.iniziali }}
+                      {{ getIniziali(record.nome.split(' ')[0], record.nome.split(' ')[1]) }}
                     </div>
                     <div>
                       <div class="text-base font-medium text-gray-900">{{ record.nome }}</div>
@@ -519,11 +523,11 @@
           <div class="hidden md:flex items-center justify-between p-4">
             <div class="flex items-center space-x-4">
               <div class="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold">
-                {{ dipendente.iniziali }}
+                {{ getIniziali(dipendente.nome, dipendente.cognome) }}
               </div>
               <div>
                 <h4 class="font-semibold text-gray-900 text-base">{{ dipendente.nome }} {{ dipendente.cognome }}</h4>
-                <p class="text-base text-gray-600">{{ getRuoloLabel(dipendente.ruolo) }}</p>
+                <p class="text-base text-gray-600">{{ getRuoloLabel(dipendente.ruolo, dipendente.ruoloPersonalizzato) }}</p>
                 <p class="text-sm text-gray-500">{{ dipendente.cantiereAttuale || 'Nessun cantiere' }}</p>
               </div>
             </div>
@@ -591,11 +595,11 @@
             <!-- Header Mobile -->
             <div class="flex items-center space-x-3">
               <div class="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold">
-                {{ dipendente.iniziali }}
+                {{ getIniziali(dipendente.nome, dipendente.cognome) }}
               </div>
               <div class="flex-1">
                 <h4 class="font-semibold text-gray-900 text-base">{{ dipendente.nome }} {{ dipendente.cognome }}</h4>
-                <p class="text-base text-gray-600">{{ getRuoloLabel(dipendente.ruolo) }}</p>
+                <p class="text-base text-gray-600">{{ getRuoloLabel(dipendente.ruolo, dipendente.ruoloPersonalizzato) }}</p>
                 <!-- 🚀 MULTI-ASSIGNMENT: Mostra cantieri multipli -->
                 <p class="text-sm text-gray-500">
                   <span v-if="getCantieriAssegnati(dipendente.id).length > 0">
@@ -1129,7 +1133,17 @@
                   <option value="carpentiere">Carpentiere</option>
                   <option value="operaio">Operaio Specializzato</option>
                   <option value="amministrativo">Amministrativo</option>
+                  <option value="manovale">Manovale</option>
+                  <option value="commerciale">Commerciale</option>
+                  <option value="tecnico">Tecnico</option>
+                  <option value="altro">Altro</option>
                 </select>
+              </div>
+              <div v-if="newDipendente.ruolo === 'altro'">
+                <label class="block text-base font-medium text-gray-700 mb-2">Ruolo Personalizzato *</label>
+                <input v-model="newDipendente.ruoloPersonalizzato" type="text" required
+                       placeholder="Specifica il ruolo personalizzato"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
               </div>
               <div>
                 <label class="block text-base font-medium text-gray-700 mb-2">Paga Oraria (€) *</label>
@@ -1205,11 +1219,11 @@
             <div class="bg-gray-50 p-4 rounded-lg">
               <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold">
-                  {{ selectedDipendente?.iniziali }}
+                  {{ getIniziali(selectedDipendente?.nome, selectedDipendente?.cognome) }}
                 </div>
                 <div>
                   <h4 class="font-semibold text-gray-900 text-lg">{{ selectedDipendente?.nome }} {{ selectedDipendente?.cognome }}</h4>
-                  <p class="text-base text-gray-600">{{ getRuoloLabel(selectedDipendente?.ruolo) }}</p>
+                  <p class="text-base text-gray-600">{{ getRuoloLabel(selectedDipendente?.ruolo, selectedDipendente?.ruoloPersonalizzato) }}</p>
                 </div>
                 <div class="ml-auto text-right">
                   <p class="text-base text-gray-600">Cantiere Attuale</p>
@@ -1390,7 +1404,17 @@
                   <option value="carpentiere">Carpentiere</option>
                   <option value="operaio">Operaio Specializzato</option>
                   <option value="amministrativo">Amministrativo</option>
+                  <option value="manovale">Manovale</option>
+                  <option value="commerciale">Commerciale</option>
+                  <option value="tecnico">Tecnico</option>
+                  <option value="altro">Altro</option>
                 </select>
+              </div>
+              <div v-if="editingDipendente.ruolo === 'altro'">
+                <label class="block text-base font-medium text-gray-700 mb-2">Ruolo Personalizzato *</label>
+                <input v-model="editingDipendente.ruoloPersonalizzato" type="text" required
+                       placeholder="Specifica il ruolo personalizzato"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base" />
               </div>
               <div>
                 <label class="block text-base font-medium text-gray-700 mb-2">Paga Oraria (€) *</label>
@@ -1528,11 +1552,11 @@
             <div class="bg-primary-50 p-4 rounded-lg border border-primary-200">
               <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold">
-                  {{ selectedDipendente?.iniziali }}
+                  {{ getIniziali(selectedDipendente?.nome, selectedDipendente?.cognome) }}
                 </div>
                 <div class="flex-1">
                   <h4 class="font-semibold text-gray-900 text-lg">{{ selectedDipendente?.nome }} {{ selectedDipendente?.cognome }}</h4>
-                  <p class="text-base text-gray-600">{{ getRuoloLabel(selectedDipendente?.ruolo) }}</p>
+                  <p class="text-base text-gray-600">{{ getRuoloLabel(selectedDipendente?.ruolo, selectedDipendente?.ruoloPersonalizzato) }}</p>
                   <!-- 🚀 MULTI-ASSIGNMENT: Mostra tutti i cantieri -->
                   <p class="text-sm text-gray-500">
                     <span v-if="getCantieriAssegnati(selectedDipendente?.id).length > 0">
@@ -1588,7 +1612,7 @@
                 <div class="space-y-3">
                   <div class="flex items-center justify-between">
                     <span class="text-gray-600">Ruolo:</span>
-                    <span class="font-medium">{{ getRuoloLabel(selectedDipendente?.ruolo) }}</span>
+                    <span class="font-medium">{{ getRuoloLabel(selectedDipendente?.ruolo, selectedDipendente?.ruoloPersonalizzato) }}</span>
                   </div>
                   <div class="flex items-center justify-between">
                     <span class="text-gray-600">Data Assunzione:</span>
@@ -1655,6 +1679,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '../stores/firestore.js'
 import { usePopup } from '../composables/usePopup.js'
+import { useModalEsc } from '../composables/useModalEsc.js'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, startOfWeek, endOfWeek, subWeeks } from 'date-fns'
 import { it } from 'date-fns/locale'
 import { TimesheetDateValidator } from '../utils/timesheetValidation.js'
@@ -1688,6 +1713,8 @@ const popoverVisible = ref(false)
 const popoverPosition = ref({ top: '0px', left: '0px' })
 const popoverTimeout = ref(null)
 const popoverRef = ref(null)
+
+
 
 // Funzioni per gestire il popover
 const showDayDetails = async (day, event) => {
@@ -1772,7 +1799,7 @@ const calendarDays = computed(() => {
         dipendentiMap.set(t.dipendenteId, {
           id: t.dipendenteId,
           nome: `${dipendente.nome} ${dipendente.cognome}`,
-          iniziali: dipendente.iniziali,
+          iniziali: getIniziali(dipendente.nome, dipendente.cognome),
           ore: 0,
           costo: 0
         })
@@ -1880,6 +1907,7 @@ const newDipendente = ref({
   email: '',
   telefono: '',
   ruolo: '',
+  ruoloPersonalizzato: '',
   pagaOraria: 25,
   dataAssunzione: new Date().toISOString().split('T')[0],
   stato: 'attivo',
@@ -1904,6 +1932,7 @@ const editingDipendente = ref({
   email: '',
   telefono: '',
   ruolo: '',
+  ruoloPersonalizzato: '',
   pagaOraria: 25,
   dataAssunzione: '',
   stato: 'attivo',
@@ -1938,11 +1967,8 @@ const loadDipendenti = async () => {
   try {
     await firestoreStore.loadDipendenti()
     console.log('✅ Dipendenti caricati da Firestore:', dipendenti.value.length)
-    
-    // Carica anche i timesheet automaticamente
-    await loadTimesheet()
   } catch (e) {
-    console.warn('Errore nel caricamento dipendenti da Firestore:', e)
+    console.error('❌ Errore nel caricamento dipendenti da Firestore:', e)
   }
 }
 
@@ -2065,20 +2091,41 @@ const runSystemTests = async () => {
 
 // Calcola le ore settimanali per ogni dipendente
 const updateDipendentiOreFromTimesheet = () => {
-  const now = new Date()
-  const startOfThisWeek = startOfWeek(now, { weekStartsOn: 1 }) // Lunedì
-  const endOfThisWeek = endOfWeek(now, { weekStartsOn: 1 })
+  // Se i timesheet non sono caricati, non aggiornare le ore per evitare di azzerarle
+  if (!timesheetDettagli.value || timesheetDettagli.value.length === 0) {
+    console.log('⚠️ Timesheet non caricati, salto aggiornamento ore settimanali')
+    return
+  }
+  
+  // Trova la settimana più recente con timesheet
+  const allDates = timesheetDettagli.value.map(t => new Date(t.data)).sort((a, b) => b - a)
+  const mostRecentDate = allDates[0]
+  const startOfMostRecentWeek = startOfWeek(mostRecentDate, { weekStartsOn: 1 })
+  const endOfMostRecentWeek = endOfWeek(mostRecentDate, { weekStartsOn: 1 })
 
   dipendenti.value.forEach(dipendente => {
+    // Se il dipendente ha già ore valide (> 0), non le azzeriamo
+    if (dipendente.oreTotaliSettimana && dipendente.oreTotaliSettimana > 0) {
+      console.log(`✅ Mantengo ore esistenti per ${dipendente.nome} ${dipendente.cognome}: ${dipendente.oreTotaliSettimana}h`)
+      return
+    }
+    
+    // Calcola le ore solo per dipendenti senza ore o con 0 ore
     const oreSettimanali = timesheetDettagli.value
       .filter(t => {
         if (!t.data) return false
         const tDate = new Date(t.data)
-        return t.dipendenteId === dipendente.id && tDate >= startOfThisWeek && tDate <= endOfThisWeek
+        const isInMostRecentWeek = tDate >= startOfMostRecentWeek && tDate <= endOfMostRecentWeek
+        const isCorrectDipendente = t.dipendenteId === dipendente.id
+        
+        return isCorrectDipendente && isInMostRecentWeek
       })
       .reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
     
-    dipendente.oreTotaliSettimana = oreSettimanali
+    if (oreSettimanali > 0) {
+      console.log(`🔄 Aggiorno ore per ${dipendente.nome} ${dipendente.cognome}: ${dipendente.oreTotaliSettimana || 0}h → ${oreSettimanali}h`)
+      dipendente.oreTotaliSettimana = oreSettimanali
+    }
   })
 }
 
@@ -2109,16 +2156,28 @@ const closeTimesheetModal = () => {
 }
 const closeDetailModal = () => showDetailModal.value = false
 
+// Chiusura modal con ESC
+const modalRefs = [showAddModal, showEditModal, showTimesheetModal, showDetailModal, showScheduleModal, showEditTimesheetModal]
+const closeFunctions = [closeAddModal, closeEditModal, closeTimesheetModal, closeDetailModal, () => showScheduleModal.value = false, () => showEditTimesheetModal.value = false]
+useModalEsc(modalRefs, closeFunctions)
+
 const saveDipendente = async () => {
   try {
     await firestoreStore.addDocument('dipendenti', newDipendente.value)
     success('Dipendente Aggiunto', `${newDipendente.value.nome} ${newDipendente.value.cognome} è stato aggiunto con successo.`)
     closeAddModal()
     newDipendente.value = {
-      nome: '', cognome: '', email: '', telefono: '', ruolo: '', pagaOraria: 25, dataAssunzione: new Date().toISOString().split('T')[0], stato: 'attivo', cantiereAttuale: '', note: ''
+      nome: '', cognome: '', email: '', telefono: '', ruolo: '', ruoloPersonalizzato: '', pagaOraria: 25, dataAssunzione: new Date().toISOString().split('T')[0], stato: 'attivo', cantiereAttuale: '', note: ''
     }
+    
+    // Ricarica solo i dipendenti per aggiornare la lista
     await loadDipendenti()
+    
+    // Il nuovo dipendente partirà automaticamente con 0 ore
+    // Non tocchiamo le ore dei dipendenti esistenti
+    
   } catch (err) {
+    console.error('❌ Errore salvataggio dipendente:', err)
     error('Errore Salvataggio', err.message)
   }
 }
@@ -2203,7 +2262,7 @@ const processTimesheetData = () => {
       records[t.dipendenteId] = {
         dipendenteId: t.dipendenteId,
         nome: `${dipendente.nome} ${dipendente.cognome}`,
-        iniziali: dipendente.iniziali,
+        iniziali: getIniziali(dipendente.nome, dipendente.cognome),
         cantiere: t.cantiere || t.cantiereNome || 'Non Assegnato',
         lunedi: 0, martedi: 0, mercoledi: 0, giovedi: 0, venerdi: 0, sabato: 0,
         totale: 0
@@ -2241,9 +2300,27 @@ const getStatoLabel = (stato) => {
   return stato.charAt(0).toUpperCase() + stato.slice(1).replace('-', ' ')
 }
 
-const getRuoloLabel = (ruolo) => {
+// Helper per le iniziali
+const getIniziali = (nome, cognome) => {
+  if (!nome || !cognome) return '??'
+  return `${nome[0]}${cognome[0]}`.toUpperCase()
+}
+
+const getRuoloLabel = (ruolo, ruoloPersonalizzato = '') => {
   if (!ruolo) return 'Non specificato'
-  return ruolo.charAt(0).toUpperCase() + ruolo.slice(1).replace('-', ' ')
+  
+  const labels = {
+    'capo-squadra': 'Capo Squadra',
+    'carpentiere': 'Carpentiere',
+    'operaio': 'Operaio Specializzato',
+    'amministrativo': 'Amministrativo',
+    'manovale': 'Manovale',
+    'commerciale': 'Commerciale',
+    'tecnico': 'Tecnico',
+    'altro': ruoloPersonalizzato || 'Altro'
+  }
+  
+  return labels[ruolo] || ruolo.charAt(0).toUpperCase() + ruolo.slice(1).replace('-', ' ')
 }
 
 const formatDate = (dateString) => {
@@ -2322,6 +2399,13 @@ const saveTimesheet = async () => {
 
 const viewTimesheet = (dipendente) => {
   selectedDipendente.value = dipendente
+  // Assicura che le ore settimanali siano calcolate correttamente solo se necessario
+  if (dipendente.oreTotaliSettimana === undefined || dipendente.oreTotaliSettimana === null) {
+    // Ricarica i timesheet prima di aggiornare le ore
+    loadTimesheet().then(() => {
+      updateDipendentiOreFromTimesheet()
+    })
+  }
   showDetailModal.value = true
 }
 
@@ -2718,7 +2802,7 @@ const filteredTimesheetList = computed(() => {
 
 const getDipendenteIniziali = (dipendenteId) => {
   const dipendente = dipendenti.value.find(d => d.id === dipendenteId)
-  return dipendente ? dipendente.iniziali : 'N/A'
+  return dipendente ? getIniziali(dipendente.nome, dipendente.cognome) : 'N/A'
 }
 
 const getDipendenteNome = (dipendenteId) => {
@@ -2799,6 +2883,7 @@ onMounted(async () => {
   info('Caricamento dati...', 'Recupero dipendenti e cantieri dal database.')
   await loadDipendenti()
   await loadCantieri()
+  await loadTimesheet() // Carica i timesheet per calcolare le ore iniziali
   processTimesheetData()
   await loadPresenze()
 })

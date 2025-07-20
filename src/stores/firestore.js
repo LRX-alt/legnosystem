@@ -462,7 +462,11 @@ export const useFirestoreStore = defineStore('firestore', () => {
   const loadDipendenti = async () => {
     const result = await loadCollection(firestoreConfig.collections.dipendenti)
     if (result.success) {
-      dipendenti.value = result.data
+      // Assicura che tutti i dipendenti abbiano il campo oreTotaliSettimana inizializzato
+      dipendenti.value = result.data.map(dipendente => ({
+        ...dipendente,
+        oreTotaliSettimana: dipendente.oreTotaliSettimana || 0
+      }))
     }
     return result
   }

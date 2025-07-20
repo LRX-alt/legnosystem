@@ -577,6 +577,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '@/stores/firestore'
 import { usePopup } from '@/composables/usePopup'
+import { useModalEsc } from '@/composables/useModalEsc'
 
 // Stores
 const firestoreStore = useFirestoreStore()
@@ -833,6 +834,15 @@ const loadClienti = async () => {
     loading.value = false
   }
 }
+
+// Chiusura modal con ESC
+const modalRefs = [showAddModal, showViewModal, showEditModal]
+const closeFunctions = [
+  () => showAddModal.value = false,
+  () => showViewModal.value = false,
+  () => showEditModal.value = false
+]
+useModalEsc(modalRefs, closeFunctions)
 
 // Carica dati all'avvio
 onMounted(() => {

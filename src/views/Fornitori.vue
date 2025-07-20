@@ -784,6 +784,7 @@ import {
   TrashIcon
 } from '@heroicons/vue/24/outline'
 import MaterialAttachmentsModal from '@/components/MaterialAttachmentsModal.vue'
+import { useModalEsc } from '@/composables/useModalEsc'
 
 // Stores
 const firestoreStore = useFirestoreStore()
@@ -964,6 +965,17 @@ const closeDetailModal = () => {
   showDetailModal.value = false
   selectedFornitore.value = null
 }
+
+// Chiusura modal con ESC
+const modalRefs = [showAddModal, showEditModal, showDetailModal, showComparationModal, showAttachmentsModal]
+const closeFunctions = [
+  () => showAddModal.value = false,
+  () => showEditModal.value = false,
+  closeDetailModal,
+  () => showComparationModal.value = false,
+  () => showAttachmentsModal.value = false
+]
+useModalEsc(modalRefs, closeFunctions)
 
 const contactFornitore = async (fornitore) => {
   const message = `Vuoi contattare ${fornitore.nome}?`

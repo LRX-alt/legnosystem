@@ -25,6 +25,7 @@ import {
   DocumentTextIcon
 } from '@heroicons/vue/24/outline'
 import { useFirestoreOperations } from '@/composables/useFirestoreOperations'
+import { useModalEsc } from '@/composables/useModalEsc'
 
 const router = useRouter()
 const popup = usePopup()
@@ -481,6 +482,39 @@ const closeEditMaterialModal = () => {
 const closeMaterialAttachmentsModal = () => {
   showMaterialAttachmentsModal.value = false
 }
+
+// Chiusura modal con ESC
+const modalRefs = [
+  showAddModal, 
+  showDetailModal, 
+  showEditModal, 
+  showProgressModal, 
+  showTeamModal, 
+  showAttachmentsModal, 
+  showManageMaterialsModal, 
+  showAddMaterialModal, 
+  showEditMaterialModal, 
+  showMaterialAttachmentsModal, 
+  showManageVociModal, 
+  showAddVoceModal, 
+  showEditVoceModal
+]
+const closeFunctions = [
+  closeAddModal,
+  closeDetailModal,
+  closeEditModal,
+  closeProgressModal,
+  closeTeamModal,
+  closeAttachmentsModal,
+  closeManageMaterialsModal,
+  closeAddMaterialModal,
+  closeEditMaterialModal,
+  closeMaterialAttachmentsModal,
+  () => showManageVociModal.value = false,
+  () => showAddVoceModal.value = false,
+  () => showEditVoceModal.value = false
+]
+useModalEsc(modalRefs, closeFunctions)
 
 // 🔧 FUNZIONI GESTIONE MATERIALI CANTIERE - Fix funzioni mancanti
 
@@ -1680,12 +1714,16 @@ const getAvailableEmployees = () => {
 }
 
 // Helper per le etichette dei ruoli
-const getRuoloLabel = (ruolo) => {
+const getRuoloLabel = (ruolo, ruoloPersonalizzato = '') => {
   const labels = {
-    'operaio': 'Operaio',
-    'caposquadra': 'Caposquadra',
+    'capo-squadra': 'Capo Squadra',
+    'carpentiere': 'Carpentiere',
+    'operaio': 'Operaio Specializzato',
+    'amministrativo': 'Amministrativo',
+    'manovale': 'Manovale',
+    'commerciale': 'Commerciale',
     'tecnico': 'Tecnico',
-    'amministrativo': 'Amministrativo'
+    'altro': ruoloPersonalizzato || 'Altro'
   }
   return labels[ruolo] || ruolo
 }
@@ -1837,12 +1875,12 @@ const saveTeamChanges = async () => {
     }
     
     await firestoreOperations.update('cantieri', selectedCantiere.value.id, updateData)
-    success('Team Aggiornato', 'Il team del cantiere è stato aggiornato con successo')
+    popup.success('Team Aggiornato', 'Il team del cantiere è stato aggiornato con successo')
     
     showTeamModal.value = false
     
   } catch (err) {
-    error('Errore Salvataggio Team', err.message)
+    popup.error('Errore Salvataggio Team', err.message)
   } finally {
     loading.value = false
   }
@@ -3241,7 +3279,7 @@ const getMaterialStatusColor = (stato) => {
                     </div>
                     <div>
                       <p class="font-medium text-gray-900">{{ dipendente.nome }} {{ dipendente.cognome }}</p>
-                      <p class="text-sm text-gray-600">{{ getRuoloLabel(dipendente.ruolo) }}</p>
+                      <p class="text-sm text-gray-600">{{ getRuoloLabel(dipendente.ruolo, dipendente.ruoloPersonalizzato) }}</p>
                       <!-- 🚀 MULTI-ASSIGNMENT: Mostra tutti i cantieri assegnati -->
                       <div class="text-xs text-gray-500">
                         <span v-if="dipendente.cantieriAssegnati?.length > 0">
