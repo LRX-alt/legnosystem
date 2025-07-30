@@ -1853,6 +1853,8 @@ const stats = computed(() => {
   // Calcola ore settimanali totali dai timesheet reali
   const oreSettimanaTotali = dipendenti.value.reduce((total, d) => total + (d.oreTotaliSettimana || 0), 0)
   
+  // Calcola ore settimanali totali dai timesheet reali
+  
   const costoOrarioMedio = dipendentiAttivi > 0 
     ? dipendenti.value.reduce((total, d) => total + (d.pagaOraria || 0), 0) / dipendentiAttivi 
     : 0
@@ -1966,6 +1968,12 @@ const loadCantieri = async () => {
 const loadDipendenti = async () => {
   try {
     await firestoreStore.loadDipendenti()
+    
+    // Pulisci valori cached di oreTotaliSettimana per evitare flickering
+    dipendenti.value.forEach(d => {
+      d.oreTotaliSettimana = 0
+    })
+    
     console.log('✅ Dipendenti caricati da Firestore:', dipendenti.value.length)
   } catch (e) {
     console.error('❌ Errore nel caricamento dipendenti da Firestore:', e)
@@ -1975,44 +1983,30 @@ const loadDipendenti = async () => {
 // Funzioni per la gestione dei timesheet - carica da Firestore
 const loadTimesheet = async (dipendenteId = null) => {
   try {
-    console.log('🔄 Inizio caricamento timesheet...')
-    
     // Carica tutti i timesheet usando il metodo dello store
     const result = await firestoreStore.loadTimesheet()
     
-    console.log('📊 Risultato caricamento timesheet:', result)
-    
     if (result.success) {
       const allTimesheet = firestoreStore.timesheet || []
-      console.log(`📋 Timesheet trovati in Firestore: ${allTimesheet.length}`)
       
       if (dipendenteId) {
         // Filtra per dipendente specifico
         timesheetDettagli.value = allTimesheet.filter(t => t.dipendenteId === dipendenteId)
-        console.log(`👤 Timesheet per dipendente ${dipendenteId}: ${timesheetDettagli.value.length}`)
       } else {
         // Carica tutti
         timesheetDettagli.value = allTimesheet
-        console.log(`📊 Tutti i timesheet caricati: ${timesheetDettagli.value.length}`)
       }
       
-      // Debug: mostra alcuni esempi di timesheet
-      if (timesheetDettagli.value.length > 0) {
-        console.log('📋 Esempio timesheet caricati:', timesheetDettagli.value.slice(0, 3))
-      } else {
-        console.warn('⚠️ Nessun timesheet trovato in Firestore!')
-        console.log('💡 Suggerimento: Vai al Giornale Cantiere per aggiungere personale e generare timesheet automaticamente')
+      // Se non ci sono timesheet, mostra suggerimento solo una volta
+      if (timesheetDettagli.value.length === 0) {
+        console.warn('⚠️ Nessun timesheet trovato. Vai al Giornale Cantiere per aggiungere registrazioni.')
       }
       
       // Aggiorna le ore settimanali per ogni dipendente
       updateDipendentiOreFromTimesheet()
       
-      // 🚀 NUOVA: Controllo coerenza presenze-timesheet dopo caricamento (solo se non siamo nel tab controlli)
-      if (activeTab.value !== 'controlli') {
-        await checkPresenceTimesheetCoherence()
-      }
-      
-      console.log('✅ Caricamento timesheet completato')
+      // NOTA: Controllo coerenza disabilitato nel caricamento automatico
+      // Verrà eseguito solo manualmente nel tab "Controlli" per evitare modifiche non richieste
     } else {
       console.error('❌ Errore caricamento timesheet:', result.error)
     }
@@ -2097,20 +2091,15 @@ const updateDipendentiOreFromTimesheet = () => {
     return
   }
   
-  // Trova la settimana più recente con timesheet
-  const allDates = timesheetDettagli.value.map(t => new Date(t.data)).sort((a, b) => b - a)
-  const mostRecentDate = allDates[0]
-  const startOfMostRecentWeek = startOfWeek(mostRecentDate, { weekStartsOn: 1 })
-  const endOfMostRecentWeek = endOfWeek(mostRecentDate, { weekStartsOn: 1 })
+  // USA SEMPRE LA SETTIMANA CORRENTE - Se non ci sono dati, mostra 0
+  const today = new Date()
+  // Usa sempre la settimana corrente per coerenza con il tab Riepilogo
+  
+  const startOfMostRecentWeek = startOfWeek(today, { weekStartsOn: 1 })
+  const endOfMostRecentWeek = endOfWeek(today, { weekStartsOn: 1 })
 
   dipendenti.value.forEach(dipendente => {
-    // Se il dipendente ha già ore valide (> 0), non le azzeriamo
-    if (dipendente.oreTotaliSettimana && dipendente.oreTotaliSettimana > 0) {
-      console.log(`✅ Mantengo ore esistenti per ${dipendente.nome} ${dipendente.cognome}: ${dipendente.oreTotaliSettimana}h`)
-      return
-    }
-    
-    // Calcola le ore solo per dipendenti senza ore o con 0 ore
+    // Calcola sempre le ore dai timesheet reali
     const oreSettimanali = timesheetDettagli.value
       .filter(t => {
         if (!t.data) return false
@@ -2122,10 +2111,10 @@ const updateDipendentiOreFromTimesheet = () => {
       })
       .reduce((sum, t) => sum + (t.ore || t.oreLavorate || 0), 0)
     
-    if (oreSettimanali > 0) {
-      console.log(`🔄 Aggiorno ore per ${dipendente.nome} ${dipendente.cognome}: ${dipendente.oreTotaliSettimana || 0}h → ${oreSettimanali}h`)
-      dipendente.oreTotaliSettimana = oreSettimanali
-    }
+    // Aggiorna sempre con il valore calcolato dai timesheet
+    dipendente.oreTotaliSettimana = oreSettimanali
+    
+    // Aggiorna sempre con il valore calcolato dai timesheet (già fatto sopra)
   })
 }
 

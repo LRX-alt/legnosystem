@@ -107,6 +107,14 @@ const progressUpdate = ref({
 const cantieriOrdinati = computed(() => {
   return firestoreStore.cantieri
     .slice() // Crea una copia per non modificare l'array originale
+    .map(cantiere => ({
+      ...cantiere,
+      // 🔤 AGGIUNGE INIZIALI: Calcola le iniziali per ogni membro del team
+      team: (cantiere.team || []).map(membro => ({
+        ...membro,
+        iniziali: getIniziali(membro.nome, membro.cognome)
+      }))
+    }))
     .sort((a, b) => {
       // Ordina per data di creazione decrescente
       const dateA = a.createdAt?.seconds || 0
@@ -2180,10 +2188,6 @@ const getMaterialStatusColor = (stato) => {
               <span class="font-medium text-purple-600 block">
                 €{{ cantiere.costiAccumulati?.vociAggiuntive?.toLocaleString() || '0' }}
               </span>
-              <!-- Debug: mostra il valore raw -->
-              <span class="text-xs text-gray-400 block">
-                Debug: {{ cantiere.costiAccumulati?.vociAggiuntive || 0 }}
-              </span>
             </div>
           </div>
 
@@ -2247,8 +2251,8 @@ const getMaterialStatusColor = (stato) => {
               <span v-if="getManodoperaGiornaliera(cantiere) > 0" class="text-xs text-gray-500 ml-1">
                 (effettiva)
               </span>
-              <span v-else class="text-xs text-gray-500 ml-1">
-                €{{ calculateActualDailyCost(cantiere).toLocaleString() }} (teorica)
+              <span v-else-if="calculateActualDailyCost(cantiere) > 0" class="text-xs text-gray-500 ml-1">
+                (stimato: €{{ calculateActualDailyCost(cantiere).toLocaleString() }})
               </span>
             </span>
           </div>

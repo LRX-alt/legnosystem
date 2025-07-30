@@ -89,7 +89,7 @@ window.autoFixCoherence = async () => {
   console.log('⚠️  Questa funzione modificherà i dati in Firestore')
   console.log('💡 Per sicurezza, esegui prima: window.testCoherence()')
   
-  const conferma = confirm('Sei sicuro di voler procedere con la correzione automatica?')
+  const conferma = window.confirm('Sei sicuro di voler procedere con la correzione automatica?')
   if (!conferma) {
     console.log('❌ Correzione annullata dall\'utente')
     return
@@ -129,7 +129,7 @@ window.restoreFromBackup = async (backupId) => {
     return
   }
   
-  const conferma = confirm(`Sei sicuro di voler ripristinare il backup ${backupId}?`)
+  const conferma = window.confirm(`Sei sicuro di voler ripristinare il backup ${backupId}?`)
   if (!conferma) {
     console.log('❌ Ripristino annullato dall\'utente')
     return

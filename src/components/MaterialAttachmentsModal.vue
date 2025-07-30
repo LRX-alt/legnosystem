@@ -249,6 +249,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useToast } from '@/composables/useToast'
 import { useFirestoreStore } from '@/stores/firestore'
+import { usePopup } from '@/composables/usePopup'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -257,7 +258,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const { success, error } = useToast()
+const toast = useToast()
+const { success, error, confirm } = usePopup()
 const firestoreStore = useFirestoreStore()
 
 // Stato locale
@@ -491,7 +493,7 @@ const downloadFile = (attachment) => {
 }
 
 const deleteFile = async (attachment) => {
-  if (confirm(`Eliminare "${attachment.nome}"?`)) {
+  if (await confirm('Elimina Allegato', `Sei sicuro di voler eliminare "${attachment.nome}"?`)) {
     try {
       isLoading.value = true
       

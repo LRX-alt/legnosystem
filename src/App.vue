@@ -39,9 +39,6 @@
       <router-view />
     </div>
     
-    <!-- Toast Notifications -->
-    <ToastNotification />
-    
     <!-- Popup Notifications -->
     <PopupContainer />
   </div>
@@ -54,7 +51,6 @@ import { useAuthStore } from '@/stores/auth'
 import AppHeader from './components/layout/AppHeader.vue'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import AppFooter from './components/layout/AppFooter.vue'
-import ToastNotification from './components/ToastNotification.vue'
 import PopupContainer from './components/PopupContainer.vue'
 
 // Stores

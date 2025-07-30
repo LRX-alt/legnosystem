@@ -369,7 +369,7 @@ export const useFirebaseAnalytics = () => {
    */
   const requestAnalyticsConsent = async () => {
     // In un'app reale, mostrerei un banner GDPR
-    const consent = confirm('Accetti la raccolta dati per migliorare l\'esperienza?')
+    const consent = window.confirm('Accetti la raccolta dati per migliorare l\'esperienza?')
     await setAnalyticsEnabled(consent)
     
     if (consent) {

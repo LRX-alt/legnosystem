@@ -42,9 +42,10 @@ authStore.initializeAuth().then(() => {
           .catch(err => console.error('❌ Firestore test failed:', err))
       }, 2000)
       
-      // Carica strumenti di test per il controllo coerenza
-      import('./utils/testCoherence.js').catch(console.error)
-      import('./utils/quickFix.js').catch(console.error)
+      // STRUMENTI DI TEST DISABILITATI: Caricati solo quando necessario
+      // Per utilizzarli manualmente, aprire la console e digitare:
+      // - import('./utils/testCoherence.js').then(() => window.testCoherence())
+      // - import('./utils/quickFix.js').then(() => window.quickFix())
     }
   }
 }).catch((error) => {
