@@ -18,6 +18,7 @@ import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, addDoc, ge
 import { auth, db, firestoreConfig, rolesConfig } from '@/config/firebase'
 import { useFirestoreStore } from '@/stores/firestore'
 import { useToast } from '@/composables/useToast'
+import { validateEmail } from '@/utils/firestoreValidation'
 
 export const useAuthStore = defineStore('auth', () => {
   const firestoreStore = useFirestoreStore()
