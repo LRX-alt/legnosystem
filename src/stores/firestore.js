@@ -804,6 +804,46 @@ export const useFirestoreStore = defineStore('firestore', () => {
     }
   }
 
+  /**
+   * Sottoscrizione realtime alle notifiche dell'utente
+   */
+  const subscribeToNotifications = (userId) => {
+    try {
+      const q = query(
+        collection(db, firestoreConfig.collections.notifications),
+        where('userId', '==', userId),
+        where('read', '==', false),
+        orderBy('createdAt', 'desc')
+      )
+      return onSnapshot(q, (snapshot) => {
+        notifications.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+      }, (err) => {
+        console.error('Errore subscribeToNotifications:', err)
+      })
+    } catch (err) {
+      console.error('Errore inizializzazione subscribeToNotifications:', err)
+      return () => {}
+    }
+  }
+
+  /**
+   * Restituisce la lista degli utenti admin
+   */
+  const getAdmins = async () => {
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, firestoreConfig.collections.userProfiles),
+          where('role', '==', 'admin')
+        )
+      )
+      return { success: true, data: snap.docs.map(d => ({ id: d.id, ...d.data() })) }
+    } catch (err) {
+      console.error('Errore getAdmins:', err)
+      return { success: false, error: err.message, data: [] }
+    }
+  }
+
   const markNotificationAsRead = async (notificationId) => {
     return await updateDocument(firestoreConfig.collections.notifications, notificationId, {
       read: true,

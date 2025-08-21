@@ -414,16 +414,28 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error('Hai raggiunto il limite di richieste di registrazione. Riprova tra 24 ore.')
       }
       
-      // Verifica se l'email è già in uso o in attesa
-      // Evita indice per altre combinazioni future: usa singolo where
-      const existingRequestQuery = await getDocs(
+      // Verifica richieste precedenti per questa email
+      const existingRequestSnapshot = await getDocs(
         query(
           collection(db, firestoreConfig.collections.registrationRequests),
           where('email', '==', userData.email)
         )
       )
-      if (!existingRequestQuery.empty) {
-        throw new Error('Una richiesta con questa email è già in attesa di approvazione')
+      if (!existingRequestSnapshot.empty) {
+        let hasPending = false
+        let hasApproved = false
+        existingRequestSnapshot.docs.forEach(d => {
+          const st = (d.data()?.status || '').toLowerCase()
+          if (st === 'pending') hasPending = true
+          if (st === 'approved') hasApproved = true
+        })
+        if (hasApproved) {
+          throw new Error('Esiste già un account approvato per questa email. Usa “Password dimenticata” per impostare la password.')
+        }
+        if (hasPending) {
+          throw new Error('Una richiesta con questa email è già in attesa di approvazione')
+        }
+        // Se tutte le precedenti sono "rejected", consentiamo nuova richiesta
       }
       
       // Crea richiesta di registrazione
@@ -468,8 +480,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       toast.success(
-        'Richiesta di registrazione inviata! Ti contatteremo per l\'approvazione.',
-        '📧 Richiesta Inviata'
+        'Richiesta inviata per approvazione. Riceverai un\'email quando sarà valutata.',
+        '📨 Richiesta inviata'
       )
       
       return { success: true }

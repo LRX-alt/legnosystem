@@ -160,7 +160,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { BellIcon, ChevronDownIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
@@ -224,9 +224,21 @@ const formatNotificationTime = (ts) => {
 const toggleNotifications = async () => {
   showNotifications.value = !showNotifications.value
   if (showNotifications.value && authStore.user) {
-    await firestoreStore.loadNotifications(authStore.user.uid).catch(() => {})
+    // Attiva realtime se disponibile, altrimenti fallback a load
+    if (firestoreStore.subscribeToNotifications) {
+      firestoreStore.subscribeToNotifications(authStore.user.uid)
+    } else {
+      await firestoreStore.loadNotifications(authStore.user.uid).catch(() => {})
+    }
   }
 }
+
+// Attiva la sottoscrizione realtime appena l'utente è autenticato
+onMounted(() => {
+  if (authStore.user && firestoreStore.subscribeToNotifications) {
+    firestoreStore.subscribeToNotifications(authStore.user.uid)
+  }
+})
 
 const markAsRead = async (notification) => {
   if (!notification.read) {
