@@ -291,13 +291,9 @@ const formatNotificationTime = (ts) => {
 
 const toggleNotifications = async () => {
   showNotifications.value = !showNotifications.value
-  if (showNotifications.value && authStore.user) {
-    // Attiva realtime se disponibile, altrimenti fallback a load
-    if (firestoreStore.subscribeToNotifications) {
-      firestoreStore.subscribeToNotifications(authStore.user.uid)
-    } else {
-      await firestoreStore.loadNotifications(authStore.user.uid).catch(() => {})
-    }
+  if (showNotifications.value && authStore.user && firestoreStore.subscribeToNotifications) {
+    // La sottoscrizione è già gestita in onMounted/watch
+    return
   }
 }
 
