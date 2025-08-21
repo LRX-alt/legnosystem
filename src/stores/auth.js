@@ -395,26 +395,33 @@ export const useAuthStore = defineStore('auth', () => {
       const rateLimitWindow = 24 * 60 * 60 * 1000 // 24 ore
       const maxRequestsPerWindow = 3
       
-      const recentRequestsQuery = await getDocs(
+      // Evita indice composito: filtra per data in memoria dopo query sull'IP
+      const recentByIpSnapshot = await getDocs(
         query(
           collection(db, firestoreConfig.collections.registrationRequests),
-          where('ipAddress', '==', ipAddress),
-          where('requestedAt', '>=', new Date(Date.now() - rateLimitWindow))
+          where('ipAddress', '==', ipAddress)
         )
       )
+      const windowStart = Date.now() - rateLimitWindow
+      const recentByIp = recentByIpSnapshot.docs.filter(docSnap => {
+        const data = docSnap.data()
+        const ts = data?.requestedAt
+        const ms = ts?.toDate ? ts.toDate().getTime() : (ts?.seconds ? ts.seconds * 1000 : 0)
+        return ms >= windowStart
+      })
       
-      if (recentRequestsQuery.size >= maxRequestsPerWindow) {
+      if (recentByIp.length >= maxRequestsPerWindow) {
         throw new Error('Hai raggiunto il limite di richieste di registrazione. Riprova tra 24 ore.')
       }
       
       // Verifica se l'email è già in uso o in attesa
+      // Evita indice per altre combinazioni future: usa singolo where
       const existingRequestQuery = await getDocs(
         query(
           collection(db, firestoreConfig.collections.registrationRequests),
           where('email', '==', userData.email)
         )
       )
-      
       if (!existingRequestQuery.empty) {
         throw new Error('Una richiesta con questa email è già in attesa di approvazione')
       }
