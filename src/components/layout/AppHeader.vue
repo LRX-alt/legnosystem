@@ -235,9 +235,27 @@ const toggleNotifications = async () => {
 
 // Attiva la sottoscrizione realtime appena l'utente è autenticato
 onMounted(() => {
+  let unsubscribe = null
   if (authStore.user && firestoreStore.subscribeToNotifications) {
-    firestoreStore.subscribeToNotifications(authStore.user.uid)
+    unsubscribe = firestoreStore.subscribeToNotifications(authStore.user.uid)
   }
+  // Watch per avviare/aggiornare la sottoscrizione quando cambia l'utente
+  const stop = watch(() => authStore.user, (u) => {
+    if (!firestoreStore.subscribeToNotifications) return
+    if (unsubscribe) {
+      try { unsubscribe() } catch (_) {}
+    }
+    if (u) {
+      unsubscribe = firestoreStore.subscribeToNotifications(u.uid)
+    }
+  })
+  // Cleanup
+  window.addEventListener('beforeunload', () => {
+    if (unsubscribe) {
+      try { unsubscribe() } catch (_) {}
+    }
+    stop()
+  })
 })
 
 const markAsRead = async (notification) => {
@@ -360,7 +378,11 @@ const createAdminUser = async () => {
   try {
     const result = await authStore.createAdminProfile()
     if (result.success) {
-      success('Admin Creato', 'Profilo amministratore creato con successo!')
+      if (result.info === 'already_admin') {
+        success('Sei già Admin', 'Il tuo profilo è già amministratore')
+      } else {
+        success('Admin Creato', 'Profilo amministratore creato con successo!')
+      }
     }
     showUserMenu.value = false
   } catch (error) {

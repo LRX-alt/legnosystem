@@ -70,6 +70,35 @@ service cloud.firestore {
         (rolePermissions[role] != null && rolePermissions[role].hasAny([permission, '*']));
     }
     
+    // 🔔 Notifiche
+    match /notifications/{notificationId} {
+      // Gli utenti autenticati possono leggere:
+      // - le proprie notifiche (userId == se stessi)
+      // - notifiche broadcast al proprio ruolo o a "all"
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.recipients != null && resource.data.recipients.hasAny([getUserRole(), 'all']))
+      );
+
+      // Creazione notifiche consentita solo a admin autenticati
+      // Eccezione controllata: consentiamo la creazione di notifiche di tipo
+      // "registration_request" da contesto non autenticato con vincoli stretti,
+      // così la richiesta di registrazione può generare un avviso agli admin.
+      allow create: if (isAuthenticated() && isAdmin()) || (
+        !isAuthenticated() &&
+        request.resource.data.type == 'registration_request' &&
+        request.resource.data.userId == 'system' &&
+        request.resource.data.recipients.size() == 1 &&
+        request.resource.data.recipients[0] == 'admin'
+      );
+
+      // Update/Delete: l'utente può segnare come letta la propria notifica,
+      // gli admin possono gestire tutte.
+      allow update, delete: if isAuthenticated() && (
+        isAdmin() || resource.data.userId == request.auth.uid
+      );
+    }
+
     // 👥 Profili Utente
     match /userProfiles/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || hasRoleLevel(80));

@@ -52,7 +52,7 @@ const handleLoginSuccess = () => {
 }
 
 const handleRegisterSuccess = () => {
-  success('Registrazione Completata', 'Account creato con successo! Ora puoi accedere.')
+  success('Richiesta inviata', 'La tua richiesta è stata inviata. Riceverai un\'email quando sarà approvata.')
   showRegister.value = false
 }
 </script>

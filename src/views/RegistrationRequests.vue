@@ -109,6 +109,17 @@
                   Rifiuta
                 </button>
               </div>
+
+              <!-- Actions per richieste già approvate -->
+              <div v-else-if="request.status === 'approved'" class="flex space-x-2">
+                <button
+                  @click="promoteToAdmin(request)"
+                  class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm flex items-center"
+                >
+                  <span class="mr-1">🔧</span>
+                  Promuovi a admin
+                </button>
+              </div>
             </div>
 
             <!-- Dettagli della richiesta -->
@@ -271,6 +282,7 @@ const selectedRequest = ref(null)
 const approving = ref(false)
 const rejecting = ref(false)
 const rejectReason = ref('')
+const promoting = ref(false)
 
 // Computed
 const filteredRequests = computed(() => {
@@ -361,6 +373,30 @@ const rejectRequest = async () => {
     console.error(err)
   } finally {
     rejecting.value = false
+  }
+}
+
+const promoteToAdmin = async (request) => {
+  if (!request?.createdUserId && !request?.userId) {
+    error('Errore', 'Non è possibile individuare l\'utente creato da questa richiesta')
+    return
+  }
+  const targetUserId = request.createdUserId || request.userId
+
+  try {
+    promoting.value = true
+    const res = await authStore.promoteUserToAdmin(targetUserId)
+    if (res.success) {
+      success('Promosso', `${request.name} ora è Amministratore`)
+      await loadRequests()
+    } else {
+      error('Errore', res.error || 'Impossibile promuovere utente')
+    }
+  } catch (e) {
+    console.error(e)
+    error('Errore', 'Impossibile promuovere utente')
+  } finally {
+    promoting.value = false
   }
 }
 

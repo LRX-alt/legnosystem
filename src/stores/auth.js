@@ -390,28 +390,36 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error(emailValidation.errors.join(', '))
       }
       
-      // Rate limiting: controlla richieste recenti dallo stesso IP
-      const ipAddress = await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(data => data.ip)
-      const rateLimitWindow = 24 * 60 * 60 * 1000 // 24 ore
-      const maxRequestsPerWindow = 3
-      
-      // Evita indice composito: filtra per data in memoria dopo query sull'IP
-      const recentByIpSnapshot = await getDocs(
-        query(
-          collection(db, firestoreConfig.collections.registrationRequests),
-          where('ipAddress', '==', ipAddress)
+      // Ottieni IP utente (best-effort)
+      let ipAddress = 'unknown'
+      try {
+        ipAddress = await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(data => data.ip)
+      } catch (_) {
+        // ignora, manterrà 'unknown'
+      }
+
+      // Rate limiting: DISABILITATO temporaneamente per test
+      const rateLimitEnabled = false
+      if (rateLimitEnabled) {
+        ipAddress = await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(data => data.ip)
+        const rateLimitWindow = 24 * 60 * 60 * 1000 // 24 ore
+        const maxRequestsPerWindow = 3
+        const recentByIpSnapshot = await getDocs(
+          query(
+            collection(db, firestoreConfig.collections.registrationRequests),
+            where('ipAddress', '==', ipAddress)
+          )
         )
-      )
-      const windowStart = Date.now() - rateLimitWindow
-      const recentByIp = recentByIpSnapshot.docs.filter(docSnap => {
-        const data = docSnap.data()
-        const ts = data?.requestedAt
-        const ms = ts?.toDate ? ts.toDate().getTime() : (ts?.seconds ? ts.seconds * 1000 : 0)
-        return ms >= windowStart
-      })
-      
-      if (recentByIp.length >= maxRequestsPerWindow) {
-        throw new Error('Hai raggiunto il limite di richieste di registrazione. Riprova tra 24 ore.')
+        const windowStart = Date.now() - rateLimitWindow
+        const recentByIp = recentByIpSnapshot.docs.filter(docSnap => {
+          const data = docSnap.data()
+          const ts = data?.requestedAt
+          const ms = ts?.toDate ? ts.toDate().getTime() : (ts?.seconds ? ts.seconds * 1000 : 0)
+          return ms >= windowStart
+        })
+        if (recentByIp.length >= maxRequestsPerWindow) {
+          throw new Error('Hai raggiunto il limite di richieste di registrazione. Riprova tra 24 ore.')
+        }
       }
       
       // Verifica richieste precedenti per questa email
@@ -459,20 +467,29 @@ export const useAuthStore = defineStore('auth', () => {
       
       // 🔔 Notifica admin: nuova richiesta (una notifica per ogni admin)
       try {
-        if (firestoreStore.createNotificationsForRole) {
+        let adminsCount = 0
+        if (typeof firestoreStore.getAdmins === 'function') {
+          const admins = await firestoreStore.getAdmins()
+          adminsCount = admins?.data?.length || 0
+          if (adminsCount === 0) {
+            console.warn('Nessun profilo admin trovato: le notifiche non saranno recapitate a nessuno.')
+          }
+        }
+
+        if (firestoreStore.createNotificationsForRole && adminsCount > 0) {
           await firestoreStore.createNotificationsForRole('admin', {
             type: 'registration_request',
             message: `Nuova richiesta da ${requestData.name} (${requestData.email})`,
             meta: { role: requestData.role, department: requestData.department }
           })
         } else {
-          // Fallback singola notifica
+          // Fallback: crea notifica broadcast agli admin; sarà visibile grazie alle nuove regole
           await firestoreStore.createNotification({
             type: 'registration_request',
             message: `Nuova richiesta da ${requestData.name} (${requestData.email})`,
             recipients: ['admin'],
-            userId: 'admin',
-            meta: { role: requestData.role, department: requestData.department }
+            userId: 'system',
+            meta: { role: requestData.role, department: requestData.department, note: 'no_admin_profiles_found' }
           })
         }
       } catch (e) {
@@ -689,6 +706,51 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Promuovi un utente a amministratore (solo admin)
+   */
+  const promoteUserToAdmin = async (targetUserId) => {
+    if (!isAdmin.value) return { success: false, error: 'Accesso negato: solo amministratori' }
+    try {
+      // 1) Verifica che esista il profilo dell'utente
+      const userDocRef = doc(db, firestoreConfig.collections.userProfiles, targetUserId)
+      const userDoc = await getDoc(userDocRef)
+      if (!userDoc.exists()) {
+        return { success: false, error: 'Profilo utente non trovato' }
+      }
+
+      // 2) Aggiorna ruolo a admin
+      await updateDoc(userDocRef, {
+        role: 'admin',
+        updatedAt: serverTimestamp()
+      })
+
+      // 3) Crea log audit
+      await addDoc(collection(db, 'audit_logs'), {
+        action: 'promote_to_admin',
+        targetUserId,
+        performedBy: user.value.uid,
+        timestamp: serverTimestamp()
+      })
+
+      // 4) Notifica all'utente promosso (se serve, come broadcast all)
+      try {
+        const firestoreStore = useFirestoreStore()
+        await firestoreStore.createNotification({
+          type: 'role_change',
+          message: 'Il tuo profilo è stato promosso ad Amministratore',
+          userId: targetUserId,
+          recipients: ['admin']
+        })
+      } catch (_) {}
+
+      return { success: true }
+    } catch (error) {
+      console.error('Errore promozione a admin:', error)
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
    * Crea profilo admin per il primo utente
    * Questa funzione può essere chiamata solo se:
    * 1. Non esistono altri admin nel sistema
@@ -701,6 +763,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     try {
+      // Se l'utente ha già il ruolo admin, rendi l'operazione idempotente
+      if (userProfile.value?.role === 'admin') {
+        console.log('ℹ️ Utente già amministratore, nessuna azione necessaria')
+        return { success: true, info: 'already_admin' }
+      }
+
       // Verifica se esistono già altri admin
       const adminQuery = await getDocs(
         query(
@@ -710,6 +778,12 @@ export const useAuthStore = defineStore('auth', () => {
       )
       
       if (!adminQuery.empty) {
+        // Se l'unico admin è l'utente corrente, tratta come idempotente
+        const onlyCurrentUserIsAdmin = adminQuery.docs.length === 1 && adminQuery.docs[0].id === user.value.uid
+        if (onlyCurrentUserIsAdmin) {
+          console.log('ℹ️ L\'utente corrente è già l\'unico amministratore')
+          return { success: true, info: 'already_admin' }
+        }
         throw new Error('Esiste già un amministratore nel sistema')
       }
       

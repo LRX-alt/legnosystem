@@ -750,16 +750,34 @@ export const useFirestoreStore = defineStore('firestore', () => {
   // 🔔 Metodi per Notifiche
   
   const loadNotifications = async (userId) => {
-    const filters = [
+    // Carica sia notifiche dirette (userId) sia broadcast al ruolo dell'utente
+    const authStore = useAuthStore()
+    const userRole = authStore.userRole
+
+    // Primo batch: dirette all'utente
+    const directFilters = [
       { field: 'userId', operator: '==', value: userId },
       { field: 'read', operator: '==', value: false }
     ]
-    
-    const result = await loadCollection(firestoreConfig.collections.notifications, filters, 'createdAt', 'desc', 50)
-    if (result.success) {
-      notifications.value = result.data
-    }
-    return result
+    // Secondo batch: broadcast al ruolo o a "all"
+    const roleFilters = [
+      { field: 'recipients', operator: 'array-contains-any', value: [userRole, 'all'] },
+      { field: 'read', operator: '==', value: false }
+    ]
+
+    const [direct, roleBased] = await Promise.all([
+      loadCollection(firestoreConfig.collections.notifications, directFilters, 'createdAt', 'desc', 50),
+      loadCollection(firestoreConfig.collections.notifications, roleFilters, 'createdAt', 'desc', 50)
+    ])
+
+    const merged = [
+      ...(direct.success ? direct.data : []),
+      ...(roleBased.success ? roleBased.data : [])
+    ]
+    // Dedup per id
+    const uniqueById = Array.from(new Map(merged.map(n => [n.id, n])).values())
+    notifications.value = uniqueById
+    return { success: true, data: uniqueById }
   }
 
   const createNotification = async (notificationData) => {
@@ -809,17 +827,39 @@ export const useFirestoreStore = defineStore('firestore', () => {
    */
   const subscribeToNotifications = (userId) => {
     try {
-      const q = query(
+      const authStore = useAuthStore()
+      const userRole = authStore.userRole
+
+      // Due query: dirette all'utente e broadcast al ruolo/all
+      const qDirect = query(
         collection(db, firestoreConfig.collections.notifications),
         where('userId', '==', userId),
         where('read', '==', false),
         orderBy('createdAt', 'desc')
       )
-      return onSnapshot(q, (snapshot) => {
-        notifications.value = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
-      }, (err) => {
-        console.error('Errore subscribeToNotifications:', err)
-      })
+      const qRole = query(
+        collection(db, firestoreConfig.collections.notifications),
+        where('recipients', 'array-contains-any', [userRole, 'all']),
+        where('read', '==', false),
+        orderBy('createdAt', 'desc')
+      )
+
+      const unsubDirect = onSnapshot(qDirect, (snapshot) => {
+        const direct = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+        // Merge con quelle già presenti (potrebbero arrivare dall'altra query)
+        const merged = [...direct, ...notifications.value]
+        const uniqueById = Array.from(new Map(merged.map(n => [n.id, n])).values())
+        notifications.value = uniqueById
+      }, (err) => console.error('Errore subscribeToNotifications (direct):', err))
+
+      const unsubRole = onSnapshot(qRole, (snapshot) => {
+        const roleBased = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+        const merged = [...roleBased, ...notifications.value]
+        const uniqueById = Array.from(new Map(merged.map(n => [n.id, n])).values())
+        notifications.value = uniqueById
+      }, (err) => console.error('Errore subscribeToNotifications (role):', err))
+
+      return () => { unsubDirect(); unsubRole() }
     } catch (err) {
       console.error('Errore inizializzazione subscribeToNotifications:', err)
       return () => {}
