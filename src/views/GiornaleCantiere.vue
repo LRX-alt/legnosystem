@@ -403,6 +403,7 @@
               <h4 class="text-lg font-medium text-gray-900 mb-4">🧱 Materiali Utilizzati</h4>
               <MaterialiSelector 
                 :materiali="materialiDisponibili"
+                :materialiMagazzino="firestoreStore.materiali || []"
                 v-model="newEntryData.materiali"
               />
             </div>
@@ -489,6 +490,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useFirestoreOperations } from '@/composables/useFirestoreOperations'
+import { useModalEsc } from '@/composables/useModalEsc'
 import { usePopup } from '@/composables/usePopup'
 import { useFirestoreStore } from '@/stores/firestore'
 import DipendentiSelector from '@/components/DipendentiSelector.vue'
@@ -1011,6 +1013,7 @@ onMounted(async () => {
     // 🚀 STEP 3: Dopo che il cantiere è caricato, carica i dati dipendenti
     const secondaryPromises = [
       firestoreStore.loadDipendenti().catch(console.error),
+      firestoreStore.loadMateriali().catch(console.error),
       loadGiornaleEntries().catch(console.error) // Ora il cantiere è sicuramente caricato
     ]
     
@@ -1031,6 +1034,11 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+// ESC per modali del giornale
+const giornaleModalRefs = [showEntryModal, showTeamModal]
+const giornaleCloseFns = [closeEntryModal, () => showTeamModal.value = false]
+useModalEsc(giornaleModalRefs, giornaleCloseFns)
 
 // 🚀 OTTIMIZZAZIONE: Caricamento con cache e operazioni parallele
 const loadGiornaleEntries = async () => {

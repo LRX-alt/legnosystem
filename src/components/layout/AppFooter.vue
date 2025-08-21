@@ -45,7 +45,7 @@ const currentYear = new Date().getFullYear()
 
 // Version and environment info
 const version = computed(() => {
-  return import.meta.env.VITE_APP_VERSION || '2.19.0'
+  return import.meta.env.VITE_APP_VERSION || '2.20.0'
 })
 
 const environment = computed(() => {

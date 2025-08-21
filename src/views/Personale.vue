@@ -1803,7 +1803,7 @@ const calendarDays = computed(() => {
       }
       const empData = dipendentiMap.get(t.dipendenteId)
       empData.ore += (t.ore || t.oreLavorate || 0)
-      empData.costo += (t.costoTotale || 0)
+      empData.costo += (t.costoTotale || ((t.ore || t.oreLavorate || 0) * (t.costoOrario || dipendente.pagaOraria || 0)))
     })
 
     const dipendentiLavoranti = Array.from(dipendentiMap.values())
@@ -1811,7 +1811,11 @@ const calendarDays = computed(() => {
     const stats = {
       dipendentiPresenti: dipendentiLavoranti.length,
       oreTotali: dipendentiLavoranti.reduce((sum, d) => sum + d.ore, 0),
-      costoTotale: timesheetDelGiorno.reduce((sum, t) => sum + (t.costoTotale || 0), 0)
+      costoTotale: timesheetDelGiorno.reduce((sum, t) => {
+        const dip = dipendenti.value.find(d => d.id === t.dipendenteId)
+        const costo = t.costoTotale || ((t.ore || t.oreLavorate || 0) * (t.costoOrario || dip?.pagaOraria || 0))
+        return sum + costo
+      }, 0)
     }
 
     return {

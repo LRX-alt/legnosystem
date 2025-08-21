@@ -107,6 +107,20 @@
             </button>
           </div>
 
+          <!-- Switch sorgente -->
+          <div class="mb-3 flex items-center gap-2">
+            <button
+              type="button"
+              @click="source = 'catalogo'"
+              :class="['px-3 py-1 text-xs rounded-lg border', source === 'catalogo' ? 'bg-primary-500 text-white border-primary-500' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50']"
+            >Catalogo</button>
+            <button
+              type="button"
+              @click="source = 'magazzino'"
+              :class="['px-3 py-1 text-xs rounded-lg border', source === 'magazzino' ? 'bg-primary-500 text-white border-primary-500' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50']"
+            >Magazzino</button>
+          </div>
+
           <!-- Ricerca materiali -->
           <div class="mb-4">
             <input 
@@ -130,8 +144,11 @@
                   🧱
                 </div>
                 <div class="flex-1">
-                  <div class="font-medium text-gray-900">{{ materiale.nome }}</div>
-                  <div class="text-sm text-gray-500">{{ materiale.categoria }} • €{{ materiale.prezzo }}/{{ materiale.unita }}</div>
+                  <div class="font-medium text-gray-900 flex items-center gap-2">
+                    <span>{{ materiale.nome }}</span>
+                    <span v-if="materiale._source === 'magazzino'" class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">Magazzino</span>
+                  </div>
+                  <div class="text-sm text-gray-500">{{ materiale.categoria }} • €{{ (materiale.prezzo ?? materiale.prezzoUnitario) }}/{{ materiale.unita }}</div>
                 </div>
               </div>
             </div>
@@ -155,6 +172,10 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  materialiMagazzino: {
+    type: Array,
+    default: () => []
+  },
   modelValue: {
     type: Array,
     default: () => []
@@ -167,19 +188,20 @@ const emit = defineEmits(['update:modelValue'])
 const showModal = ref(false)
 const searchTerm = ref('')
 const materialiSelezionati = ref([...props.modelValue])
+const source = ref('catalogo') // 'catalogo' | 'magazzino'
 
-// Materiali filtrati per ricerca
+// Materiali filtrati per ricerca e sorgente
 const materialiFiltrati = computed(() => {
-  const materialiDisponibili = props.materiali.filter(m => 
-    !materialiSelezionati.value.some(selected => selected.id === m.id)
-  )
-  
-  if (!searchTerm.value) return materialiDisponibili
-  
-  return materialiDisponibili.filter(m => 
-    m.nome.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-    m.categoria.toLowerCase().includes(searchTerm.value.toLowerCase())
-  )
+  const base = source.value === 'magazzino' ? props.materialiMagazzino : props.materiali
+  const disponibili = base.filter(m => !materialiSelezionati.value.some(selected => selected.id === m.id))
+
+  if (!searchTerm.value) return disponibili
+
+  return disponibili.filter(m => {
+    const categoria = (m.categoria || '').toLowerCase()
+    const nome = (m.nome || '').toLowerCase()
+    return nome.includes(searchTerm.value.toLowerCase()) || categoria.includes(searchTerm.value.toLowerCase())
+  })
 })
 
 // Aggiungi materiale
@@ -194,11 +216,12 @@ const selectMateriale = (materiale) => {
     id: materiale.id,
     nome: materiale.nome,
     categoria: materiale.categoria,
-    prezzo: materiale.prezzo,
+    prezzo: materiale.prezzo ?? materiale.prezzoUnitario,
     quantita: 1, // Default 1
     unita: materiale.unita || 'pz',
-    costoUnitario: materiale.prezzo,
-    costoTotale: materiale.prezzo
+    costoUnitario: materiale.prezzo ?? materiale.prezzoUnitario,
+    costoTotale: materiale.prezzo ?? materiale.prezzoUnitario,
+    _source: materiale._source || (source.value === 'magazzino' ? 'magazzino' : 'catalogo')
   }
   
   materialiSelezionati.value.push(nuovoMateriale)

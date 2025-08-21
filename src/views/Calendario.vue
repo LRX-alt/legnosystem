@@ -120,7 +120,12 @@
             <option value="cantiere">Solo Cantieri</option>
             <option value="appuntamento">Solo Appuntamenti</option>
             <option value="scadenza">Solo Scadenze</option>
+            <option value="giornale">Solo Giornale</option>
           </select>
+          <label class="inline-flex items-center text-sm text-gray-600 ml-2">
+            <input type="checkbox" v-model="showJournal" class="mr-2">
+            Mostra Giornale
+          </label>
           <button @click="todayView" class="btn-secondary text-sm py-2 px-3">
             Oggi
           </button>
@@ -439,6 +444,132 @@
             </div>
           </div>
 
+          <!-- Dettaglio Giornale Cantiere -->
+          <div v-if="selectedEvent?.giornale" class="space-y-6">
+            <!-- Riepilogo sintetico -->
+            <div class="border border-indigo-200 bg-indigo-50 rounded-lg p-4">
+              <h4 class="text-lg font-semibold text-indigo-900 mb-4 flex items-center">
+                <CalendarDaysIcon class="w-5 h-5 mr-2" />
+                Dettaglio Giornale Cantiere
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white rounded-lg border border-indigo-100 p-3">
+                  <p class="text-xs text-indigo-600">Dipendenti</p>
+                  <p class="text-xl font-semibold text-indigo-900">{{ selectedJournalStats.numDip }}</p>
+                </div>
+                <div class="bg-white rounded-lg border border-indigo-100 p-3">
+                  <p class="text-xs text-indigo-600">Ore Totali</p>
+                  <p class="text-xl font-semibold text-indigo-900">{{ selectedJournalStats.oreTot }}h</p>
+                </div>
+                <div class="bg-white rounded-lg border border-indigo-100 p-3">
+                  <p class="text-xs text-indigo-600">Costo Totale</p>
+                  <p class="text-xl font-semibold text-red-600">€{{ Math.round(selectedJournalStats.totale).toLocaleString('it-IT') }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Breakdown costi -->
+            <div class="border border-gray-200 rounded-lg p-4">
+              <h5 class="text-sm font-semibold text-gray-700 mb-3">Breakdown Costi</h5>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div class="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                  <p class="text-orange-700">Dipendenti</p>
+                  <p class="font-semibold text-orange-900">€{{ Math.round(selectedJournalStats.costoDip).toLocaleString('it-IT') }}</p>
+                </div>
+                <div class="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <p class="text-blue-700">Materiali</p>
+                  <p class="font-semibold text-blue-900">€{{ Math.round(selectedJournalStats.costoMat).toLocaleString('it-IT') }}</p>
+                </div>
+                <div class="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                  <p class="text-purple-700">Mezzi</p>
+                  <p class="font-semibold text-purple-900">€{{ Math.round(selectedJournalStats.costoMez).toLocaleString('it-IT') }}</p>
+                </div>
+                <div class="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+                  <p class="text-emerald-700">Lavori</p>
+                  <p class="font-semibold text-emerald-900">€{{ Math.round(selectedJournalStats.costoLav).toLocaleString('it-IT') }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Elenchi sintetici -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <!-- Materiali -->
+              <div class="border rounded-lg">
+                <div class="px-4 py-2 bg-gray-50 border-b flex items-center gap-2">
+                  <span class="w-4 h-4 rounded-sm bg-blue-500 inline-block"></span>
+                  <h5 class="text-sm font-medium text-gray-700">Materiali</h5>
+                </div>
+                <div class="max-h-40 overflow-y-auto divide-y">
+                  <div v-if="!selectedEvent.giornale.materiali || selectedEvent.giornale.materiali.length === 0" class="p-3 text-sm text-gray-500">Nessun materiale</div>
+                  <div v-for="m in selectedEvent.giornale.materiali || []" :key="m.id" class="p-3 text-sm flex items-center justify-between">
+                    <div>
+                      <div class="font-medium text-gray-900">{{ m.nome }}</div>
+                      <div class="text-gray-500 text-xs">{{ m.quantita }} {{ m.unita || 'pz' }}</div>
+                    </div>
+                    <div class="text-blue-600 font-semibold">€{{ (m.costoTotale || ((m.quantita || 0)*(m.costoUnitario || m.prezzoUnitario || 0))).toFixed(2) }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mezzi / Lavori -->
+              <div class="grid grid-cols-1 gap-6">
+                <div class="border rounded-lg">
+                  <div class="px-4 py-2 bg-gray-50 border-b flex items-center gap-2">
+                    <span class="w-4 h-4 rounded-sm bg-purple-500 inline-block"></span>
+                    <h5 class="text-sm font-medium text-gray-700">Mezzi</h5>
+                  </div>
+                  <div class="max-h-40 overflow-y-auto divide-y">
+                    <div v-if="!selectedEvent.giornale.mezzi || selectedEvent.giornale.mezzi.length === 0" class="p-3 text-sm text-gray-500">Nessun mezzo</div>
+                    <div v-for="z in selectedEvent.giornale.mezzi || []" :key="z.id" class="p-3 text-sm flex items-center justify-between">
+                      <div>
+                        <div class="font-medium text-gray-900">{{ z.nome }}</div>
+                        <div class="text-gray-500 text-xs">{{ z.oreUtilizzo || 0 }}h × €{{ z.costoOrario || 0 }}/h</div>
+                      </div>
+                      <div class="text-purple-600 font-semibold">€{{ (z.costoTotale || ((z.oreUtilizzo || 0)*(z.costoOrario || 0))).toFixed(2) }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="border rounded-lg">
+                  <div class="px-4 py-2 bg-gray-50 border-b flex items-center gap-2">
+                    <span class="w-4 h-4 rounded-sm bg-emerald-500 inline-block"></span>
+                    <h5 class="text-sm font-medium text-gray-700">Lavori</h5>
+                  </div>
+                  <div class="max-h-40 overflow-y-auto divide-y">
+                    <div v-if="!selectedEvent.giornale.lavori || selectedEvent.giornale.lavori.length === 0" class="p-3 text-sm text-gray-500">Nessun lavoro</div>
+                    <div v-for="l in selectedEvent.giornale.lavori || []" :key="`${l.tipo}-${l.sottocategoria}`" class="p-3 text-sm flex items-center justify-between">
+                      <div>
+                        <div class="font-medium text-gray-900">{{ l.tipo }} - {{ l.sottocategoria }}</div>
+                        <div class="text-gray-500 text-xs">{{ l.ore || 0 }}h × €{{ l.costoOrario || 0 }}/h</div>
+                      </div>
+                      <div class="text-emerald-700 font-semibold">€{{ (l.costoTotale || ((l.ore || 0)*(l.costoOrario || 0))).toFixed(2) }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Meteo, Attività e Note -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div class="border rounded-lg p-3">
+                <h5 class="text-sm font-medium text-gray-700 mb-2">Meteo</h5>
+                <div class="text-sm text-gray-600">Condizioni: {{ selectedEvent.giornale.meteo?.condizioni || 'N/D' }}</div>
+                <div class="text-sm text-gray-600">Temp: {{ selectedEvent.giornale.meteo?.temperatura ?? 'N/D' }}°C</div>
+              </div>
+              <div class="border rounded-lg p-3">
+                <h5 class="text-sm font-medium text-gray-700 mb-2">Attività</h5>
+                <ul class="list-disc pl-4 text-sm text-gray-700 space-y-1 max-h-24 overflow-y-auto">
+                  <li v-for="(a, i) in selectedEvent.giornale.attivita || []" :key="i">{{ a }}</li>
+                  <li v-if="!selectedEvent.giornale.attivita || selectedEvent.giornale.attivita.length === 0" class="text-gray-500">Nessuna attività</li>
+                </ul>
+              </div>
+              <div class="border rounded-lg p-3">
+                <h5 class="text-sm font-medium text-gray-700 mb-2">Note</h5>
+                <div class="text-sm text-gray-700 max-h-24 overflow-y-auto">{{ selectedEvent.giornale.note || '—' }}</div>
+              </div>
+            </div>
+          </div>
+
           <!-- Dettagli Cantiere (se presente) -->
           <div v-if="selectedEvent?.cantiere" class="space-y-6">
             <!-- Info Cliente e Progetto -->
@@ -692,6 +823,7 @@ import {
   CurrencyEuroIcon
 } from '@heroicons/vue/24/outline'
 import { useFirestoreStore } from '@/stores/firestore'
+import { useModalEsc } from '@/composables/useModalEsc'
 import { usePopup } from '@/composables/usePopup'
 import { useRouter } from 'vue-router'
 
@@ -702,6 +834,7 @@ const activeTab = ref('calendario')
 const currentView = ref('month')
 const currentDate = ref(new Date())
 const filterType = ref('')
+const showJournal = ref(true)
 const showEventDetailModal = ref(false)
 const selectedEvent = ref(null)
 
@@ -713,7 +846,10 @@ const { success, error } = usePopup()
 // Dati cantieri - computed per reattività
 const cantieri = computed(() => firestoreStore.cantieri)
 
-// Eventi - ora include i cantieri automaticamente
+// Registrazioni giornale cantiere
+const giornaleEntries = ref([])
+
+// Eventi - include cantieri e (opzionale) giornale cantiere
 const eventi = computed(() => {
   // Eventi statici di esempio (da rimuovere se non necessari)
   const eventiStatici = [
@@ -834,8 +970,32 @@ const eventi = computed(() => {
     return eventi
   }).flat()
 
+  // Eventi dal giornale cantiere
+  const eventiGiornale = showJournal.value ? (giornaleEntries.value || []).map(entry => {
+    const numDip = Array.isArray(entry.dipendenti) ? entry.dipendenti.length : 0
+    const oreTot = Array.isArray(entry.dipendenti) ? entry.dipendenti.reduce((s, d) => s + (d.ore || d.oreLavorate || 0), 0) : 0
+    const costoDip = Array.isArray(entry.dipendenti) ? entry.dipendenti.reduce((s, d) => s + (d.costoTotale || ((d.ore || 0) * (d.costoOrario || 0))), 0) : 0
+    const costoMat = Array.isArray(entry.materiali) ? entry.materiali.reduce((s, m) => s + (m.costoTotale || ((m.quantita || 0) * (m.costoUnitario || m.prezzoUnitario || 0))), 0) : 0
+    const costoMez = Array.isArray(entry.mezzi) ? entry.mezzi.reduce((s, m) => s + (m.costoTotale || ((m.oreUtilizzo || 0) * (m.costoOrario || 0))), 0) : 0
+    const costoLav = Array.isArray(entry.lavori) ? entry.lavori.reduce((s, l) => s + (l.costoTotale || ((l.ore || 0) * (l.costoOrario || 0))), 0) : 0
+    const costoTot = Math.round((costoDip + costoMat + costoMez + costoLav) * 100) / 100
+    const cantiereNome = (cantieri.value.find(c => c.id === entry.cantiereId)?.nome) || 'Cantiere'
+    return {
+      id: `giornale-${entry.id}`,
+      type: 'giornale',
+      title: `📘 Giornale: ${numDip} dip., ${oreTot}h, €${costoTot.toFixed(0)}`,
+      date: entry.data,
+      startTime: entry.orarioInizio || '08:00',
+      endTime: entry.orarioFine || '17:00',
+      description: `${cantiereNome}`,
+      status: 'confirmed',
+      giornale: entry,
+      cantiereId: entry.cantiereId
+    }
+  }) : []
+
   // Filtra eventi in base al filtro selezionato
-  let tuttiEventi = [...eventiStatici, ...eventiCantieri]
+  let tuttiEventi = [...eventiStatici, ...eventiCantieri, ...eventiGiornale]
   
   if (filterType.value) {
     tuttiEventi = tuttiEventi.filter(evento => evento.type === filterType.value)
@@ -1018,6 +1178,7 @@ const getEventColor = (type) => {
     'cantiere': 'bg-blue-100 text-blue-800 hover:bg-blue-200',
     'appuntamento': 'bg-green-100 text-green-800 hover:bg-green-200',
     'scadenza': 'bg-red-100 text-red-800 hover:bg-red-200',
+    'giornale': 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200',
     'manutenzione': 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
   }
   return colors[type] || 'bg-gray-100 text-gray-800 hover:bg-gray-200'
@@ -1133,6 +1294,22 @@ const getEventHeaderColor = (type) => {
   }
   return colors[type] || 'bg-gray-100 text-gray-600'
 }
+// Stats calcolate per il giornale selezionato
+const calculateJournalStats = (entry) => {
+  const numDip = Array.isArray(entry?.dipendenti) ? entry.dipendenti.length : 0
+  const oreTot = Array.isArray(entry?.dipendenti) ? entry.dipendenti.reduce((s, d) => s + (d.ore || d.oreLavorate || 0), 0) : 0
+  const costoDip = Array.isArray(entry?.dipendenti) ? entry.dipendenti.reduce((s, d) => s + (d.costoTotale || ((d.ore || 0) * (d.costoOrario || 0))), 0) : 0
+  const costoMat = Array.isArray(entry?.materiali) ? entry.materiali.reduce((s, m) => s + (m.costoTotale || ((m.quantita || 0) * (m.costoUnitario || m.prezzoUnitario || 0))), 0) : 0
+  const costoMez = Array.isArray(entry?.mezzi) ? entry.mezzi.reduce((s, m) => s + (m.costoTotale || ((m.oreUtilizzo || 0) * (m.costoOrario || 0))), 0) : 0
+  const costoLav = Array.isArray(entry?.lavori) ? entry.lavori.reduce((s, l) => s + (l.costoTotale || ((l.ore || 0) * (l.costoOrario || 0))), 0) : 0
+  const totale = costoDip + costoMat + costoMez + costoLav
+  return { numDip, oreTot, costoDip, costoMat, costoMez, costoLav, totale }
+}
+
+const selectedJournalStats = computed(() => {
+  if (!selectedEvent.value?.giornale) return { numDip: 0, oreTot: 0, costoDip: 0, costoMat: 0, costoMez: 0, costoLav: 0, totale: 0 }
+  return calculateJournalStats(selectedEvent.value.giornale)
+})
 
 const getMargineColorText = (cantiere) => {
   const margine = cantiere.valore - (cantiere.costiAccumulati?.totale || 0)
@@ -1218,11 +1395,20 @@ onMounted(async () => {
     // Carica tutti i dati necessari da Firestore
     await Promise.all([
       firestoreStore.loadCantieri(),
-      firestoreStore.loadDipendenti()
+      firestoreStore.loadDipendenti(),
+      // Carica registrazioni giornale cantiere
+      firestoreStore.loadCollection('giornale_cantiere').then(res => {
+        giornaleEntries.value = res?.data || []
+      })
     ])
     console.log('✅ Dati calendario caricati con successo')
   } catch (error) {
     console.error('❌ Errore nel caricamento dati Calendario:', error)
   }
 })
+
+// Abilita chiusura modali con ESC
+const calendarioModalRefs = [showNewEventModal, showEventDetailModal]
+const calendarioCloseFns = [closeNewEventModal, closeEventDetailModal]
+useModalEsc(calendarioModalRefs, calendarioCloseFns)
 </script> 
