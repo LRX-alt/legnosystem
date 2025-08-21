@@ -302,6 +302,8 @@ onMounted(() => {
   let unsubscribe = null
   if (authStore.user && firestoreStore.subscribeToNotifications) {
     unsubscribe = firestoreStore.subscribeToNotifications(authStore.user.uid)
+    // Carica immediatamente le notifiche per popolare il badge
+    firestoreStore.loadNotifications && firestoreStore.loadNotifications(authStore.user.uid).catch(() => {})
   }
   // Watch per avviare/aggiornare la sottoscrizione quando cambia l'utente
   const stop = watch(() => authStore.user, (u) => {
@@ -311,6 +313,8 @@ onMounted(() => {
     }
     if (u) {
       unsubscribe = firestoreStore.subscribeToNotifications(u.uid)
+      // Carica immediatamente anche la lista corrente
+      firestoreStore.loadNotifications && firestoreStore.loadNotifications(u.uid).catch(() => {})
     }
   })
   // Cleanup
