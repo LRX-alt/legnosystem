@@ -142,7 +142,7 @@
     </div>
 
     <!-- Dashboard Principale -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
       <!-- Totale Costi -->
       <div class="card bg-gradient-to-r from-red-50 to-red-100 border-red-200">
         <div class="flex items-center">
@@ -178,6 +178,19 @@
           <div class="ml-4">
             <p class="text-sm font-medium text-blue-600">Costo Materiali</p>
             <p class="text-2xl font-bold text-blue-900">€{{ statistiche.costoMateriali.toLocaleString() }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Costo Lavori -->
+      <div class="card bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200">
+        <div class="flex items-center">
+          <div class="p-3 bg-emerald-500 rounded-lg">
+            <WrenchScrewdriverIcon class="w-6 h-6 text-white" />
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-emerald-600">Costo Lavori</p>
+            <p class="text-2xl font-bold text-emerald-900">€{{ statistiche.costoLavori.toLocaleString() }}</p>
           </div>
         </div>
       </div>
@@ -346,6 +359,7 @@ import {
   UsersIcon, 
   CubeIcon, 
   TruckIcon,
+  WrenchScrewdriverIcon,
   DocumentArrowDownIcon,
   TableCellsIcon,
   FunnelIcon
@@ -440,6 +454,7 @@ const statistiche = computed(() => {
     costoTotale: costi.reduce((tot, c) => tot + c.costoTotale, 0),
     costoDipendenti: costi.filter(c => c.categoria === 'dipendenti').reduce((tot, c) => tot + c.costoTotale, 0),
     costoMateriali: costi.filter(c => c.categoria === 'materiali').reduce((tot, c) => tot + c.costoTotale, 0),
+    costoLavori: costi.filter(c => c.categoria === 'lavori').reduce((tot, c) => tot + c.costoTotale, 0),
     costoMezzi: costi.filter(c => c.categoria === 'mezzi').reduce((tot, c) => tot + c.costoTotale, 0)
   }
 })
