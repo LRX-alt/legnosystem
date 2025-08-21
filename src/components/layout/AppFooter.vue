@@ -38,6 +38,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import appPkg from '../../../package.json'
 import logoLegnosystem from '@/assets/logo legnosystem.avif'
 
 // Current year for copyright
@@ -45,7 +46,7 @@ const currentYear = new Date().getFullYear()
 
 // Version and environment info
 const version = computed(() => {
-  return import.meta.env.VITE_APP_VERSION || '2.20.0'
+  return import.meta.env.VITE_APP_VERSION || appPkg.version || '2.20.0'
 })
 
 const environment = computed(() => {

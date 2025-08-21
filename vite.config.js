@@ -22,7 +22,8 @@ export default defineConfig({
     sourcemap: false
   },
   define: {
-    'import.meta.env.VITE_APP_VERSION': JSON.stringify('2.18.0'),
+    // Se definita nel .env, Vite userà quella; altrimenti lasciamo undefined e AppFooter leggerà da package.json
+    'import.meta.env.VITE_APP_VERSION': process.env.VITE_APP_VERSION ? JSON.stringify(process.env.VITE_APP_VERSION) : undefined,
     'import.meta.env.VITE_APP_NAME': JSON.stringify('Legnosystem.bio')
   },
   server: {

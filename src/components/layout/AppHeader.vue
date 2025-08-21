@@ -29,12 +29,12 @@
         <!-- Actions -->
         <div class="flex items-center space-x-2 sm:space-x-4">
           <!-- Notifiche -->
-          <button @click="showNotifications = !showNotifications" 
+          <button @click="toggleNotifications" 
                   class="relative p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg transition-colors duration-200">
             <BellIcon class="w-5 h-5 sm:w-6 sm:h-6" />
-            <span v-if="unreadNotifications > 0" 
+            <span v-if="unreadCount > 0" 
                   class="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-              {{ unreadNotifications }}
+              {{ unreadCount }}
             </span>
           </button>
 
@@ -81,6 +81,10 @@
                   <span class="mr-3">🔧</span>
                   Crea Admin
                 </button>
+                <button @click="openChangePassword" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <span class="mr-3">🔒</span>
+                  Cambia Password
+                </button>
                 <button v-if="authStore.isAdmin" @click="viewRegistrationRequests" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                   <span class="mr-3">📋</span>
                   Richieste Registrazione
@@ -105,7 +109,7 @@
       </div>
     </div>
 
-    <!-- Notifications Panel - Mobile Optimized -->
+    <!-- Notifications Panel -->
     <div v-if="showNotifications" class="absolute top-16 right-2 sm:right-4 w-72 sm:w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
       <div class="p-3 sm:p-4 border-b border-gray-200">
         <h3 class="text-sm font-medium text-gray-900">Notifiche</h3>
@@ -115,9 +119,40 @@
           Nessuna notifica
         </div>
         <div v-for="notification in notifications" :key="notification.id" 
-             class="p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50">
-          <p class="text-sm text-gray-900">{{ notification.message }}</p>
-          <p class="text-xs text-gray-500 mt-1">{{ notification.time }}</p>
+             class="p-3 sm:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+             @click="markAsRead(notification)">
+          <div class="flex justify-between items-start">
+            <p class="text-sm text-gray-900" :class="!notification.read ? 'font-semibold' : ''">{{ notification.message }}</p>
+            <span v-if="!notification.read" class="mt-0.5 inline-block w-2 h-2 rounded-full bg-primary-500"></span>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">{{ formatNotificationTime(notification.createdAt) }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div v-if="showChangePassword" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" @click="showChangePassword = false">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md" @click.stop>
+        <div class="px-5 py-4 border-b">
+          <h3 class="text-lg font-semibold text-gray-900">Cambia Password</h3>
+        </div>
+        <div class="p-5 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Password attuale</label>
+            <input v-model="currentPassword" type="password" class="w-full border rounded-md px-3 py-2" placeholder="••••••" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Nuova password</label>
+            <input v-model="newPassword" type="password" class="w-full border rounded-md px-3 py-2" placeholder="Minimo 6 caratteri" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Conferma nuova password</label>
+            <input v-model="confirmPassword" type="password" class="w-full border rounded-md px-3 py-2" />
+          </div>
+        </div>
+        <div class="px-5 py-4 border-t flex justify-end gap-2">
+          <button class="btn-secondary" @click="showChangePassword = false">Annulla</button>
+          <button class="btn-primary" :disabled="!canSubmitPassword" @click="submitChangePassword">Aggiorna</button>
         </div>
       </div>
     </div>
@@ -129,6 +164,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { BellIcon, ChevronDownIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
+import { useFirestoreStore } from '@/stores/firestore'
 import { usePopup } from '@/composables/usePopup'
 import logoLegnosystem from '@/assets/logo legnosystem.avif'
 
@@ -143,7 +179,7 @@ const router = useRouter()
 // UI State
 const showNotifications = ref(false)
 const showUserMenu = ref(false)
-const unreadNotifications = ref(3)
+const firestoreStore = useFirestoreStore()
 
 // Firebase Auth Data
 const userName = computed(() => authStore.userName || 'Utente')
@@ -172,11 +208,59 @@ const userRoleLabel = computed(() => {
   return roleLabels[userRole.value] || '👤 Utente'
 })
 
-const notifications = ref([
-  { id: 1, message: 'Scorte legno di quercia sotto il minimo', time: '5 min fa' },
-  { id: 2, message: 'Cantiere Via Roma: fase completata', time: '1 ora fa' },
-  { id: 3, message: 'Nuovo preventivo richiesto', time: '2 ore fa' }
-])
+const notifications = computed(() => firestoreStore.notifications || [])
+const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
+
+const formatNotificationTime = (ts) => {
+  try {
+    if (!ts) return ''
+    const date = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts)
+    return date.toLocaleString('it-IT')
+  } catch {
+    return ''
+  }
+}
+
+const toggleNotifications = async () => {
+  showNotifications.value = !showNotifications.value
+  if (showNotifications.value && authStore.user) {
+    await firestoreStore.loadNotifications(authStore.user.uid).catch(() => {})
+  }
+}
+
+const markAsRead = async (notification) => {
+  if (!notification.read) {
+    await firestoreStore.markNotificationAsRead(notification.id).catch(() => {})
+  }
+}
+
+// Change Password modal state
+const showChangePassword = ref(false)
+const currentPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const canSubmitPassword = computed(() => !!currentPassword.value && newPassword.value.length >= 6 && newPassword.value === confirmPassword.value)
+
+const openChangePassword = () => {
+  showUserMenu.value = false
+  showChangePassword.value = true
+}
+
+const submitChangePassword = async () => {
+  if (!canSubmitPassword.value) return
+  try {
+    const res = await authStore.changePassword(currentPassword.value, newPassword.value)
+    if (res?.success) {
+      showChangePassword.value = false
+      currentPassword.value = ''
+      newPassword.value = ''
+      confirmPassword.value = ''
+      success('Password aggiornata', 'La password è stata cambiata con successo')
+    }
+  } catch (e) {
+    error('Errore', e?.message || 'Impossibile cambiare password')
+  }
+}
 
 // State per logout
 const logoutLoading = ref(false)

@@ -16,9 +16,11 @@ import {
 } from 'firebase/auth'
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { auth, db, firestoreConfig, rolesConfig } from '@/config/firebase'
+import { useFirestoreStore } from '@/stores/firestore'
 import { useToast } from '@/composables/useToast'
 
 export const useAuthStore = defineStore('auth', () => {
+  const firestoreStore = useFirestoreStore()
   const toast = useToast()
   
   // 🔐 State
@@ -435,6 +437,19 @@ export const useAuthStore = defineStore('auth', () => {
       
       await addDoc(collection(db, firestoreConfig.collections.registrationRequests), requestData)
       
+      // 🔔 Notifica admin: nuova richiesta
+      try {
+        await firestoreStore.createNotification({
+          type: 'registration_request',
+          message: `Nuova richiesta da ${requestData.name} (${requestData.email})`,
+          recipients: ['admin'],
+          userId: 'admin',
+          meta: { role: requestData.role, department: requestData.department }
+        })
+      } catch (e) {
+        console.warn('Impossibile creare notifica richiesta registrazione:', e)
+      }
+
       toast.success(
         'Richiesta di registrazione inviata! Ti contatteremo per l\'approvazione.',
         '📧 Richiesta Inviata'

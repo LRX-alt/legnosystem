@@ -516,7 +516,7 @@ const route = useRoute()
 const popup = usePopup()
 const { success, error, warning, info, confirm, removePopup } = popup
 const firestoreOperations = useFirestoreOperations()
-const firestoreStore = useFirestoreStore()
+const fsStore = useFirestoreStore()
 
 // Reactive state
 const loading = ref(false)
@@ -1387,7 +1387,25 @@ const saveEntry = async () => {
     // Fallback cleanup nel raro caso l'auto-dismiss non scatti
     setTimeout(() => {
       removePopup(okPopupId)
-    }, 3500)
+    }, 2500)
+    
+    // 🔔 Notifica automatica: nuova registrazione giornale
+    try {
+      await fsStore.createNotification({
+        type: 'giornale_create',
+        message: `Giornale salvato per ${cantiere.value.nome} - ${entryData.data}`,
+        recipients: ['admin'],
+        meta: {
+          cantiereId: cantiere.value.id,
+          cantiereNome: cantiere.value.nome,
+          data: entryData.data,
+          dipendenti: (entryData.dipendenti || []).length,
+          oreTotali: (entryData.dipendenti || []).reduce((s, d) => s + (d.ore || d.oreLavorate || 0), 0)
+        }
+      })
+    } catch (e) {
+      console.warn('Notifica giornale non creata:', e)
+    }
     
     // Aggiorna in background
     Promise.all([
@@ -1414,7 +1432,7 @@ const deleteEntry = async (entryId) => {
     { type: 'warning', confirmText: 'Elimina', cancelText: 'Annulla', icon: '⚠️' }
   )
   if (!proceed) {
-    info('Operazione Annullata', 'Eliminazione annullata dall’utente.', 1800)
+    info('Operazione Annullata', "Eliminazione annullata dall'utente.", 1800)
     return
   }
   try {
