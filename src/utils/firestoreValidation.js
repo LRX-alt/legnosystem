@@ -622,7 +622,9 @@ export const validateEmail = (email) => {
   ]
   
   const emailDomain = email.split('@')[1]?.toLowerCase()
-  if (!allowedDomains.includes(emailDomain)) {
+  // La restrizione ai soli domini aziendali è opzionale e controllata da ENV
+  const requireCompanyEmail = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_REQUIRE_COMPANY_EMAIL === 'true'
+  if (requireCompanyEmail && !allowedDomains.includes(emailDomain)) {
     errors.push('Usa un indirizzo email aziendale')
   }
   
