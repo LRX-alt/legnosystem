@@ -6,11 +6,13 @@
       <div v-for="u in users" :key="u.id" class="border rounded p-3 flex items-center justify-between">
         <div>
           <div class="font-medium">{{ u.name || u.email }}</div>
-          <div class="text-xs text-gray-500">{{ u.email }} • Ruolo: {{ u.role }}</div>
+          <div class="text-xs text-gray-500">{{ u.email }} • Ruolo: {{ u.role }} • Stato: {{ u.isActive ? 'attivo' : 'disabilitato' }}</div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap justify-end">
+          <button class="btn-secondary" @click="toggleActive(u)">{{ u.isActive ? 'Disabilita' : 'Abilita' }}</button>
           <button class="btn-secondary" @click="setRole(u.id, 'manager')">Rendi Manager</button>
           <button class="btn-primary" @click="promoteToAdmin(u.id)">Promuovi a Admin</button>
+          <button class="btn-secondary" @click="sendPasswordReset(u.email)">Reset Password</button>
         </div>
       </div>
     </div>
@@ -20,12 +22,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore'
-import { db, firestoreConfig } from '@/config/firebase'
+import { sendPasswordResetEmail } from 'firebase/auth'
+import { db, auth, firestoreConfig } from '@/config/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { usePopup } from '@/composables/usePopup'
 
-const auth = useAuthStore()
-const { success, error } = usePopup()
+const authStore = useAuthStore()
+const { success, error, confirm } = usePopup()
 
 const users = ref([])
 const loading = ref(false)
@@ -52,8 +55,29 @@ const setRole = async (userId, role) => {
   }
 }
 
+const toggleActive = async (u) => {
+  try {
+    const ok = await confirm(u.isActive ? 'Disabilita utente?' : 'Abilita utente?', `${u.email}`)
+    if (!ok) return
+    await updateDoc(doc(db, firestoreConfig.collections.userProfiles, u.id), { isActive: !u.isActive })
+    success('Stato aggiornato', `Utente ${!u.isActive ? 'abilitato' : 'disabilitato'}`)
+    await loadUsers()
+  } catch (e) {
+    error('Errore', 'Impossibile aggiornare stato utente')
+  }
+}
+
+const sendPasswordReset = async (email) => {
+  try {
+    await sendPasswordResetEmail(auth, email)
+    success('Email inviata', `Reset password inviato a ${email}`)
+  } catch (e) {
+    error('Errore', e?.message || 'Impossibile inviare reset password')
+  }
+}
+
 const promoteToAdmin = async (userId) => {
-  const res = await auth.promoteUserToAdmin(userId)
+  const res = await authStore.promoteUserToAdmin(userId)
   if (res.success) {
     success('Promosso', 'Utente promosso ad admin')
     await loadUsers()

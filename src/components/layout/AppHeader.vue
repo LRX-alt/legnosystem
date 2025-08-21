@@ -89,6 +89,10 @@
                   <span class="mr-3">📋</span>
                   Richieste Registrazione
                 </button>
+                <button v-if="authStore.isAdmin" @click="goToUsers" class="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <span class="mr-3">👥</span>
+                  Gestione Utenti
+                </button>
               </div>
               
               <div class="border-t border-gray-100 py-1">
@@ -524,6 +528,11 @@ const createAdminUser = async () => {
 const viewRegistrationRequests = () => {
   showUserMenu.value = false
   router.push('/registration-requests')
+}
+
+const goToUsers = () => {
+  showUserMenu.value = false
+  router.push('/utenti')
 }
 
 // Chiudi dropdown quando si clicca fuori
