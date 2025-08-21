@@ -113,6 +113,7 @@
               <option v-for="tipo in tipiLavori" :key="tipo.id" :value="tipo.id">
                 {{ tipo.nome }}
               </option>
+              <option value="altro">Altro</option>
             </select>
           </div>
 
@@ -127,13 +128,14 @@
               <option v-for="sottocat in sottocategorieDisponibili" :key="sottocat.id" :value="sottocat.id">
                 {{ sottocat.nome }} - {{ sottocat.descrizione }}
               </option>
+              <option v-if="selectedCategoria === 'altro'" value="altro">Altro</option>
             </select>
           </div>
 
           <!-- Dettagli lavoro selezionato -->
           <div v-if="selectedSottocategoria" class="mb-4 p-3 bg-gray-50 rounded-lg">
             <h4 class="font-medium text-gray-900 mb-2">Dettagli Lavoro</h4>
-            <div class="space-y-2 text-sm">
+            <div v-if="selectedCategoria !== 'altro'" class="space-y-2 text-sm">
               <div class="flex justify-between">
                 <span class="text-gray-600">Categoria:</span>
                 <span class="font-medium">{{ tipoLavoroSelezionato?.nome }}</span>
@@ -145,6 +147,29 @@
               <div class="flex justify-between">
                 <span class="text-gray-600">Costo Standard:</span>
                 <span class="font-medium">€{{ costoStandard }}/h</span>
+              </div>
+            </div>
+            <div v-else class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ore Lavoro</label>
+                <input 
+                  v-model.number="oreManuale" 
+                  type="number" 
+                  step="0.5" 
+                  min="0" 
+                  max="12"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Costo Orario (€)</label>
+                <input 
+                  v-model.number="costoOrarioManuale" 
+                  type="number" 
+                  step="0.5" 
+                  min="0"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                />
               </div>
             </div>
           </div>
@@ -161,7 +186,7 @@
             <button 
               @click="confirmLavoro"
               type="button"
-              :disabled="!selectedSottocategoria"
+              :disabled="!selectedSottocategoria || (selectedCategoria === 'altro' && (oreManuale <= 0 || costoOrarioManuale <= 0))"
               class="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Conferma
@@ -192,6 +217,8 @@ const showModal = ref(false)
 const selectedCategoria = ref('')
 const selectedSottocategoria = ref('')
 const lavoriSelezionati = ref([...props.modelValue])
+const oreManuale = ref(0)
+const costoOrarioManuale = ref(0)
 
 // Dati tipi lavori
 const tipiLavori = getTipiLavori()
@@ -202,7 +229,7 @@ const tipoLavoroSelezionato = computed(() =>
 )
 
 const sottocategorieDisponibili = computed(() => 
-  selectedCategoria.value ? getSottocategorie(selectedCategoria.value) : []
+  selectedCategoria.value && selectedCategoria.value !== 'altro' ? getSottocategorie(selectedCategoria.value) : []
 )
 
 const sottocategoriaSelezionata = computed(() => 
@@ -211,7 +238,7 @@ const sottocategoriaSelezionata = computed(() =>
 )
 
 const costoStandard = computed(() => 
-  selectedSottocategoria.value ? 
+  selectedSottocategoria.value && selectedCategoria.value !== 'altro' ? 
     getCostoStandard(selectedCategoria.value, selectedSottocategoria.value) : 0
 )
 
@@ -220,18 +247,29 @@ const addLavoro = () => {
   showModal.value = true
   selectedCategoria.value = ''
   selectedSottocategoria.value = ''
+  oreManuale.value = 0
+  costoOrarioManuale.value = 0
 }
 
 // Conferma selezione lavoro
 const confirmLavoro = () => {
   if (!selectedSottocategoria.value) return
 
-  const nuovoLavoro = {
+  const isAltro = selectedCategoria.value === 'altro'
+  const nuovoLavoro = isAltro ? {
+    tipo: 'altro',
+    sottocategoria: 'altro',
+    nomeTipo: 'Altro',
+    nomeSottocategoria: 'Altro',
+    ore: oreManuale.value,
+    costoOrario: costoOrarioManuale.value,
+    descrizione: 'Lavoro personalizzato'
+  } : {
     tipo: selectedCategoria.value,
     sottocategoria: selectedSottocategoria.value,
     nomeTipo: tipoLavoroSelezionato.value.nome,
     nomeSottocategoria: sottocategoriaSelezionata.value.nome,
-    ore: 8, // Default 8 ore
+    ore: 8,
     costoOrario: costoStandard.value,
     descrizione: sottocategoriaSelezionata.value.descrizione
   }
