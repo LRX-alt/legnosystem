@@ -44,9 +44,23 @@ import logoLegnosystem from '@/assets/logo legnosystem.avif'
 // Current year for copyright
 const currentYear = new Date().getFullYear()
 
-// Version and environment info
+// Version and environment info (preferisci pkg se ENV è mancante o più vecchio)
+const normalize = (v) => String(v || '').trim()
+const parseSemver = (v) => normalize(v).split('.').map(n => parseInt(n, 10) || 0)
+const isEnvVersionPreferred = (envV, pkgV) => {
+  const [e1, e2, e3] = parseSemver(envV)
+  const [p1, p2, p3] = parseSemver(pkgV)
+  if (Number.isNaN(e1)) return false
+  if (e1 !== p1) return e1 > p1
+  if (e2 !== p2) return e2 > p2
+  return e3 >= p3
+}
+
 const version = computed(() => {
-  return import.meta.env.VITE_APP_VERSION || appPkg.version || '2.20.0'
+  const envV = normalize(import.meta.env.VITE_APP_VERSION)
+  const pkgV = normalize(appPkg.version || '2.20.0')
+  if (!envV) return pkgV
+  return isEnvVersionPreferred(envV, pkgV) ? envV : pkgV
 })
 
 const environment = computed(() => {

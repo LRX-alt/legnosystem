@@ -770,6 +770,40 @@ export const useFirestoreStore = defineStore('firestore', () => {
     })
   }
 
+  /**
+   * Crea notifiche per tutti gli utenti di un certo ruolo
+   * Esempio: createNotificationsForRole('admin', { type, message, meta })
+   */
+  const createNotificationsForRole = async (role, baseNotificationData) => {
+    try {
+      const adminsSnap = await getDocs(
+        query(
+          collection(db, firestoreConfig.collections.userProfiles),
+          where('role', '==', role)
+        )
+      )
+      if (adminsSnap.empty) {
+        console.warn(`Nessun utente con ruolo ${role} trovato per notifica`)
+        return { success: false, error: `Nessun utente con ruolo ${role}` }
+      }
+      const tasks = adminsSnap.docs.map(docSnap => {
+        const userId = docSnap.id
+        return createDocument(firestoreConfig.collections.notifications, {
+          ...baseNotificationData,
+          userId,
+          recipients: [role],
+          read: false,
+          createdAt: serverTimestamp()
+        })
+      })
+      await Promise.all(tasks)
+      return { success: true }
+    } catch (err) {
+      console.error('Errore creazione notifiche per ruolo:', err)
+      return { success: false, error: err.message }
+    }
+  }
+
   const markNotificationAsRead = async (notificationId) => {
     return await updateDocument(firestoreConfig.collections.notifications, notificationId, {
       read: true,

@@ -445,15 +445,24 @@ export const useAuthStore = defineStore('auth', () => {
       
       await addDoc(collection(db, firestoreConfig.collections.registrationRequests), requestData)
       
-      // 🔔 Notifica admin: nuova richiesta
+      // 🔔 Notifica admin: nuova richiesta (una notifica per ogni admin)
       try {
-        await firestoreStore.createNotification({
-          type: 'registration_request',
-          message: `Nuova richiesta da ${requestData.name} (${requestData.email})`,
-          recipients: ['admin'],
-          userId: 'admin',
-          meta: { role: requestData.role, department: requestData.department }
-        })
+        if (firestoreStore.createNotificationsForRole) {
+          await firestoreStore.createNotificationsForRole('admin', {
+            type: 'registration_request',
+            message: `Nuova richiesta da ${requestData.name} (${requestData.email})`,
+            meta: { role: requestData.role, department: requestData.department }
+          })
+        } else {
+          // Fallback singola notifica
+          await firestoreStore.createNotification({
+            type: 'registration_request',
+            message: `Nuova richiesta da ${requestData.name} (${requestData.email})`,
+            recipients: ['admin'],
+            userId: 'admin',
+            meta: { role: requestData.role, department: requestData.department }
+          })
+        }
       } catch (e) {
         console.warn('Impossibile creare notifica richiesta registrazione:', e)
       }
