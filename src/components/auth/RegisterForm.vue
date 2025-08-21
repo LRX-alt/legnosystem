@@ -133,9 +133,28 @@
                     :style="{ width: `${passwordStrength}%` }"
                   ></div>
                 </div>
-                <p class="text-xs mt-1" :class="getPasswordStrengthColor.replace('bg-', 'text-')">
+                <p class="text-xs mt-1" :class="passwordStrengthTextColor">
                   {{ getPasswordStrengthLabel }}
                 </p>
+                
+                <!-- Password Requirements -->
+                <div class="mt-2 text-xs text-gray-600 space-y-1">
+                  <div class="flex items-center" :class="form.password.length >= 8 ? 'text-green-600' : 'text-gray-400'">
+                    <span class="mr-1">{{ form.password.length >= 8 ? '✅' : '⭕' }}</span>
+                    Minimo 8 caratteri
+                  </div>
+                  <div class="flex items-center" :class="/\d/.test(form.password) ? 'text-green-600' : 'text-gray-400'">
+                    <span class="mr-1">{{ /\d/.test(form.password) ? '✅' : '⭕' }}</span>
+                    Almeno un numero
+                  </div>
+                  <div class="flex items-center" :class="/[a-zA-Z]/.test(form.password) ? 'text-green-600' : 'text-gray-400'">
+                    <span class="mr-1">{{ /[a-zA-Z]/.test(form.password) ? '✅' : '⭕' }}</span>
+                    Almeno una lettera
+                  </div>
+                </div>
+                
+                <!-- Sentinel per assicurare che le classi Tailwind siano compilate -->
+                <span class="hidden bg-green-500 text-green-500 bg-yellow-500 text-yellow-500 bg-orange-500 text-orange-500 bg-red-500 text-red-500"></span>
               </div>
             </div>
 
@@ -320,7 +339,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { validateEmail, validatePassword } from '@/utils/firestoreValidation'
 import logoLegnosystem from '@/assets/logo legnosystem.avif'
@@ -368,6 +387,16 @@ const passwordValidation = computed(() => {
   const validation = validatePassword(form.value.password)
   passwordStrength.value = validation.strength
   return validation
+})
+
+// Aggiorna la barra forza in tempo reale
+watch(() => form.value.password, (pwd) => {
+  if (!pwd) {
+    passwordStrength.value = 0
+    return
+  }
+  const v = validatePassword(pwd)
+  passwordStrength.value = v.strength
 })
 
 const isFormValid = computed(() => {
@@ -443,7 +472,15 @@ const getPasswordStrengthLabel = computed(() => {
   if (passwordStrength.value >= 80) return 'Eccellente'
   if (passwordStrength.value >= 60) return 'Buona'
   if (passwordStrength.value >= 40) return 'Media'
-  return 'Debole'
+  if (passwordStrength.value >= 20) return 'Debole'
+  return 'Molto debole'
+})
+
+const passwordStrengthTextColor = computed(() => {
+  if (passwordStrength.value >= 80) return 'text-green-500'
+  if (passwordStrength.value >= 60) return 'text-yellow-500'
+  if (passwordStrength.value >= 40) return 'text-orange-500'
+  return 'text-red-500'
 })
 </script>
 

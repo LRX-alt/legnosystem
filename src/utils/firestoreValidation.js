@@ -655,25 +655,15 @@ export const validatePassword = (password) => {
     errors.push('La password deve contenere almeno un numero')
   }
   
-  // Deve contenere almeno una lettera maiuscola
-  if (!/[A-Z]/.test(password)) {
-    errors.push('La password deve contenere almeno una lettera maiuscola')
+  // Deve contenere almeno una lettera (maiuscola o minuscola)
+  if (!/[a-zA-Z]/.test(password)) {
+    errors.push('La password deve contenere almeno una lettera')
   }
   
-  // Deve contenere almeno una lettera minuscola
-  if (!/[a-z]/.test(password)) {
-    errors.push('La password deve contenere almeno una lettera minuscola')
-  }
-  
-  // Deve contenere almeno un carattere speciale
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('La password deve contenere almeno un carattere speciale')
-  }
-  
-  // Controllo sequenze comuni
-  const commonSequences = ['123', 'abc', 'qwerty', 'password', 'admin']
-  if (commonSequences.some(seq => password.toLowerCase().includes(seq))) {
-    errors.push('La password non può contenere sequenze comuni')
+  // Controllo sequenze comuni (solo quelle molto ovvie)
+  const veryCommonSequences = ['123456', 'password', 'qwerty']
+  if (veryCommonSequences.some(seq => password.toLowerCase().includes(seq))) {
+    errors.push('La password non può contenere sequenze troppo comuni')
   }
   
   return {
@@ -691,30 +681,53 @@ export const validatePassword = (password) => {
 const calculatePasswordStrength = (password) => {
   let score = 0
   
-  // Lunghezza (max 25 punti)
-  score += Math.min(25, password.length * 2)
+  // Lunghezza (max 30 punti)
+  score += Math.min(30, password.length * 2.5)
   
-  // Varietà caratteri (max 25 punti)
+  // Varietà caratteri (max 30 punti)
   const charTypes = {
     numbers: /\d/.test(password),
-    lower: /[a-z]/.test(password),
-    upper: /[A-Z]/.test(password),
+    letters: /[a-zA-Z]/.test(password),
+    mixedCase: /[a-z]/.test(password) && /[A-Z]/.test(password),
     special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
   }
-  score += Object.values(charTypes).filter(Boolean).length * 6.25
+  
+  // Punti base per tipi di caratteri
+  score += Object.values(charTypes).filter(Boolean).length * 7.5
+  
+  // Bonus per maiuscole/minuscole miste
+  if (charTypes.mixedCase) {
+    score += 5
+  }
+  
+  // Bonus per caratteri speciali (opzionale ma premiato)
+  if (charTypes.special) {
+    score += 5
+  }
   
   // Complessità (max 25 punti)
   const uniqueChars = new Set(password).size
   score += Math.min(25, uniqueChars * 2)
   
-  // Penalità per sequenze comuni (max -25 punti)
-  const commonSequences = ['123', 'abc', 'qwerty', 'password', 'admin']
-  const hasCommonSeq = commonSequences.some(seq => password.toLowerCase().includes(seq))
+  // Penalità per sequenze comuni (max -20 punti)
+  const veryCommonSequences = ['123456', 'password', 'qwerty']
+  const hasCommonSeq = veryCommonSequences.some(seq => password.toLowerCase().includes(seq))
   if (hasCommonSeq) {
-    score -= 25
+    score -= 20
   }
   
-  return Math.max(0, Math.min(100, score))
+  // Penalità per password troppo semplici
+  if (password.length === 8 && !charTypes.mixedCase && !charTypes.special) {
+    score -= 10
+  }
+
+  // Se i requisiti minimi sono rispettati, forza un livello minimo "Media"
+  const meetsMinimumRequirements = password.length >= 8 && charTypes.numbers && charTypes.letters
+  if (meetsMinimumRequirements && score < 40) {
+    score = 40
+  }
+  
+  return Math.max(0, Math.min(100, Math.round(score)))
 }
 
 // 🛡️ Validation Wrapper
