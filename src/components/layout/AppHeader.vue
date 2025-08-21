@@ -157,10 +157,74 @@
       </div>
     </div>
   </header>
+
+  <!-- Profile Modal -->
+  <div v-if="showProfileModal" class="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4" @click="showProfileModal = false">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md" @click.stop>
+      <div class="px-5 py-4 border-b">
+        <h3 class="text-lg font-semibold text-gray-900">Profilo Utente</h3>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+          <input v-model="profileName" type="text" class="w-full border rounded-md px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
+          <input v-model="profilePhone" type="tel" class="w-full border rounded-md px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Dipartimento</label>
+          <input v-model="profileDepartment" type="text" class="w-full border rounded-md px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Posizione</label>
+          <input v-model="profilePosition" type="text" class="w-full border rounded-md px-3 py-2" />
+        </div>
+      </div>
+      <div class="px-5 py-4 border-t flex justify-end gap-2">
+        <button class="btn-secondary" @click="showProfileModal = false">Annulla</button>
+        <button class="btn-primary" :disabled="savingProfile" @click="saveProfile">{{ savingProfile ? 'Salvataggio…' : 'Salva' }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div v-if="showSettingsModal" class="fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4" @click="showSettingsModal = false">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-md" @click.stop>
+      <div class="px-5 py-4 border-b">
+        <h3 class="text-lg font-semibold text-gray-900">Impostazioni</h3>
+      </div>
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Tema</label>
+          <select v-model="settingTheme" class="w-full border rounded-md px-3 py-2">
+            <option value="light">Chiaro</option>
+            <option value="dark">Scuro</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Lingua</label>
+          <select v-model="settingLanguage" class="w-full border rounded-md px-3 py-2">
+            <option value="it">Italiano</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <div class="flex items-center">
+          <input id="notif" type="checkbox" v-model="settingNotifications" class="mr-2" />
+          <label for="notif" class="text-sm text-gray-700">Abilita notifiche</label>
+        </div>
+      </div>
+      <div class="px-5 py-4 border-t flex justify-end gap-2">
+        <button class="btn-secondary" @click="showSettingsModal = false">Annulla</button>
+        <button class="btn-primary" :disabled="savingSettings" @click="saveSettings">{{ savingSettings ? 'Salvataggio…' : 'Salva' }}</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BellIcon, ChevronDownIcon, Bars3Icon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
@@ -362,16 +426,78 @@ const handleLogout = async () => {
   }
 }
 
+// Profile modal state
+const showProfileModal = ref(false)
+const profileName = ref('')
+const profilePhone = ref('')
+const profileDepartment = ref('')
+const profilePosition = ref('')
+const savingProfile = ref(false)
+
 const viewProfile = () => {
   showUserMenu.value = false
-  // TODO: Implementare modal profilo
-  success('Profilo', 'Funzionalità in sviluppo')
+  profileName.value = userProfile.value?.name || ''
+  profilePhone.value = userProfile.value?.phone || ''
+  profileDepartment.value = userProfile.value?.department || ''
+  profilePosition.value = userProfile.value?.position || ''
+  showProfileModal.value = true
 }
+
+const saveProfile = async () => {
+  try {
+    savingProfile.value = true
+    const res = await authStore.updateUserProfile({
+      name: profileName.value,
+      phone: profilePhone.value,
+      department: profileDepartment.value,
+      position: profilePosition.value
+    })
+    if (res?.success) {
+      showProfileModal.value = false
+      success('Profilo aggiornato', 'Le tue informazioni sono state salvate')
+    }
+  } catch (e) {
+    error('Errore', e?.message || 'Impossibile salvare il profilo')
+  } finally {
+    savingProfile.value = false
+  }
+}
+
+// Settings modal state
+const showSettingsModal = ref(false)
+const settingTheme = ref('light')
+const settingLanguage = ref('it')
+const settingNotifications = ref(true)
+const savingSettings = ref(false)
 
 const viewSettings = () => {
   showUserMenu.value = false
-  // TODO: Implementare modal impostazioni
-  success('Impostazioni', 'Funzionalità in sviluppo')
+  const s = userProfile.value?.settings || {}
+  settingTheme.value = s.theme || 'light'
+  settingLanguage.value = s.language || 'it'
+  settingNotifications.value = s.notifications !== false
+  showSettingsModal.value = true
+}
+
+const saveSettings = async () => {
+  try {
+    savingSettings.value = true
+    const res = await authStore.updateUserProfile({
+      settings: {
+        theme: settingTheme.value,
+        language: settingLanguage.value,
+        notifications: !!settingNotifications.value
+      }
+    })
+    if (res?.success) {
+      showSettingsModal.value = false
+      success('Impostazioni aggiornate', 'Preferenze salvate con successo')
+    }
+  } catch (e) {
+    error('Errore', e?.message || 'Impossibile salvare le impostazioni')
+  } finally {
+    savingSettings.value = false
+  }
 }
 
 const createAdminUser = async () => {
@@ -425,3 +551,9 @@ window.addEventListener('before-logout', () => {
   console.log('🚪 AppHeader preparato per logout')
 })
 </script> 
+
+<style scoped>
+.modal-overlay {
+  background: rgba(0,0,0,0.4);
+}
+</style>
