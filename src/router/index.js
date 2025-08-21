@@ -15,6 +15,17 @@ const router = createRouter({
         requiresGuest: true // Solo per utenti non autenticati
       }
     },
+    // 👥 Utenti (Admin)
+    {
+      path: '/utenti',
+      name: 'utenti',
+      component: () => import('../views/Users.vue'),
+      meta: {
+        title: 'Gestione Utenti - Legnosystem.bio',
+        requiresAuth: true,
+        permissions: ['isAdmin']
+      }
+    },
     {
       path: '/login',
       redirect: '/auth'

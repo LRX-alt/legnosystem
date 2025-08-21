@@ -766,16 +766,19 @@ export const useFirestoreStore = defineStore('firestore', () => {
     ]
 
     const [direct, roleBased] = await Promise.all([
-      loadCollection(firestoreConfig.collections.notifications, directFilters, 'createdAt', 'desc', 50),
-      loadCollection(firestoreConfig.collections.notifications, roleFilters, 'createdAt', 'desc', 50)
+      // Evita orderBy per non richiedere indici: ordiniamo client-side
+      loadCollection(firestoreConfig.collections.notifications, directFilters, null, 'desc', 50),
+      loadCollection(firestoreConfig.collections.notifications, roleFilters, null, 'desc', 50)
     ])
 
     const merged = [
       ...(direct.success ? direct.data : []),
       ...(roleBased.success ? roleBased.data : [])
     ]
-    // Dedup per id
+    // Dedup per id e ordina per createdAt desc
+    const toMs = (ts) => ts?.toDate ? ts.toDate().getTime() : (ts?.seconds ? ts.seconds * 1000 : 0)
     const uniqueById = Array.from(new Map(merged.map(n => [n.id, n])).values())
+      .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
     notifications.value = uniqueById
     return { success: true, data: uniqueById }
   }
@@ -834,28 +837,30 @@ export const useFirestoreStore = defineStore('firestore', () => {
       const qDirect = query(
         collection(db, firestoreConfig.collections.notifications),
         where('userId', '==', userId),
-        where('read', '==', false),
-        orderBy('createdAt', 'desc')
+        where('read', '==', false)
       )
       const qRole = query(
         collection(db, firestoreConfig.collections.notifications),
         where('recipients', 'array-contains-any', [userRole, 'all']),
-        where('read', '==', false),
-        orderBy('createdAt', 'desc')
+        where('read', '==', false)
       )
 
       const unsubDirect = onSnapshot(qDirect, (snapshot) => {
         const direct = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
         // Merge con quelle già presenti (potrebbero arrivare dall'altra query)
         const merged = [...direct, ...notifications.value]
+        const toMs = (ts) => ts?.toDate ? ts.toDate().getTime() : (ts?.seconds ? ts.seconds * 1000 : 0)
         const uniqueById = Array.from(new Map(merged.map(n => [n.id, n])).values())
+          .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
         notifications.value = uniqueById
       }, (err) => console.error('Errore subscribeToNotifications (direct):', err))
 
       const unsubRole = onSnapshot(qRole, (snapshot) => {
         const roleBased = snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
         const merged = [...roleBased, ...notifications.value]
+        const toMs = (ts) => ts?.toDate ? ts.toDate().getTime() : (ts?.seconds ? ts.seconds * 1000 : 0)
         const uniqueById = Array.from(new Map(merged.map(n => [n.id, n])).values())
+          .sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt))
         notifications.value = uniqueById
       }, (err) => console.error('Errore subscribeToNotifications (role):', err))
 
