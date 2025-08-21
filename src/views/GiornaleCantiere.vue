@@ -233,16 +233,21 @@
             <p class="text-xs text-gray-500">{{ entry.meteo.note }}</p>
           </div>
 
-          <!-- Ore Lavorate -->
+          <!-- Operatori assegnati con ore per ciascuno -->
           <div>
-            <h4 class="text-sm font-medium text-gray-700 mb-2">⏰ Ore Lavorate</h4>
-            <p class="text-sm font-semibold">{{ entry.oreTotali }}h totali</p>
-            <p class="text-xs text-gray-500">
-              {{ (entry.teamPresente || entry.team || []).length }} operatori
+            <h4 class="text-sm font-medium text-gray-700 mb-2">👷 Operatori Assegnati</h4>
+            <p class="text-xs text-gray-500 mb-1">
+              {{ getOperatoriCount(entry) }} operatori
+              <span v-if="entry.oreTotali" class="ml-1">• {{ entry.oreTotali }}h totali</span>
               <span v-if="entry.costoGiornata" class="text-green-600 font-medium ml-2">
                 • €{{ entry.costoGiornata.toFixed(0) }}
               </span>
             </p>
+            <div class="text-sm text-gray-900 flex flex-wrap gap-x-3 gap-y-1">
+              <span v-for="op in getOperatoriList(entry)" :key="op.id || op.nome" class="whitespace-nowrap">
+                {{ op.nome }}: <span class="font-medium">{{ op.ore.toFixed(1) }}h</span>
+              </span>
+            </div>
           </div>
 
           <!-- Attività -->
@@ -507,7 +512,7 @@ import {
 // Composables
 const route = useRoute()
 const popup = usePopup()
-const { success, error, warning, info } = popup
+const { success, error, warning, info, confirm, removePopup } = popup
 const firestoreOperations = useFirestoreOperations()
 const firestoreStore = useFirestoreStore()
 
@@ -582,6 +587,52 @@ const filteredEntries = computed(() => {
 
   return result.sort((a, b) => new Date(b.data) - new Date(a.data))
 })
+
+// Conta operatori robusto su più formati dati
+const getOperatoriCount = (entry) => {
+  // Nuovo formato: entry.dipendenti (array di oggetti {id, nome, ore})
+  if (Array.isArray(entry.dipendenti) && entry.dipendenti.length > 0) {
+    return entry.dipendenti.length
+  }
+  // Vecchio formato: teamPresente o team (array di oggetti con id/nome)
+  if (Array.isArray(entry.teamPresente) && entry.teamPresente.length > 0) {
+    return entry.teamPresente.length
+  }
+  if (Array.isArray(entry.team) && entry.team.length > 0) {
+    return entry.team.length
+  }
+  // Fallback: prova a ricavare da presenze registrate per quella entry
+  try {
+    const presenze = (firestoreStore.presenze || []).filter(p => (
+      (p.registrazioneGiornaleId && entry.id && p.registrazioneGiornaleId === entry.id) ||
+      (p.cantiereId === (cantiere.value?.id || entry.cantiereId) && (p.data === entry.data))
+    ))
+    const unique = new Set(presenze.map(p => p.dipendenteId))
+    return unique.size
+  } catch (_) {
+    return 0
+  }
+}
+
+// Ritorna lista operatori con ore per la riga riepilogo
+const getOperatoriList = (entry) => {
+  // Nuovo formato
+  if (Array.isArray(entry.dipendenti) && entry.dipendenti.length > 0) {
+    return entry.dipendenti.map(d => ({ id: d.id, nome: d.nome || d.cognome || d.id, ore: Number(d.ore || 0) }))
+  }
+  // Vecchio formato: ripartizione uniforme su teamPresente
+  if (Array.isArray(entry.teamPresente) && entry.teamPresente.length > 0) {
+    const ore = Number(entry.oreTotali || 0)
+    const each = entry.teamPresente.length > 0 ? (ore / entry.teamPresente.length) : 0
+    return entry.teamPresente.map(m => ({ id: m.id, nome: m.nome || m.cognome || m.id, ore: each }))
+  }
+  if (Array.isArray(entry.team) && entry.team.length > 0) {
+    const ore = Number(entry.oreTotali || 0)
+    const each = entry.team.length > 0 ? (ore / entry.team.length) : 0
+    return entry.team.map(m => ({ id: m.id, nome: m.nome || m.cognome || m.id, ore: each }))
+  }
+  return []
+}
 
 const availableWeeks = computed(() => {
   const weeks = new Set()
@@ -1322,9 +1373,13 @@ const saveEntry = async () => {
       await firestoreOperations.giornaleCantiere.create(cantiere.value.id, entryData)
     }
     
-    // Chiudi il modal e mostra successo immediatamente
+    // Chiudi il modal e mostra successo immediatamente (con cleanup forzato)
     showEntryModal.value = false
-    success('Registrazione Salvata', 'I dati sono stati salvati con successo')
+    const okPopupId = success('Registrazione Salvata', 'I dati sono stati salvati con successo', 2200)
+    // Fallback cleanup nel raro caso l'auto-dismiss non scatti
+    setTimeout(() => {
+      removePopup(okPopupId)
+    }, 3500)
     
     // Aggiorna in background
     Promise.all([
@@ -1344,12 +1399,25 @@ const saveEntry = async () => {
 }
 
 const deleteEntry = async (entryId) => {
+  // Conferma eliminazione con popup personalizzato
+  const proceed = await confirm(
+    'Eliminare la registrazione?',
+    'Questa azione rimuove il giornale e i timesheet collegati. Procedere?',
+    { type: 'warning', confirmText: 'Elimina', cancelText: 'Annulla', icon: '⚠️' }
+  )
+  if (!proceed) {
+    info('Operazione Annullata', 'Eliminazione annullata dall’utente.', 1800)
+    return
+  }
   try {
     loading.value = true
     
     await firestoreOperations.giornaleCantiere.delete(entryId)
     
-    success('Registrazione Eliminata', 'La registrazione è stata eliminata con successo')
+    const delPopupId = success('Registrazione Eliminata', 'La registrazione è stata eliminata con successo', 2200)
+    setTimeout(() => {
+      removePopup(delPopupId)
+    }, 3500)
     
     // Aggiorna in background
     Promise.all([
@@ -1715,6 +1783,7 @@ watch([() => newEntryData.value.orarioInizio, () => newEntryData.value.orarioFin
 </script>
 
 <style scoped>
+
 .form-input {
   width: 100%;
   padding: 12px 16px;

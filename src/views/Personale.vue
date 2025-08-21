@@ -1279,13 +1279,13 @@
                 <table class="min-w-full divide-y divide-gray-200">
                   <thead class="bg-gray-50">
                     <tr>
+                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">Azioni</th>
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Data</th>
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Cantiere</th>
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Ore</th>
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Costo</th>
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Fonte</th>
                       <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Note</th>
-                      <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
@@ -1293,6 +1293,21 @@
                         :key="entry.id" 
                         class="hover:bg-gray-50 transition-colors duration-200"
                         :class="entry.fonte === 'giornale_cantiere' ? 'bg-blue-25' : ''">
+                      <!-- Azioni sticky a sinistra -->
+                      <td class="px-6 py-4 whitespace-nowrap text-sm sticky left-0 bg-white z-10">
+                        <div class="flex items-center space-x-2">
+                          <button @click="editTimesheet(entry)" 
+                                  class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                                  title="Modifica registrazione">
+                            <PencilIcon class="w-4 h-4" />
+                          </button>
+                          <button @click="deleteTimesheet(entry)" 
+                                  class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50 transition-colors"
+                                  title="Elimina registrazione">
+                            <TrashIcon class="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                       <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div class="flex items-center">
                           <span class="font-medium">{{ formatDate(entry.data) }}</span>
@@ -1322,24 +1337,6 @@
                       </td>
                       <td class="px-6 py-4 text-sm text-gray-900 max-w-xs">
                         <div class="truncate" :title="entry.note">{{ entry.note || '-' }}</div>
-                      </td>
-                      <!-- 🚀 NUOVO: Colonna Azioni per modifica/eliminazione -->
-                      <td class="px-6 py-4 whitespace-nowrap text-sm">
-                        <div v-if="entry.fonte === 'manuale'" class="flex items-center space-x-2">
-                          <button @click="editTimesheetEntry(entry)" 
-                                  class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors"
-                                  title="Modifica registrazione">
-                            <PencilIcon class="w-4 h-4" />
-                          </button>
-                          <button @click="deleteTimesheetEntry(entry)" 
-                                  class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-50 transition-colors"
-                                  title="Elimina registrazione">
-                            <TrashIcon class="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div v-else class="text-xs text-gray-400 italic">
-                          Auto-generato
-                        </div>
                       </td>
                     </tr>
                   </tbody>
@@ -2343,6 +2340,41 @@ const saveTimesheet = async () => {
       throw new Error('Dipendente non trovato!')
     }
 
+    // 🔒 Regola priorità fonti: Giornale Cantiere > Presenze > Manuale
+    // Se esiste già una fonte prioritaria nello stesso giorno per lo stesso dipendente, chiedi conferma
+    await loadTimesheet()
+    const manualeData = newTimesheet.value.data
+    const normalizeDate = (d) => {
+      if (!d) return ''
+      // Se è già nel formato YYYY-MM-DD lo ritorna, altrimenti prova a normalizzare
+      if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d
+      try {
+        return new Date(d).toISOString().split('T')[0]
+      } catch (_) {
+        return String(d)
+      }
+    }
+    const existingSameDay = (firestoreStore.timesheet || []).filter(t => {
+      const tid = t.dipendenteId || t.dipendente_id
+      const tDate = normalizeDate(t.data || t.date)
+      return tid === newTimesheet.value.dipendenteId && tDate === normalizeDate(manualeData)
+    })
+    const existsGiornale = existingSameDay.some(t => (t.fonte || '').trim() === 'giornale_cantiere')
+    const existsPresenze = existingSameDay.some(t => (t.fonte || '').trim() === 'presenze')
+    const existsQualsiasi = existingSameDay.length > 0
+    if (existsGiornale || existsPresenze || existsQualsiasi) {
+      const fontePrioritaria = existsGiornale ? 'Giornale Cantiere' : (existsPresenze ? 'Presenze' : 'Timesheet esistente')
+      console.debug('[Timesheet Manuale] Conflitto rilevato:', { dipendenteId: newTimesheet.value.dipendenteId, data: manualeData, existing: existingSameDay })
+      const proceed = await confirm(
+        'Registrazione già presente',
+        `Esiste già una registrazione (${fontePrioritaria}) per questo dipendente e giorno. Vuoi comunque creare un nuovo timesheet manuale?`
+      )
+      if (!proceed) {
+        warning('Operazione Annullata', 'Creazione timesheet manuale annullata per evitare duplicati.')
+        return
+      }
+    }
+
     const { ensureValidTimesheetData } = await import('../utils/timesheetValidation.js')
 
     const timesheetDataRaw = {
@@ -2490,8 +2522,53 @@ const savePresenza = async (dipendenteId) => {
     const presenzaData = presenze.value[dipendenteId]
     if (!presenzaData) throw new Error('Dati presenza non trovati')
 
+    // ⛔ Evita salvataggi inutili: presenze completamente vuote/assenti non vengono salvate
+    const isEmptyAssente = (
+      (presenzaData.stato === 'assente' || !presenzaData.stato) &&
+      !presenzaData.entrata &&
+      !presenzaData.uscita &&
+      !(presenzaData.note && presenzaData.note.trim()) &&
+      !(presenzaData.pausa && presenzaData.pausa > 0)
+    )
+    if (isEmptyAssente) {
+      return
+    }
+
     // Se è presente, calcola le ore e crea timesheet
     if (presenzaData.stato === 'presente') {
+      // 🔒 Regola priorità fonti: se esiste già timesheet da Giornale Cantiere nello stesso giorno, chiedi conferma
+      await loadTimesheet()
+      const normalizeDate = (d) => {
+        if (!d) return ''
+        if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d
+        try {
+          return new Date(d).toISOString().split('T')[0]
+        } catch (_) {
+          return String(d)
+        }
+      }
+      // Controllo duplicati su base giorno/dipendente
+      const existingSameDay = (firestoreStore.timesheet || []).filter(t => {
+        const tid = t.dipendenteId || t.dipendente_id
+        const tDate = normalizeDate(t.data || t.date)
+        return tid === dipendenteId && tDate === normalizeDate(selectedDate.value)
+      })
+      const existsGiornale = existingSameDay.some(t => (t.fonte || '').trim() === 'giornale_cantiere')
+      const existsAltro = existingSameDay.length > 0
+      if (existsGiornale || existsAltro) {
+        console.debug('[Presenze] Conflitto rilevato:', { dipendenteId, data: selectedDate.value, existing: existingSameDay })
+        const proceed = await confirm(
+          existsGiornale ? 'Fonte Prioritaria Presente' : 'Registrazione già presente',
+          existsGiornale
+            ? 'Esiste già un timesheet da Giornale Cantiere per questo dipendente e giorno. Vuoi comunque creare il timesheet da Presenze?'
+            : 'Esiste già una registrazione per questo dipendente e giorno. Vuoi comunque aggiungerne una nuova da Presenze?'
+        )
+        if (!proceed) {
+          warning('Operazione Annullata', 'Creazione timesheet da Presenze annullata per evitare duplicati.')
+          return
+        }
+      }
+
       const ore = calcolaOreTotali(dipendenteId)
       if (ore <= 0) {
         warning('Ore a Zero', 'Le ore calcolate sono zero, il timesheet non verrà creato.')
@@ -2547,11 +2624,27 @@ const savePresenza = async (dipendenteId) => {
 }
 
 const saveAllPresenze = async () => {
-  info('Salvataggio in corso...', 'Salvataggio di tutte le presenze modificate.')
-  const promises = Object.values(presenze.value).map(p => savePresenza(p.dipendenteId))
+  // Considera solo le presenze effettivamente compilate/modificate
+  const candidati = Object.values(presenze.value).filter(p => (
+    p.stato === 'presente' ||
+    !!p.entrata ||
+    !!p.uscita ||
+    (p.note && p.note.trim()) ||
+    (p.pausa && p.pausa > 0) ||
+    !!p.timesheetId
+  ))
+
+  if (candidati.length === 0) {
+    warning('Nessuna Modifica', 'Non ci sono presenze da salvare per questa data.')
+    return
+  }
+
+  info('Salvataggio in corso...', `Salvataggio di ${candidati.length} presenze modificate.`)
+  const promises = candidati.map(p => savePresenza(p.dipendenteId))
   try {
     await Promise.all(promises)
     success('Salvataggio Completato', 'Tutte le presenze sono state salvate.')
+    await loadPresenze() // Ricarica presenze per aggiornare riepilogo
     await loadTimesheet() // Ricarica anche i timesheet
   } catch(err) {
     error('Errore Salvataggio Multiplo', `Almeno un salvataggio è fallito: ${err.message}`)
