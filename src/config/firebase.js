@@ -7,7 +7,7 @@ import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import { getAnalytics } from 'firebase/analytics'
 
 // Configurazione Firebase - DOVETE SOSTITUIRE CON LE VOSTRE CREDENZIALI
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,

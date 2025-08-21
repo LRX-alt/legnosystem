@@ -258,7 +258,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePopup } from '@/composables/usePopup'
 
@@ -465,13 +465,24 @@ const formatDate = (date) => {
 
 // Lifecycle
 onMounted(() => {
-  // Verifica che l'utente sia admin
-  if (!authStore.isAdmin) {
-    error('Accesso Negato', 'Solo gli amministratori possono accedere a questa pagina')
-    return
+  const tryLoad = () => {
+    if (authStore.isAdmin) {
+      loadRequests()
+    } else {
+      error('Accesso Negato', 'Solo gli amministratori possono accedere a questa pagina')
+    }
   }
-  
-  loadRequests()
+
+  if (authStore.authInitialized) {
+    tryLoad()
+  } else {
+    const stop = watch(() => authStore.authInitialized, (ready) => {
+      if (ready) {
+        tryLoad()
+        stop()
+      }
+    })
+  }
 })
 </script>
 
