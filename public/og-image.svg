@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Sfondo con gradiente -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9d6b3e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6b4423;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Sfondo principale -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  
+  <!-- Pattern geometrico sottile -->
+  <g opacity="0.1">
+    <circle cx="100" cy="100" r="2" fill="white"/>
+    <circle cx="300" cy="150" r="1.5" fill="white"/>
+    <circle cx="500" cy="80" r="2.5" fill="white"/>
+    <circle cx="700" cy="120" r="1" fill="white"/>
+    <circle cx="900" cy="90" r="2" fill="white"/>
+    <circle cx="1100" cy="140" r="1.5" fill="white"/>
+    
+    <circle cx="150" cy="500" r="2" fill="white"/>
+    <circle cx="350" cy="550" r="1.5" fill="white"/>
+    <circle cx="550" cy="480" r="2.5" fill="white"/>
+    <circle cx="750" cy="520" r="1" fill="white"/>
+    <circle cx="950" cy="490" r="2" fill="white"/>
+    <circle cx="1150" cy="540" r="1.5" fill="white"/>
+  </g>
+  
+  <!-- Logo Legnosystem (centrato) -->
+  <g transform="translate(600, 250)" filter="url(#shadow)">
+    <!-- Logo principale -->
+    <image href="logo_legnosystem.avif" x="-50" y="-50" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  
+  <!-- Nome azienda -->
+  <text x="600" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white" filter="url(#shadow)">
+    LEGNOSYSTEM
+  </text>
+  
+  <!-- Tagline -->
+  <text x="600" y="430" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" font-weight="normal" fill="#f0f0f0" opacity="0.9">
+    Gestionale Aziendale
+  </text>
+  
+  <!-- Sottotitolo -->
+  <text x="600" y="470" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="normal" fill="#e0e0e0" opacity="0.8">
+    Costruzione e Posa Tetti in Legno
+  </text>
+  
+  <!-- Elementi decorativi laterali -->
+  <g opacity="0.6">
+    <!-- Linea sinistra -->
+    <line x1="100" y1="200" x2="100" y2="430" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <line x1="100" y1="200" x2="150" y2="200" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Linea destra -->
+    <line x1="1100" y1="200" x2="1100" y2="430" stroke="white" stroke-width="3" stroke-linecap="round"/>
+    <line x1="1050" y1="200" x2="1100" y2="200" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Indicatore di qualità -->
+  <g transform="translate(600, 550)">
+    <circle cx="0" cy="0" r="15" fill="#4ade80" opacity="0.9"/>
+    <text x="0" y="5" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">✓</text>
+  </g>
+  
+  <text x="600" y="580" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="normal" fill="#4ade80" opacity="0.9">
+    Sistema Professionale
+  </text>
+</svg>
