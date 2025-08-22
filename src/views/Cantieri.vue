@@ -38,6 +38,7 @@ const firestoreOperations = useFirestoreOperations()
 // Reactive state
 const cantieri = ref([])
 const unsubscribeCantieri = ref(null)
+const unsubscribeJournal = ref(null)
 const searchTerm = ref('')
 const selectedStatus = ref('')
 const selectedPriority = ref('')
@@ -431,10 +432,41 @@ onMounted(async () => {
   }
 })
 
+// Listener giornale per auto-sync costi del cantiere selezionato
+onMounted(async () => {
+  try {
+    const setupJournalListener = () => {
+      if (unsubscribeJournal.value) {
+        unsubscribeJournal.value()
+        unsubscribeJournal.value = null
+      }
+      if (!selectedCantiere.value?.id) return
+      const result = firestoreRealtime.listenToCollection('giornale_cantiere', {
+        filters: [{ field: 'cantiereId', operator: '==', value: selectedCantiere.value.id }],
+        onData: () => {
+          clearTimeout(setupJournalListener._debounce)
+          setupJournalListener._debounce = setTimeout(async () => {
+            await firestoreOperations.recalculateCantiereCostsFromJournal(selectedCantiere.value.id)
+          }, 250)
+        }
+      })
+      unsubscribeJournal.value = result?.unsubscribe || null
+    }
+
+    setupJournalListener()
+    watch(selectedCantiere, () => setupJournalListener())
+  } catch (error) {
+    console.error('Errore avvio listener giornale:', error)
+  }
+})
+
 onUnmounted(() => {
   // Rimuovi il listener quando il componente viene distrutto
   if (unsubscribeCantieri.value) {
     unsubscribeCantieri.value()
+  }
+  if (unsubscribeJournal.value) {
+    unsubscribeJournal.value()
   }
 })
 
@@ -1210,7 +1242,7 @@ const closeManageVociModal = async () => {
   }
 }
 
-// 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere includendo le voci aggiuntive
+// 🚀 AGGIORNAMENTO AUTOMATICO: Preferisci i costi aggregati dal Giornale Cantiere; fallback a timesheet+materiali
 const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
   if (!cantiereId) return
   
@@ -1218,29 +1250,90 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
     // IMPORTANTE: Ricarica i cantieri dallo store per avere i dati aggiornati
     await firestoreStore.loadCantieri()
     
-    // Carica timesheet per manodopera (senza ordinamento per evitare indice)
-    const timesheetResult = await firestoreOperations.load('timesheet', [
-      ['cantiereId', '==', cantiereId]
-    ], null, null, null)
-    
     let costoManodopera = 0
-    if (timesheetResult.success && timesheetResult.data) {
-      costoManodopera = timesheetResult.data.reduce((acc, entry) => {
-        const oreLavorate = entry.oreLavorate || entry.ore || 0
-        const costoOrario = entry.costoOrario || 0
-        return acc + (oreLavorate * costoOrario)
-      }, 0)
-    }
-    
-    // Carica materiali del cantiere
-    const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiereId)
     let costoMateriali = 0
-    if (materialiResult.success && materialiResult.data) {
-      costoMateriali = materialiResult.data.reduce((acc, materiale) => {
-        const quantita = materiale.quantitaUtilizzata || materiale.quantitaRichiesta || 0
-        const prezzo = materiale.prezzoUnitario || 0
-        return acc + (quantita * prezzo)
+    let costoMezzi = 0
+    let costoLavori = 0
+    let giorniLavorativi = 0
+    let oreTotali = 0
+
+    // 1) Prova ad aggregare dal Giornale di Cantiere
+    const giornaleResult = await firestoreStore.loadCollection('giornale_cantiere', [
+      { field: 'cantiereId', operator: '==', value: cantiereId }
+    ])
+
+    if (giornaleResult?.success && Array.isArray(giornaleResult.data) && giornaleResult.data.length > 0) {
+      const entries = giornaleResult.data
+      // Dipendenti
+      costoManodopera = entries.reduce((sum, e) => {
+        const dipCost = Array.isArray(e.dipendenti) ? e.dipendenti.reduce((s, d) => {
+          const ore = d.ore || d.oreLavorate || 0
+          const costoOrario = d.costoOrario || 0
+          const costo = d.costoTotale != null ? d.costoTotale : (ore * costoOrario)
+          return s + costo
+        }, 0) : 0
+        return sum + dipCost
       }, 0)
+
+      // Materiali
+      costoMateriali = entries.reduce((sum, e) => {
+        const matCost = Array.isArray(e.materiali) ? e.materiali.reduce((s, m) => {
+          const qty = m.quantita || 0
+          const unit = m.costoUnitario || m.prezzoUnitario || 0
+          const costo = m.costoTotale != null ? m.costoTotale : (qty * unit)
+          return s + costo
+        }, 0) : 0
+        return sum + matCost
+      }, 0)
+
+      // Mezzi
+      costoMezzi = entries.reduce((sum, e) => {
+        const mezCost = Array.isArray(e.mezzi) ? e.mezzi.reduce((s, z) => {
+          const ore = z.oreUtilizzo || 0
+          const unit = z.costoOrario || 0
+          const costo = z.costoTotale != null ? z.costoTotale : (ore * unit)
+          return s + costo
+        }, 0) : 0
+        return sum + mezCost
+      }, 0)
+
+      // Lavori
+      costoLavori = entries.reduce((sum, e) => {
+        const lavCost = Array.isArray(e.lavori) ? e.lavori.reduce((s, l) => {
+          const ore = l.ore || 0
+          const unit = l.costoOrario || 0
+          const costo = l.costoTotale != null ? l.costoTotale : (ore * unit)
+          return s + costo
+        }, 0) : 0
+        return sum + lavCost
+      }, 0)
+
+      // Statistiche da giornale
+      giorniLavorativi = [...new Set(entries.map(e => e.data))].length
+      oreTotali = entries.reduce((sum, e) => sum + (Array.isArray(e.dipendenti) ? e.dipendenti.reduce((s, d) => s + (d.ore || d.oreLavorate || 0), 0) : 0), 0)
+    } else {
+      // 2) Fallback: usa timesheet + materiali
+      const timesheetResult = await firestoreOperations.load('timesheet', [
+        ['cantiereId', '==', cantiereId]
+      ], null, null, null)
+      if (timesheetResult.success && timesheetResult.data) {
+        costoManodopera = timesheetResult.data.reduce((acc, entry) => {
+          const oreLavorate = entry.oreLavorate || entry.ore || 0
+          const costoOrario = entry.costoOrario || 0
+          return acc + (oreLavorate * costoOrario)
+        }, 0)
+        giorniLavorativi = [...new Set(timesheetResult.data.map(t => t.data))].length
+        oreTotali = timesheetResult.data.reduce((acc, t) => acc + (t.oreLavorate || t.ore || 0), 0)
+      }
+
+      const materialiResult = await firestoreStore.loadMaterialiCantiere(cantiereId)
+      if (materialiResult.success && materialiResult.data) {
+        costoMateriali = materialiResult.data.reduce((acc, materiale) => {
+          const quantita = materiale.quantitaUtilizzata || materiale.quantitaRichiesta || 0
+          const prezzo = materiale.prezzoUnitario || 0
+          return acc + (quantita * prezzo)
+        }, 0)
+      }
     }
     
     // Calcola costo voci aggiuntive (originali + aggiunte)
@@ -1264,30 +1357,24 @@ const autoUpdateCantiereCostsWithVoci = async (cantiereId) => {
     }
     
     // Calcola statistiche
-    const giorniLavorativi = timesheetResult.success ? 
-      [...new Set(timesheetResult.data.map(t => t.data))].length : 0
-    const oreTotali = timesheetResult.success ?
-      timesheetResult.data.reduce((acc, t) => acc + (t.oreLavorate || t.ore || 0), 0) : 0
-    
     // Aggiorna i costi nel cantiere
     const updateData = {
       costiAccumulati: {
         manodopera: Math.round(costoManodopera * 100) / 100,
         materiali: Math.round(costoMateriali * 100) / 100,
-        vociAggiuntive: Math.round(costoVociAggiuntive * 100) / 100,
-        totale: Math.round((costoManodopera + costoMateriali + costoVociAggiuntive) * 100) / 100
+        vociAggiuntive: Math.round((costoVociAggiuntive + costoMezzi + costoLavori) * 100) / 100,
+        totale: Math.round((costoManodopera + costoMateriali + costoMezzi + costoLavori + costoVociAggiuntive) * 100) / 100
       },
       statisticheCosti: {
         giorniLavorativi,
         oreTotaliLavorate: oreTotali,
         costoMedioGiornaliero: giorniLavorativi > 0 ? 
-          Math.round(((costoManodopera + costoMateriali + costoVociAggiuntive) / giorniLavorativi) * 100) / 100 : 0
+          Math.round(((costoManodopera + costoMateriali + costoMezzi + costoLavori + costoVociAggiuntive) / giorniLavorativi) * 100) / 100 : 0
       },
       updatedAt: new Date()
     }
     
     await firestoreOperations.update('cantieri', cantiereId, updateData)
-    
     // Ricarica i cantieri per aggiornare l'UI
     await firestoreStore.loadCantieri()
     
@@ -1580,6 +1667,32 @@ const deleteCantiere = async (cantiere) => {
     
     await firestoreOperations.delete('cantieri', cantiere.id)
     popup.success('Cantiere Eliminato', 'Il cantiere è stato eliminato definitivamente')
+
+    // 🔧 Opzionale: cleanup cantiereAttuale nei dipendenti che puntavano a questo cantiere
+    try {
+      // Assicura di avere la lista aggiornata dei dipendenti
+      await firestoreStore.loadDipendenti().catch(() => {})
+
+      const normalize = (s) => (s || '').toString().trim().toLowerCase()
+      const affectedDipendenti = (firestoreStore.dipendenti || []).filter(d => normalize(d.cantiereAttuale) === normalize(cantiere.nome))
+
+      if (affectedDipendenti.length > 0) {
+        const doCleanup = await popup.confirm(
+          'Pulizia Assegnazioni',
+          `Trovati ${affectedDipendenti.length} dipendenti con cantiere attuale "${cantiere.nome}".<br><br>Vuoi rimuovere questo riferimento dai loro profili?`,
+          { type: 'warning', confirmText: 'Sì, rimuovi', cancelText: 'No' }
+        )
+
+        if (doCleanup) {
+          await Promise.allSettled(
+            affectedDipendenti.map(d => firestoreOperations.update('dipendenti', d.id, { cantiereAttuale: '' }))
+          )
+          popup.info('Pulizia completata', `Rimosso cantiere attuale da ${affectedDipendenti.length} profili`)
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('Pulizia cantiereAttuale non riuscita:', cleanupErr)
+    }
     
   } catch (err) {
     popup.error('Errore Eliminazione', err.message)
@@ -1662,10 +1775,13 @@ const addCantiere = async () => {
 const saveCantiere = async () => {
   try {
     loading.value = true
+    popup.clearByType('info')
+    popup.clearByType('info')
     popup.info('Salvataggio in corso...')
     
     if (editingCantiere.value.id) {
       await firestoreOperations.update('cantieri', editingCantiere.value.id, editingCantiere.value)
+      popup.clearByType('info')
       popup.success('Cantiere Aggiornato', 'Le modifiche sono state salvate con successo')
     } else {
       // Se il cliente è nuovo, crealo prima
@@ -1675,6 +1791,7 @@ const saveCantiere = async () => {
       }
       
       await firestoreOperations.cantieri.create(editingCantiere.value)
+      popup.clearByType('info')
       popup.success('Cantiere Creato', 'Il nuovo cantiere è stato creato con successo')
     }
     
@@ -1687,6 +1804,91 @@ const saveCantiere = async () => {
     loading.value = false
   }
 }
+
+// Salvataggio modifiche per cantiere esistente (usato dal modal Modifica Cantiere)
+const saveCantiereChanges = async () => {
+  try {
+    if (!editingCantiere?.value || !editingCantiere.value.id) {
+      popup.error('Dati mancanti', 'Cantiere non valido per l\'aggiornamento')
+      return
+    }
+
+    loading.value = true
+    popup.info('Salvataggio in corso...')
+
+    // Aggiorna direttamente il documento del cantiere
+    await firestoreOperations.update('cantieri', editingCantiere.value.id, editingCantiere.value)
+
+    // Ricarica la lista cantieri per riflettere i dati aggiornati
+    await firestoreStore.loadCantieri().catch(() => {})
+
+    // Aggiorna eventuale selezione corrente
+    if (selectedCantiere.value && selectedCantiere.value.id === editingCantiere.value.id) {
+      const updated = firestoreStore.cantieri.find(c => c.id === editingCantiere.value.id)
+      if (updated) selectedCantiere.value = { ...updated }
+    }
+
+    popup.clearByType('info')
+    popup.success('Cantiere Aggiornato', 'Le modifiche sono state salvate con successo')
+    showEditModal.value = false
+  } catch (err) {
+    console.error('Errore salvataggio cantiere:', err)
+    popup.error('Errore Salvataggio', err?.message || 'Impossibile salvare le modifiche del cantiere')
+  } finally {
+    loading.value = false
+  }
+}
+
+// ====== Formattazione Valore Cantiere (EUR, senza decimali) ======
+const formatCurrencyIT = (num) => {
+  try {
+    const n = Number(num)
+    if (!isFinite(n)) return ''
+    // Mostra solo Euro interi con separatore migliaia e prefisso €
+    const grouped = Math.round(n).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    return `€${grouped}`
+  } catch {
+    return ''
+  }
+}
+
+const parseItalianCurrencyToNumber = (str) => {
+  if (str == null) return NaN
+  const s = String(str)
+    .replace(/€/g, '')
+    .replace(/\s+/g, '')
+  // Considera solo la parte intera prima della virgola
+  const [integerPart] = s.split(',')
+  const onlyDigits = integerPart.replace(/\./g, '').replace(/[^0-9-]/g, '')
+  const n = parseInt(onlyDigits, 10)
+  return isNaN(n) ? NaN : n
+}
+
+// Valore (modifica cantiere) formattato mentre si digita
+const displayedEditingValore = computed({
+  get: () => editingCantiere.value?.valore != null ? formatCurrencyIT(editingCantiere.value.valore) : '',
+  set: (val) => {
+    const n = parseItalianCurrencyToNumber(val)
+    if (!isNaN(n)) {
+      editingCantiere.value.valore = n
+    } else if (val === '') {
+      editingCantiere.value.valore = 0
+    }
+  }
+})
+
+// Valore (nuovo cantiere) formattato mentre si digita
+const displayedNewValore = computed({
+  get: () => newCantiere.value?.valore != null ? formatCurrencyIT(newCantiere.value.valore) : '',
+  set: (val) => {
+    const n = parseItalianCurrencyToNumber(val)
+    if (!isNaN(n)) {
+      newCantiere.value.valore = n
+    } else if (val === '') {
+      newCantiere.value.valore = 0
+    }
+  }
+})
 
 // 🚪 Helper per chiudere i modali generici
 const closeModal = () => {
@@ -2196,7 +2398,7 @@ const getMaterialStatusColor = (stato) => {
             <div class="flex justify-between items-center mb-2">
               <span class="text-gray-600 text-sm">Totale Sostenuto:</span>
               <span class="font-bold text-red-600">
-                €{{ cantiere.costiAccumulati?.totale?.toLocaleString() || '0' }} / €{{ cantiere.valore?.toLocaleString() || '0' }}
+                €{{ Math.round(cantiere.costiAccumulati?.totale || 0).toLocaleString('it-IT') }} / €{{ Math.round(cantiere.valore || 0).toLocaleString('it-IT') }}
               </span>
             </div>
             
@@ -2242,7 +2444,7 @@ const getMaterialStatusColor = (stato) => {
           </div>
           <div class="flex items-center justify-between text-sm min-w-0">
             <span class="text-gray-600 flex-shrink-0">Valore:</span>
-            <span class="font-medium truncate ml-2">€{{ cantiere.valore ? cantiere.valore.toLocaleString() : '0' }}</span>
+            <span class="font-medium truncate ml-2">€{{ Math.round(cantiere.valore || 0).toLocaleString('it-IT') }}</span>
           </div>
           <div class="flex items-center justify-between text-sm min-w-0">
             <span class="text-gray-600 flex-shrink-0">Manodopera/giorno:</span>
@@ -2406,7 +2608,7 @@ const getMaterialStatusColor = (stato) => {
                   </div>
                   <div class="flex justify-between min-w-0">
                     <span class="text-gray-600 flex-shrink-0">Valore:</span> 
-                    <span class="font-medium truncate ml-2">€{{ selectedCantiere.valore ? selectedCantiere.valore.toLocaleString() : '0' }}</span>
+                    <span class="font-medium truncate ml-2">€{{ Math.round(selectedCantiere.valore || 0).toLocaleString('it-IT') }}</span>
                   </div>
                   <div class="flex justify-between min-w-0">
                     <span class="text-gray-600 flex-shrink-0">Manodopera/giorno:</span> 
@@ -2466,7 +2668,7 @@ const getMaterialStatusColor = (stato) => {
                   <div><span class="text-gray-600">Cliente:</span> {{ getClienteNome(selectedCantiere.cliente) }}</div>
                   <div><span class="text-gray-600">Indirizzo:</span> {{ selectedCantiere.indirizzo }}</div>
                   <div><span class="text-gray-600">Tipo Lavoro:</span> {{ selectedCantiere.tipoLavoro }}</div>
-                  <div><span class="text-gray-600">Valore:</span> €{{ selectedCantiere.valore ? selectedCantiere.valore.toLocaleString() : '0' }}</div>
+                  <div><span class="text-gray-600">Valore:</span> €{{ Math.round(selectedCantiere.valore || 0).toLocaleString('it-IT') }}</div>
                   <div><span class="text-gray-600">Manodopera/giorno:</span> <span class="text-orange-600 font-medium">€{{ calculateTeamDailyCost(selectedCantiere).toLocaleString() }}</span></div>
                   <div><span class="text-gray-600">Data Inizio:</span> {{ formatDate(selectedCantiere.dataInizio) }}</div>
                   <div><span class="text-gray-600">Scadenza:</span> {{ formatDate(selectedCantiere.scadenza) }}</div>
@@ -2584,10 +2786,9 @@ const getMaterialStatusColor = (stato) => {
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Valore (€)</label>
                 <input
-                  v-model.number="editingCantiere.valore"
-                  type="number"
-                  min="0"
-                  required
+                  v-model="displayedEditingValore"
+                  inputmode="decimal"
+                  placeholder="€1.250.000"
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
                 />
               </div>
@@ -3144,10 +3345,9 @@ const getMaterialStatusColor = (stato) => {
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Valore (€)</label>
                 <input
-                  v-model.number="newCantiere.valore"
-                  type="number"
-                  min="0"
-                  required
+                  v-model="displayedNewValore"
+                  inputmode="decimal"
+                  placeholder="€1.250.000"
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
                 />
               </div>

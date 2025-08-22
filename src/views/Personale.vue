@@ -2672,10 +2672,12 @@ const saveAllPresenze = async () => {
     return
   }
 
+  popup.clearByType && popup.clearByType('info')
   info('Salvataggio in corso...', `Salvataggio di ${candidati.length} presenze modificate.`)
   const promises = candidati.map(p => savePresenza(p.dipendenteId))
   try {
     await Promise.all(promises)
+    popup.clearByType && popup.clearByType('info')
     success('Salvataggio Completato', 'Tutte le presenze sono state salvate.')
     await loadPresenze() // Ricarica presenze per aggiornare riepilogo
     await loadTimesheet() // Ricarica anche i timesheet

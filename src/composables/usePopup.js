@@ -7,15 +7,21 @@ let popupIdCounter = 0
 const createPopup = (config) => {
   console.log('🚀 Creazione popup:', config) // Debug
   
+  // Sanitizza durata per evitare popup permanenti
+  const requestedDuration = Number(config?.duration)
+  const sanitizedDuration = Number.isFinite(requestedDuration) ? requestedDuration : 2000
+  const isConfirm = !!config.isConfirm
+
   const popup = {
     id: ++popupIdCounter,
     type: config.type || 'success',
     title: config.title || '',
     message: config.message || '',
     icon: config.icon || getDefaultIcon(config.type || 'success'),
-    duration: config.duration || 2000,
+    // Per i confirm: durata sempre 0 (no auto-dismiss). Per gli altri, minimo 1200ms.
+    duration: isConfirm ? 0 : Math.max(1200, sanitizedDuration),
     visible: false,
-    isConfirm: config.isConfirm || false,
+    isConfirm,
     confirmText: config.confirmText || 'Conferma',
     cancelText: config.cancelText || 'Annulla',
     onConfirm: config.onConfirm || null,
@@ -51,6 +57,18 @@ const removePopup = (popupId) => {
       console.log('🧹 Popup rimosso. Rimanenti:', activePopups.value.length) // Debug
     }, 300)
   }
+}
+
+// Rimuove tutti i popup non di conferma
+const clearAllNonConfirm = () => {
+  const ids = activePopups.value.filter(p => !p.isConfirm).map(p => p.id)
+  ids.forEach(id => removePopup(id))
+}
+
+// Rimuove tutti i popup di un certo tipo (es. 'info') che non sono di conferma
+const clearByType = (type) => {
+  const ids = activePopups.value.filter(p => p.type === type && !p.isConfirm).map(p => p.id)
+  ids.forEach(id => removePopup(id))
 }
 
 const getDefaultIcon = (type) => {
@@ -148,6 +166,8 @@ export function usePopup() {
     info,
     confirm,
     removePopup,
+    clearAllNonConfirm,
+    clearByType,
     test
   }
 } 

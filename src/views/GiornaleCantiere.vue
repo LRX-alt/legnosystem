@@ -562,6 +562,21 @@ const costiCantiere = ref({
   costoMedioGiorno: 0
 })
 
+// Allinea il pannello "Costi Accumulati" con i dati aggiornati del cantiere
+const setLocalCostsFromCantiere = () => {
+  if (!cantiere.value?.id) return
+  const cDoc = firestoreStore.cantieri.find(c => c.id === cantiere.value.id)
+  if (!cDoc) return
+  costiCantiere.value = {
+    manodopera: Number(cDoc.costiAccumulati?.manodopera) || 0,
+    materiali: Number(cDoc.costiAccumulati?.materiali) || 0,
+    totale: Number(cDoc.costiAccumulati?.totale) || 0,
+    giorniLavorativi: Number(cDoc.statisticheCosti?.giorniLavorativi) || 0,
+    oreTotali: Number(cDoc.statisticheCosti?.oreTotaliLavorate) || 0,
+    costoMedioGiorno: Number(cDoc.statisticheCosti?.costoMedioGiornaliero) || 0
+  }
+}
+
 // NUOVO: Dati per materiali e mezzi
 const materialiDisponibili = ref([
   { id: 'mat_001', nome: 'Cemento', categoria: 'Materiali da costruzione', prezzo: 0.5, unita: 'kg' },
@@ -1063,8 +1078,9 @@ const loadGiornaleEntries = async () => {
     })
     entries.value = sortedEntries
     
-    // 🚀 CALCOLO AUTOMATICO COSTI: Calcola sia manodopera che materiali al caricamento
-    await refreshCantiereCostsFromTimesheet()
+    // 🚀 Ricalcolo costi dal Giornale per mantenere coerenza con la scheda cantiere
+    await firestoreOperations.recalculateCantiereCostsFromJournal(cantiere.value.id)
+    setLocalCostsFromCantiere()
   } catch (err) {
     error('Errore', `Caricamento registrazioni fallito: ${err.message}`)
   } finally {
@@ -1350,6 +1366,7 @@ const saveEntry = async () => {
 
   try {
     loading.value = true
+    popup.clearByType && popup.clearByType('info')
     info('Salvataggio in corso...')
     
     // 🔧 CONVERSIONE DATI: Converte problemiText in array problemi
@@ -1380,9 +1397,12 @@ const saveEntry = async () => {
     } else {
       await firestoreOperations.giornaleCantiere.create(cantiere.value.id, entryData)
     }
+    // 🔄 Recalc costi cantiere dal giornale appena salvato
+    await firestoreOperations.recalculateCantiereCostsFromJournal(cantiere.value.id)
     
     // Chiudi il modal e mostra successo immediatamente (con cleanup forzato)
     showEntryModal.value = false
+    popup.clearByType && popup.clearByType('info')
     const okPopupId = success('Registrazione Salvata', 'I dati sono stati salvati con successo', 2200)
     // Fallback cleanup nel raro caso l'auto-dismiss non scatti
     setTimeout(() => {
@@ -1407,14 +1427,12 @@ const saveEntry = async () => {
       console.warn('Notifica giornale non creata:', e)
     }
     
-    // Aggiorna in background
+    // Aggiorna in background senza sovrascrivere i costi aggregati
     Promise.all([
       loadGiornaleEntries(),
-      updateCostiCantiere(),
       syncTimesheet()
-    ]).then(async () => {
-      // 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere
-      await refreshCantiereCostsFromTimesheet()
+    ]).then(() => {
+      setLocalCostsFromCantiere()
     }).catch(console.error)
     
   } catch (err) {
@@ -1439,6 +1457,8 @@ const deleteEntry = async (entryId) => {
     loading.value = true
     
     await firestoreOperations.giornaleCantiere.delete(entryId)
+    // 🔄 Recalc costi dopo eliminazione
+    await firestoreOperations.recalculateCantiereCostsFromJournal(cantiere.value.id)
     
     const delPopupId = success('Registrazione Eliminata', 'La registrazione è stata eliminata con successo', 2200)
     setTimeout(() => {
@@ -1448,11 +1468,9 @@ const deleteEntry = async (entryId) => {
     // Aggiorna in background
     Promise.all([
       loadGiornaleEntries(),
-      updateCostiCantiere(),
       syncTimesheet()
-    ]).then(async () => {
-      // 🚀 AGGIORNAMENTO AUTOMATICO: Ricalcola i costi del cantiere
-      await refreshCantiereCostsFromTimesheet()
+    ]).then(() => {
+      setLocalCostsFromCantiere()
     }).catch(console.error)
     
   } catch (err) {

@@ -13,6 +13,7 @@
             'popup-card pointer-events-auto transform transition-all duration-300 ease-out',
             getPopupClasses(popup.type)
           ]"
+          @click="!popup.isConfirm && removePopup(popup.id)"
         >
           <!-- Popup Content Centrato -->
           <div class="flex flex-col items-center text-center space-y-3">
@@ -72,7 +73,7 @@
             <div 
               class="h-full rounded-full transition-all ease-linear"
               :class="getProgressClasses(popup.type)"
-              :style="`width: 100%; animation: popup-progress ${popup.duration}ms linear forwards;`"
+              :style="popup.duration > 0 ? `width: 100%; animation: popup-progress ${popup.duration}ms linear forwards;` : 'width: 0%;'"
             ></div>
           </div>
         </div>
