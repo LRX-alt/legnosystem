@@ -143,16 +143,7 @@
         >
           Calendario
         </button>
-        <button
-          @click="activeTab = 'controlli'"
-          :class="activeTab === 'controlli' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-          class="whitespace-nowrap py-3 px-2 border-b-2 font-medium text-base relative"
-        >
-          Controlli
-          <span v-if="incoerenze.length > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-            {{ incoerenze.length }}
-          </span>
-        </button>
+        
       </nav>
     </div>
 
@@ -874,7 +865,7 @@
     </div>
 
     <!-- Tab Content: Controlli -->
-    <div v-if="activeTab === 'controlli'" class="space-y-6">
+    <div v-if="false" class="space-y-6">
       <div class="flex items-center justify-between">
         <div>
           <h3 class="text-xl font-semibold text-gray-900">Controlli di Coerenza</h3>
@@ -2713,10 +2704,10 @@ const checkPresenceTimesheetCoherence = async () => {
   incoerenze.value = report.issues || []
   ultimoControlloCount.value = report.summary.total_issues || 0
 
-  if (incoerenze.value.length > 0 && activeTab.value !== 'controlli') {
+  if (incoerenze.value.length > 0) {
     warning(
       `${incoerenze.value.length} Incoerenze Trovate`,
-      'Sono state rilevate delle discrepanze tra presenze e timesheet. Vai alla sezione "Controlli" per i dettagli.'
+      'Sono state rilevate discrepanze tra presenze e timesheet. Puoi esaminarle dal riepilogo o nei dettagli dei timesheet.'
     )
   }
 }
