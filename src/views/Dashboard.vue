@@ -348,9 +348,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useFirestoreStore } from '@/stores/firestore'
-import { useFirestore } from '@/composables/useFirestore'
+// Legacy useFirestore rimosso in favore di store/operations
 import { useFirebaseAnalytics } from '@/composables/useFirebaseAnalytics'
 import { useFirestoreRealtime } from '@/composables/useFirestoreRealtime'
+import { useFirestoreOperations } from '@/composables/useFirestoreOperations'
 import { useAuthStore } from '@/stores/auth'
 import { usePopup } from '@/composables/usePopup'
 import { executeHoursCoherenceCheck } from '@/utils/hoursCoherenceCheck'
@@ -360,8 +361,9 @@ import { executeAutoCorrection } from '@/utils/hoursCoherenceCorrection'
 // Stores & Composables
 const authStore = useAuthStore()
 const firestoreStore = useFirestoreStore()
-const firestore = useFirestore()
+// const firestore = useFirestore()
 const analytics = useFirebaseAnalytics()
+const firestoreOperations = useFirestoreOperations()
 const realtime = useFirestoreRealtime()
 const { success, error, info, warning, confirm } = usePopup()
 
@@ -779,7 +781,13 @@ const loadDashboardData = async () => {
   
   try {
     // Carica tutti i dati da Firestore
-    await firestore.loadAllData()
+    // Carica dati principali tramite store/operations
+    await Promise.all([
+      firestoreStore.loadCantieri(),
+      firestoreStore.loadMateriali(),
+      firestoreStore.loadMezzi(),
+      firestoreStore.loadClienti()
+    ])
     
     // 🕒 Carica specificamente i timesheet per il calcolo delle ore
     console.log('📊 Caricamento timesheet per dashboard...')

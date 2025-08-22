@@ -358,7 +358,7 @@ export const useFirestore = () => {
       // Validazione dati
       const validation = validateAndSanitize('allegatoMateriale', 'update', data)
       if (!validation.isValid) {
-        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        popup.error('Dati non validi', `❌ ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 
@@ -389,7 +389,7 @@ export const useFirestore = () => {
       // Validazione dati prima della creazione
       const validation = validateAndSanitize('cliente', 'create', data)
       if (!validation.isValid) {
-        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        popup.error('Dati non validi', `❌ ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 

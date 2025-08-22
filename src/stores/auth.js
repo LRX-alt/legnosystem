@@ -496,15 +496,15 @@ export const useAuthStore = defineStore('auth', () => {
         console.warn('Impossibile creare notifica richiesta registrazione:', e)
       }
 
-      toast.success(
-        'Richiesta inviata per approvazione. Riceverai un\'email quando sarà valutata.',
-        '📨 Richiesta inviata'
+      popup.success(
+        '📨 Richiesta inviata',
+        'Richiesta inviata per approvazione. Riceverai un\'email quando sarà valutata.'
       )
       
       return { success: true }
     } catch (error) {
       console.error('Errore richiesta registrazione:', error)
-      toast.error(error.message || 'Errore durante l\'invio della richiesta', '❌ Errore Richiesta')
+      popup.error('❌ Errore Richiesta', error.message || 'Errore durante l\'invio della richiesta')
       return { success: false, error: error.message }
     } finally {
       loading.value = false
@@ -589,15 +589,15 @@ export const useAuthStore = defineStore('auth', () => {
       // Invia email di reset password per il primo accesso
       await sendPasswordResetEmail(auth, requestData.email)
       
-      toast.success(
-        `Account creato per ${requestData.name}. Email di impostazione password inviata.`,
-        '✅ Registrazione Approvata'
+      popup.success(
+        '✅ Registrazione Approvata',
+        `Account creato per ${requestData.name}. Email di impostazione password inviata.`
       )
       
       return { success: true, userId: userCredential.user.uid }
     } catch (error) {
       console.error('Errore approvazione richiesta:', error)
-      toast.error(error.message || 'Errore durante l\'approvazione', '❌ Errore Approvazione')
+      popup.error('❌ Errore Approvazione', error.message || 'Errore durante l\'approvazione')
       return { success: false, error: error.message }
     }
   }
@@ -618,11 +618,11 @@ export const useAuthStore = defineStore('auth', () => {
         notes: reason
       })
       
-      toast.success('Richiesta rifiutata', '❌ Richiesta Rifiutata')
+      popup.success('❌ Richiesta Rifiutata', 'Richiesta rifiutata')
       return { success: true }
     } catch (error) {
       console.error('Errore rifiuto richiesta:', error)
-      toast.error(error.message || 'Errore durante il rifiuto', '❌ Errore')
+      popup.error('❌ Errore', error.message || 'Errore durante il rifiuto')
       return { success: false, error: error.message }
     }
   }
@@ -660,11 +660,11 @@ export const useAuthStore = defineStore('auth', () => {
         await updateProfile(auth.currentUser, { displayName: updates.name })
       }
       
-      toast.success('Profilo aggiornato con successo', '✅ Profilo Aggiornato')
+      popup.success('✅ Profilo Aggiornato', 'Profilo aggiornato con successo')
       return { success: true }
     } catch (error) {
       console.error('Errore aggiornamento profilo:', error)
-      toast.error(`Errore aggiornamento profilo: ${error.message}`)
+      popup.error('Errore', `Errore aggiornamento profilo: ${error.message}`)
       return { success: false, error: error.message }
     }
   }
@@ -683,7 +683,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Aggiorna password
       await updatePassword(auth.currentUser, newPassword)
       
-      toast.success('Password aggiornata con successo', '✅ Password Aggiornata')
+      popup.success('✅ Password Aggiornata', 'Password aggiornata con successo')
       return { success: true }
     } catch (error) {
       console.error('Errore cambio password:', error)
@@ -700,7 +700,7 @@ export const useAuthStore = defineStore('auth', () => {
           errorMessage = error.message
       }
       
-      toast.error(errorMessage, '❌ Errore Password')
+      popup.error('❌ Errore Password', errorMessage)
       return { success: false, error: errorMessage }
     }
   }

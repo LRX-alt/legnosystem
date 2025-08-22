@@ -1,10 +1,10 @@
 import { useFirestoreStore } from '@/stores/firestore'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 
 export class MigrationManager {
   constructor() {
     this.firestoreStore = useFirestoreStore()
-    this.toast = useToast()
+    this.popup = usePopup()
     this.migrationLog = []
   }
 
@@ -199,17 +199,14 @@ export class MigrationManager {
       this.log(`✅ Migrazione completata: ${totalMigrated} elementi migrati, ${totalErrors} errori`)
       
       if (!dryRun) {
-        this.toast.success(
-          `✅ Migrazione completata con successo! ${totalMigrated} elementi migrati a Firestore`,
-          '🚀 Migrazione Completata'
-        )
+        this.popup.success('🚀 Migrazione Completata', `✅ Migrazione completata con successo! ${totalMigrated} elementi migrati a Firestore`)
       }
 
       return summary
 
     } catch (error) {
       this.log(`❌ Errore fatale migrazione: ${error.message}`)
-      this.toast.error(`❌ Errore migrazione: ${error.message}`)
+      this.popup.error('❌ Errore Migrazione', `Errore migrazione: ${error.message}`)
       throw error
     }
   }

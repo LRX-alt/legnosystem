@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useFirestore } from '@/composables/useFirestore'
+// Legacy useFirestore rimosso in favore di store/operations
 import { useFirestoreRealtime } from '@/composables/useFirestoreRealtime'
 import { usePopup } from '@/composables/usePopup'
 // import { useToast } from '@/composables/useToast'
@@ -30,7 +30,7 @@ import { useModalEsc } from '@/composables/useModalEsc'
 const router = useRouter()
 const popup = usePopup()
 // const { showToast } = useToast()
-const firestore = useFirestore()
+// const firestore = useFirestore()
 const firestoreRealtime = useFirestoreRealtime()
 const firestoreStore = useFirestoreStore()
 const firestoreOperations = useFirestoreOperations()
@@ -416,7 +416,7 @@ onMounted(async () => {
     unsubscribeCantieri.value = unsubscribe
 
     // Carica i clienti disponibili
-    const clientiResult = await firestore.clientiOperations.load()
+    const clientiResult = await firestoreOperations.load('clienti')
     if (clientiResult.success) {
       availableClients.value = clientiResult.data
     }

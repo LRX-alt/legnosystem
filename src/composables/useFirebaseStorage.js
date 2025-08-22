@@ -231,7 +231,7 @@ export const useFirebaseStorage = () => {
 
     if (errors.length > 0) {
       console.warn('Errori upload multiplo:', errors)
-      toast.warning(`${errors.length} file non caricati`, '⚠️ Upload Parziale')
+      popup.warning('⚠️ Upload Parziale', `${errors.length} file non caricati`)
     }
 
     return {
@@ -250,7 +250,7 @@ export const useFirebaseStorage = () => {
       currentUploadTask.value = null
       isUploading.value = false
       uploadProgress.value = 0
-      toast.info('Upload annullato', '🚫 Annullato')
+      popup.info('🚫 Annullato', 'Upload annullato')
     }
   }
 
