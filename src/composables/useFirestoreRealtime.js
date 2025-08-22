@@ -12,11 +12,11 @@ import {
   disableNetwork
 } from 'firebase/firestore'
 import { db } from '@/config/firebase'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 import { useAuthStore } from '@/stores/auth'
 
 export const useFirestoreRealtime = () => {
-  const toast = useToast()
+  const popup = usePopup()
   const authStore = useAuthStore()
   
   // State per listeners attivi
@@ -38,7 +38,7 @@ export const useFirestoreRealtime = () => {
   const handleReconnect = async () => {
     if (!canReconnect.value) {
       console.error('❌ Numero massimo di tentativi di riconnessione raggiunto')
-      toast.error('Impossibile riconnettersi al server. Ricarica la pagina.')
+      popup.error('Errore Connessione', 'Impossibile riconnettersi al server. Ricarica la pagina.')
       return false
     }
 
@@ -266,7 +266,7 @@ export const useFirestoreRealtime = () => {
       },
       onError: (error) => {
         console.error('❌ Errore listener cantieri:', error)
-        toast.error(`Errore sincronizzazione cantieri: ${error.message}`)
+        popup.error('Errore sincronizzazione', `Errore sincronizzazione cantieri: ${error.message}`)
       }
     })
   }
@@ -276,7 +276,7 @@ export const useFirestoreRealtime = () => {
     return listenToDocument('cantieri', cantiereId, {
       onData: onUpdate,
       onError: (error) => {
-        toast.error(`Errore sincronizzazione cantiere: ${error.message}`)
+        popup.error('Errore sincronizzazione', `Errore sincronizzazione cantiere: ${error.message}`)
       }
     })
   }

@@ -247,7 +247,7 @@ import {
   ArrowDownTrayIcon, 
   TrashIcon 
 } from '@heroicons/vue/24/outline'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 import { useFirestoreStore } from '@/stores/firestore'
 import { usePopup } from '@/composables/usePopup'
 
@@ -258,7 +258,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const toast = useToast()
+const popup = usePopup()
 const { success, error, confirm } = usePopup()
 const firestoreStore = useFirestoreStore()
 

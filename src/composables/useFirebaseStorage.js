@@ -10,11 +10,11 @@ import {
   updateMetadata
 } from 'firebase/storage'
 import { storage, storagePaths } from '@/config/firebase'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 import { useAuthStore } from '@/stores/auth'
 
 export const useFirebaseStorage = () => {
-  const toast = useToast()
+  const popup = usePopup()
   const authStore = useAuthStore()
   
   // State
@@ -162,7 +162,7 @@ export const useFirebaseStorage = () => {
                 errorMessage = error.message
             }
             
-            toast.error(errorMessage, '❌ Errore Upload')
+            popup.error('❌ Errore Upload', errorMessage)
             reject(new Error(errorMessage))
           },
           // Complete
@@ -186,7 +186,7 @@ export const useFirebaseStorage = () => {
               currentUploadTask.value = null
               uploadProgress.value = 100
               
-              toast.success(`File "${file.name}" caricato con successo`, '✅ Upload Completato')
+              popup.success('✅ Upload Completato', `File "${file.name}" caricato con successo`)
               resolve(result)
             } catch (error) {
               reject(error)
@@ -198,7 +198,7 @@ export const useFirebaseStorage = () => {
       isUploading.value = false
       currentUploadTask.value = null
       console.error('Errore upload file:', error)
-      toast.error(`Errore upload: ${error.message}`)
+      popup.error('Errore Upload', `Errore upload: ${error.message}`)
       throw error
     }
   }
@@ -266,7 +266,7 @@ export const useFirebaseStorage = () => {
       const fileRef = storageRef(storage, path)
       await deleteObject(fileRef)
       
-      toast.success('File eliminato con successo', '🗑️ File Eliminato')
+      popup.success('🗑️ File Eliminato', 'File eliminato con successo')
       return { success: true }
     } catch (error) {
       console.error('Errore eliminazione file:', error)
@@ -283,7 +283,7 @@ export const useFirebaseStorage = () => {
           errorMessage = error.message
       }
       
-      toast.error(errorMessage, '❌ Errore Eliminazione')
+      popup.error('❌ Errore Eliminazione', errorMessage)
       throw new Error(errorMessage)
     }
   }

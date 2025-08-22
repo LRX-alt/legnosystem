@@ -516,7 +516,7 @@ const route = useRoute()
 const popup = usePopup()
 const { success, error, warning, info, confirm, removePopup } = popup
 const firestoreOperations = useFirestoreOperations()
-const fsStore = useFirestoreStore()
+const firestoreStore = useFirestoreStore()
 
 // Reactive state
 const loading = ref(false)
@@ -1391,7 +1391,7 @@ const saveEntry = async () => {
     
     // 🔔 Notifica automatica: nuova registrazione giornale
     try {
-      await fsStore.createNotification({
+      await firestoreStore.createNotification({
         type: 'giornale_create',
         message: `Giornale salvato per ${cantiere.value.nome} - ${entryData.data}`,
         recipients: ['admin'],

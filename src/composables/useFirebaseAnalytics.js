@@ -8,11 +8,11 @@ import {
 } from 'firebase/analytics'
 import { analytics } from '@/config/firebase'
 import { useAuthStore } from '@/stores/auth'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 
 export const useFirebaseAnalytics = () => {
   const authStore = useAuthStore()
-  const toast = useToast()
+  const popup = usePopup()
   
   // State
   const isEnabled = ref(true)
@@ -373,7 +373,7 @@ export const useFirebaseAnalytics = () => {
     await setAnalyticsEnabled(consent)
     
     if (consent) {
-      toast.success('Raccolta dati abilitata', '📊 Analytics')
+      popup.success('📊 Analytics', 'Raccolta dati abilitata')
     } else {
       toast.info('Raccolta dati disabilitata', '🔒 Privacy')
     }

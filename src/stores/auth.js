@@ -17,12 +17,12 @@ import {
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp, collection, addDoc, getDocs, query, where, orderBy } from 'firebase/firestore'
 import { auth, db, firestoreConfig, rolesConfig } from '@/config/firebase'
 import { useFirestoreStore } from '@/stores/firestore'
-import { useToast } from '@/composables/useToast'
+import { usePopup } from '@/composables/usePopup'
 import { validateEmail } from '@/utils/firestoreValidation'
 
 export const useAuthStore = defineStore('auth', () => {
   const firestoreStore = useFirestoreStore()
-  const toast = useToast()
+  const popup = usePopup()
   
   // 🔐 State
   const user = ref(null)
@@ -154,7 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (error) {
       console.error('Errore nel caricamento profilo utente:', error)
-      toast.error(`Errore caricamento profilo: ${error.message}`)
+      popup.error('Errore', `Errore caricamento profilo: ${error.message}`)
     }
   }
 
@@ -180,7 +180,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       
       handleSessionTimeout()
-      toast.success(`Benvenuto ${userProfile.value?.name || user.value.email}!`, '✅ Accesso Effettuato')
+      popup.success('✅ Accesso Effettuato', `Benvenuto ${userProfile.value?.name || user.value.email}!`)
       return { success: true, user: userCredential.user }
     } catch (error) {
       console.error('Errore login:', error)
@@ -206,7 +206,7 @@ export const useAuthStore = defineStore('auth', () => {
           errorMessage = error.message
       }
       
-      toast.error(errorMessage, '❌ Errore Accesso')
+      popup.error('❌ Errore Accesso', errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
@@ -244,7 +244,7 @@ export const useAuthStore = defineStore('auth', () => {
       
       await setDoc(doc(db, firestoreConfig.collections.userProfiles, userCredential.user.uid), profileData)
       
-      toast.success(`Account creato con successo! Benvenuto ${profileData.name}!`, '✅ Registrazione Completata')
+      popup.success('✅ Registrazione Completata', `Account creato con successo! Benvenuto ${profileData.name}!`)
       return { success: true, user: userCredential.user }
     } catch (error) {
       console.error('Errore registrazione:', error)
@@ -264,7 +264,7 @@ export const useAuthStore = defineStore('auth', () => {
           errorMessage = error.message
       }
       
-      toast.error(errorMessage, '❌ Errore Registrazione')
+      popup.error('❌ Errore Registrazione', errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
@@ -355,7 +355,7 @@ export const useAuthStore = defineStore('auth', () => {
   const resetPassword = async (email) => {
     try {
       await sendPasswordResetEmail(auth, email)
-      toast.success('Email di reset password inviata. Controlla la tua casella di posta.', '📧 Reset Password')
+      popup.success('📧 Reset Password', 'Email di reset password inviata. Controlla la tua casella di posta.')
       return { success: true }
     } catch (error) {
       console.error('Errore reset password:', error)
@@ -372,7 +372,7 @@ export const useAuthStore = defineStore('auth', () => {
           errorMessage = error.message
       }
       
-      toast.error(errorMessage, '❌ Errore Reset')
+      popup.error('❌ Errore Reset', errorMessage)
       return { success: false, error: errorMessage }
     }
   }

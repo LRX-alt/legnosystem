@@ -1,4 +1,4 @@
-import { useToast } from './useToast'
+import { usePopup } from './usePopup'
 import { useFirestoreStore } from '@/stores/firestore'
 import { validateAndSanitize } from '@/utils/firestoreValidation'
 import { serverTimestamp, writeBatch, doc, increment } from 'firebase/firestore'
@@ -16,7 +16,7 @@ const removeUndefinedFields = (obj) => {
 }
 
 export const useFirestore = () => {
-  const toast = useToast()
+  const popup = usePopup()
   const firestoreStore = useFirestoreStore()
   const authStore = useAuthStore()
 
@@ -33,7 +33,7 @@ export const useFirestore = () => {
       return result
     } catch (error) {
       console.error(`❌ ${operationName}:`, error)
-      toast.error(`❌ ${operationName} fallita: ${error.message}`)
+      popup.error('Errore', `❌ ${operationName} fallita: ${error.message}`)
       throw error
     } finally {
       firestoreStore.loading = false
@@ -53,25 +53,25 @@ export const useFirestore = () => {
       // Validazione completa dei dati prima della creazione
       const validation = validateAndSanitize('cantiere', 'create', data)
       if (!validation.isValid) {
-        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        popup.error('Dati non validi', `❌ ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 
       // Verifica presenza cliente
       if (!validation.sanitizedData.cliente?.id) {
-        toast.error('❌ Cliente mancante o non valido')
+        popup.error('Dati non validi', '❌ Cliente mancante o non valido')
         throw new Error('Cliente mancante o non valido')
       }
 
       // Verifica date
       if (new Date(validation.sanitizedData.scadenza) <= new Date(validation.sanitizedData.dataInizio)) {
-        toast.error('❌ La data di scadenza deve essere successiva alla data di inizio')
+        popup.error('Dati non validi', '❌ La data di scadenza deve essere successiva alla data di inizio')
         throw new Error('Data scadenza non valida')
       }
 
       // Verifica valore cantiere
       if (isNaN(parseFloat(validation.sanitizedData.valore)) || parseFloat(validation.sanitizedData.valore) <= 0) {
-        toast.error('❌ Il valore del cantiere deve essere un numero positivo')
+        popup.error('Dati non validi', '❌ Il valore del cantiere deve essere un numero positivo')
         throw new Error('Valore cantiere non valido')
       }
 
@@ -79,7 +79,7 @@ export const useFirestore = () => {
       const userId = authStore.user?.uid
 
       if (!userId) {
-        toast.error('❌ Utente non autenticato')
+        popup.error('Autenticazione', '❌ Utente non autenticato')
         throw new Error('Utente non autenticato')
       }
 
@@ -112,14 +112,14 @@ export const useFirestore = () => {
       // Validazione dati prima dell'aggiornamento
       const validation = validateAndSanitize('cantiere', 'update', cleanedData)
       if (!validation.isValid) {
-        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        popup.error('Dati non validi', `❌ ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 
       // Verifica date se presenti
       if (validation.sanitizedData.scadenza && validation.sanitizedData.dataInizio) {
         if (new Date(validation.sanitizedData.scadenza) <= new Date(validation.sanitizedData.dataInizio)) {
-          toast.error('❌ La data di scadenza deve essere successiva alla data di inizio')
+          popup.error('Dati non validi', '❌ La data di scadenza deve essere successiva alla data di inizio')
           throw new Error('Data scadenza non valida')
         }
       }
@@ -141,7 +141,7 @@ export const useFirestore = () => {
       // Verifica che il cantiere non abbia dipendenze
       const hasDependencies = await firestoreStore.checkCantiereDependencies(id)
       if (hasDependencies) {
-        toast.error('❌ Impossibile eliminare il cantiere: ci sono materiali o allegati associati')
+        popup.error('Operazione non consentita', '❌ Impossibile eliminare il cantiere: ci sono materiali o allegati associati')
         throw new Error('Cantiere ha dipendenze')
       }
 
@@ -154,7 +154,7 @@ export const useFirestore = () => {
     async updateProgress(id, progressData) {
       // Validazione dati progresso
       if (!progressData.data || !progressData.descrizione) {
-        toast.error('❌ Data e descrizione sono obbligatori per aggiornare il progresso')
+        popup.error('Dati non validi', '❌ Data e descrizione sono obbligatori per aggiornare il progresso')
         throw new Error('Dati progresso incompleti')
       }
 
@@ -220,7 +220,7 @@ export const useFirestore = () => {
       })
       
       if (!validation.isValid) {
-        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        popup.error('Dati non validi', `❌ ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 
@@ -255,7 +255,7 @@ export const useFirestore = () => {
       // Validazione dati
       const validation = validateAndSanitize('materialeCantiere', 'update', data)
       if (!validation.isValid) {
-        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        popup.error('Dati non validi', `❌ ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 
@@ -344,7 +344,7 @@ export const useFirestore = () => {
       })
       
       if (!validation.isValid) {
-        toast.error(`❌ Dati non validi: ${validation.errors.join(', ')}`)
+        popup.error('Dati non validi', `❌ ${validation.errors.join(', ')}`)
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
       }
 
