@@ -528,7 +528,7 @@
               <div>
                 <h4 class="font-semibold text-gray-900 text-base">{{ dipendente.nome }} {{ dipendente.cognome }}</h4>
                 <p class="text-base text-gray-600">{{ getRuoloLabel(dipendente.ruolo, dipendente.ruoloPersonalizzato) }}</p>
-                <p class="text-sm text-gray-500">{{ dipendente.cantiereAttuale || 'Nessun cantiere' }}</p>
+                <p class="text-sm text-gray-500">{{ getCantiereAttualeDisplay(dipendente) }}</p>
               </div>
             </div>
             
@@ -2442,11 +2442,40 @@ const getTimesheetForDipendente = (dipendenteId) => {
 }
 
 const getCantieriAssegnati = (dipendenteId) => {
-  const cantieri = new Set()
+  const cantieriAssegnati = new Set()
+  const existingById = new Set((firestoreStore.cantieri || []).map(c => String(c.id)))
+  const existingByName = new Set((firestoreStore.cantieri || []).map(c => c.nome))
+
   timesheetDettagli.value
-    .filter(t => t.dipendenteId === dipendenteId && (t.cantiere || t.cantiereNome))
-    .forEach(t => cantieri.add(t.cantiere || t.cantiereNome))
-  return Array.from(cantieri)
+    .filter(t => t.dipendenteId === dipendenteId)
+    .forEach(t => {
+      const tId = t.cantiereId != null ? String(t.cantiereId) : null
+      const tName = t.cantiere || t.cantiereNome
+
+      // Considera solo cantieri ancora esistenti
+      if ((tId && existingById.has(tId)) || (tName && existingByName.has(tName))) {
+        // Se esiste ID, mostra il nome ufficiale aggiornato
+        if (tId) {
+          const found = (firestoreStore.cantieri || []).find(c => String(c.id) === tId)
+          if (found?.nome) {
+            cantieriAssegnati.add(found.nome)
+            return
+          }
+        }
+        if (tName) {
+          cantieriAssegnati.add(tName)
+        }
+      }
+    })
+
+  return Array.from(cantieriAssegnati)
+}
+
+const getCantiereAttualeDisplay = (dipendente) => {
+  const name = dipendente?.cantiereAttuale
+  if (!name) return 'Nessuno'
+  const exists = (firestoreStore.cantieri || []).some(c => c.nome === name)
+  return exists ? name : 'Nessuno'
 }
 
 const viewSchedule = (dipendente) => {
