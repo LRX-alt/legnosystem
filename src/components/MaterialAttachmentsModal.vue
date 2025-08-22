@@ -249,7 +249,6 @@ import {
 } from '@heroicons/vue/24/outline'
 import { usePopup } from '@/composables/usePopup'
 import { useFirestoreStore } from '@/stores/firestore'
-import { usePopup } from '@/composables/usePopup'
 
 const props = defineProps({
   isOpen: Boolean,
