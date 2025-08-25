@@ -154,6 +154,13 @@ service cloud.firestore {
       allow write: if isAuthenticated() && hasPermission('manage_dipendenti');
     }
     
+    // 💼 Centri di costo (cantieri e mansioni interne)
+    match /centri_costo/{centroId} {
+      allow read: if isAuthenticated();
+      // Gestione consentita a admin e manager
+      allow write: if isAuthenticated() && (hasRoleLevel(80) || isAdmin());
+    }
+    
     // 💰 Fatture
     match /fatture/{fatturaId} {
       allow read: if isAuthenticated() && hasPermission('view_fatture');

@@ -564,6 +564,23 @@
                 </p>
               </div>
               
+              <!-- Centro di costo -->
+              <div class="text-left">
+                <p class="text-sm text-gray-500 mb-1">Centro di costo</p>
+                <select
+                  v-model="presenze[dipendente.id].centroSelezionato"
+                  class="w-56 px-3 py-2 border border-gray-300 rounded text-base focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">Seleziona...</option>
+                  <optgroup label="Cantieri">
+                    <option v-for="opt in cantieriOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </optgroup>
+                  <optgroup label="Mansioni">
+                    <option v-for="opt in mansioniOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </optgroup>
+                </select>
+              </div>
+              
               <!-- Stato presenza -->
               <div class="text-center">
                 <p class="text-sm text-gray-500 mb-1">Stato</p>
@@ -646,6 +663,21 @@
                   <option value="ferie">Ferie</option>
                   <option value="malattia">Malattia</option>
                   <option value="permesso">Permesso</option>
+                </select>
+              </div>
+              <div class="col-span-2">
+                <label class="block text-sm text-gray-500 mb-1">Centro di costo</label>
+                <select
+                  v-model="presenze[dipendente.id].centroSelezionato"
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg text-base focus:ring-primary-500 focus:border-primary-500"
+                >
+                  <option value="">Seleziona...</option>
+                  <optgroup label="Cantieri">
+                    <option v-for="opt in cantieriOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </optgroup>
+                  <optgroup label="Mansioni">
+                    <option v-for="opt in mansioniOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -2495,7 +2527,8 @@ const loadPresenze = async () => {
             entrata: '',
             uscita: '',
             pausa: 0,
-            note: ''
+            note: '',
+            centroSelezionato: ''
           }
         }
       })
@@ -2607,7 +2640,16 @@ const savePresenza = async (dipendenteId) => {
         data: selectedDate.value,
         ore: ore,
         oreLavorate: ore,
-        cantiere: dipendente.cantiereAttuale || 'Sede',
+        // Centro di costo derivato dalla presenza (selezione giornaliera)
+        cantiere: (() => {
+          const sel = presenzaData.centroSelezionato || ''
+          const tipo = sel.split(':')[0]
+          const label = sel.split(':')[2]
+          return tipo === 'CANTIERE' ? (label || dipendente.cantiereAttuale || 'Sede') : undefined
+        })(),
+        centroCostoId: (() => (presenzaData.centroSelezionato || '').split(':')[1] || null)(),
+        centroCostoNome: (() => (presenzaData.centroSelezionato || '').split(':')[2] || null)(),
+        centroCostoTipo: (() => (presenzaData.centroSelezionato || '').split(':')[0] || null)(),
         note: `Generato da presenze: ${presenzaData.note || ''}`,
         costoOrario: dipendente.pagaOraria || 25,
         costoTotale: ore * (dipendente.pagaOraria || 25),

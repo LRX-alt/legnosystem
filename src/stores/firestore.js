@@ -44,6 +44,9 @@ export const useFirestoreStore = defineStore('firestore', () => {
   const dipendenti = ref([])
   const timesheet = ref([])
   const presenze = ref([])
+
+  // 💼 Centri di costo (cantieri o mansioni)
+  const centriCosto = ref([])
   
   // 🚚 Fornitori
   const fornitori = ref([])
@@ -362,6 +365,32 @@ export const useFirestoreStore = defineStore('firestore', () => {
     }
     
     return await createDocument(firestoreConfig.collections.cantieri, data)
+  }
+
+  // 💼 Metodi per Centri di Costo
+  const loadCentriCosto = async () => {
+    const result = await loadCollection(firestoreConfig.collections.centriCosto)
+    if (result.success) {
+      centriCosto.value = result.data
+    }
+    return result
+  }
+
+  const createCentroCosto = async (centroData) => {
+    const data = {
+      ...centroData,
+      tipo: centroData.tipo || 'MANSIONE', // 'CANTIERE' o 'MANSIONE'
+      stato: centroData.stato || 'attivo'
+    }
+    return await createDocument(firestoreConfig.collections.centriCosto, data)
+  }
+
+  const updateCentroCosto = async (centroId, updateData) => {
+    return await updateDocument(firestoreConfig.collections.centriCosto, centroId, updateData)
+  }
+
+  const archiveCentroCosto = async (centroId) => {
+    return await updateDocument(firestoreConfig.collections.centriCosto, centroId, { stato: 'archiviato' })
   }
 
   const updateCantiereProgress = async (cantiereId, progressData) => {
@@ -1166,6 +1195,7 @@ export const useFirestoreStore = defineStore('firestore', () => {
     // State
     loading,
     error,
+    centriCosto,
     cantieri,
     cantieriProgress,
     clienti,
@@ -1200,6 +1230,12 @@ export const useFirestoreStore = defineStore('firestore', () => {
     loadCantieri,
     createCantiere,
     updateCantiereProgress,
+
+    // Centri di costo
+    loadCentriCosto,
+    createCentroCosto,
+    updateCentroCosto,
+    archiveCentroCosto,
     
     // Clienti
     loadClienti,
