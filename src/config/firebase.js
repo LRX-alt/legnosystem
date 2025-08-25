@@ -89,6 +89,8 @@ export const firestoreConfig = {
     dipendenti: 'dipendenti',
     timesheet: 'timesheet',
     presenze: 'presenze',
+    // 💼 Centri di costo (Cantieri e Mansioni interne)
+    centriCosto: 'centri_costo',
     
     // 🚚 Gestione fornitori e mezzi
     fornitori: 'fornitori',
