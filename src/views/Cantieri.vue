@@ -66,6 +66,7 @@ const newCantiere = ref({
   },
   indirizzo: '',
   tipoLavoro: '',
+  tipoLavoroPersonalizzato: '',
   valore: 0,
   dataInizio: '',
   scadenza: '',
@@ -210,6 +211,28 @@ const getTipoLabel = (tipo) => {
   }
   return labels[tipo] || tipo
 }
+
+// Computed properties per gestire il tipo di lavoro personalizzato
+const showTipoLavoroPersonalizzato = computed(() => {
+  return newCantiere.value.tipoLavoro === 'Altro'
+})
+
+const showEditingTipoLavoroPersonalizzato = computed(() => {
+  return editingCantiere.value?.tipoLavoro === 'Altro'
+})
+
+// Watcher per resettare il campo personalizzato quando si cambia la selezione
+watch(() => newCantiere.value.tipoLavoro, (newValue) => {
+  if (newValue !== 'Altro') {
+    newCantiere.value.tipoLavoroPersonalizzato = ''
+  }
+})
+
+watch(() => editingCantiere.value?.tipoLavoro, (newValue) => {
+  if (newValue !== 'Altro') {
+    editingCantiere.value.tipoLavoroPersonalizzato = ''
+  }
+})
 
 // 🔧 Helper per gestire il campo cliente (compatibilità oggetto/stringa)
 const getClienteNome = (cliente) => {
@@ -1408,6 +1431,7 @@ const resetNewCantiere = () => {
     },
     indirizzo: '',
     tipoLavoro: '',
+    tipoLavoroPersonalizzato: '',
     valore: 0,
     dataInizio: '',
     scadenza: '',
@@ -1433,9 +1457,22 @@ const showCantiereDetail = (cantiere) => {
 }
 
 const editCantiere = (cantiere) => {
+  // Gestisci il tipo di lavoro personalizzato per la modifica
+  let tipoLavoro = cantiere.tipoLavoro
+  let tipoLavoroPersonalizzato = ''
+  
+  // Se il tipo di lavoro non è uno dei valori standard, è un tipo personalizzato
+  const tipiStandard = ['Rifacimento Completo', 'Nuova Costruzione', 'Restauro Conservativo', 'Manutenzione']
+  if (!tipiStandard.includes(cantiere.tipoLavoro)) {
+    tipoLavoro = 'Altro'
+    tipoLavoroPersonalizzato = cantiere.tipoLavoro
+  }
+
   // Crea una copia profonda per gestire correttamente l'oggetto cliente
   editingCantiere.value = {
     ...cantiere,
+    tipoLavoro: tipoLavoro,
+    tipoLavoroPersonalizzato: tipoLavoroPersonalizzato,
     cliente: typeof cantiere.cliente === 'object' && cantiere.cliente 
       ? { ...cantiere.cliente }
       : { nome: cantiere.cliente || '' }
@@ -1709,6 +1746,12 @@ const addCantiere = async () => {
       return
     }
 
+    // Validazione tipo di lavoro personalizzato
+    if (newCantiere.value.tipoLavoro === 'Altro' && !newCantiere.value.tipoLavoroPersonalizzato) {
+      popup.error('Tipo Lavoro Mancante', 'Specifica il tipo di lavoro personalizzato')
+      return
+    }
+
     // Prepara i dati del cliente
     let clienteData
     if (clientSelectionMode.value === 'existing') {
@@ -1751,9 +1794,16 @@ const addCantiere = async () => {
       }
     }
 
+    // Gestisci il tipo di lavoro personalizzato
+    let tipoLavoroFinale = newCantiere.value.tipoLavoro
+    if (newCantiere.value.tipoLavoro === 'Altro' && newCantiere.value.tipoLavoroPersonalizzato) {
+      tipoLavoroFinale = newCantiere.value.tipoLavoroPersonalizzato
+    }
+
     // Crea il cantiere con i dati del cliente
     const cantiereData = {
       ...newCantiere.value,
+      tipoLavoro: tipoLavoroFinale,
       cliente: clienteData
     }
 
@@ -1813,11 +1863,29 @@ const saveCantiereChanges = async () => {
       return
     }
 
+    // Validazione tipo di lavoro personalizzato
+    if (editingCantiere.value.tipoLavoro === 'Altro' && !editingCantiere.value.tipoLavoroPersonalizzato) {
+      popup.error('Tipo Lavoro Mancante', 'Specifica il tipo di lavoro personalizzato')
+      return
+    }
+
     loading.value = true
     popup.info('Salvataggio in corso...')
 
+    // Gestisci il tipo di lavoro personalizzato
+    let tipoLavoroFinale = editingCantiere.value.tipoLavoro
+    if (editingCantiere.value.tipoLavoro === 'Altro' && editingCantiere.value.tipoLavoroPersonalizzato) {
+      tipoLavoroFinale = editingCantiere.value.tipoLavoroPersonalizzato
+    }
+
+    // Prepara i dati da salvare
+    const datiDaSalvare = {
+      ...editingCantiere.value,
+      tipoLavoro: tipoLavoroFinale
+    }
+
     // Aggiorna direttamente il documento del cantiere
-    await firestoreOperations.update('cantieri', editingCantiere.value.id, editingCantiere.value)
+    await firestoreOperations.update('cantieri', editingCantiere.value.id, datiDaSalvare)
 
     // Ricarica la lista cantieri per riflettere i dati aggiornati
     await firestoreStore.loadCantieri().catch(() => {})
@@ -2781,6 +2849,7 @@ const getMaterialStatusColor = (stato) => {
                   <option value="Nuova Costruzione">Nuova Costruzione</option>
                   <option value="Restauro Conservativo">Restauro Conservativo</option>
                   <option value="Manutenzione">Manutenzione</option>
+                  <option value="Altro">Altro</option>
                 </select>
               </div>
               <div>
@@ -2792,6 +2861,18 @@ const getMaterialStatusColor = (stato) => {
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
                 />
               </div>
+            </div>
+
+            <!-- Campo Tipo Lavoro Personalizzato -->
+            <div v-if="showEditingTipoLavoroPersonalizzato" class="w-full">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Specifica Tipo Lavoro</label>
+              <input
+                v-model="editingCantiere.tipoLavoroPersonalizzato"
+                type="text"
+                required
+                placeholder="Inserisci il tipo di lavoro personalizzato..."
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
             </div>
 
             <!-- Riga 2: Date -->
@@ -3340,6 +3421,7 @@ const getMaterialStatusColor = (stato) => {
                   <option value="Nuova Costruzione">Nuova Costruzione</option>
                   <option value="Restauro Conservativo">Restauro Conservativo</option>
                   <option value="Manutenzione">Manutenzione</option>
+                  <option value="Altro">Altro</option>
                 </select>
               </div>
               <div>
@@ -3351,6 +3433,18 @@ const getMaterialStatusColor = (stato) => {
                   class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
                 />
               </div>
+            </div>
+
+            <!-- Campo Tipo Lavoro Personalizzato -->
+            <div v-if="showTipoLavoroPersonalizzato" class="w-full">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Specifica Tipo Lavoro</label>
+              <input
+                v-model="newCantiere.tipoLavoroPersonalizzato"
+                type="text"
+                required
+                placeholder="Inserisci il tipo di lavoro personalizzato..."
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 text-base"
+              />
             </div>
 
             <!-- Riga 2: Date -->
